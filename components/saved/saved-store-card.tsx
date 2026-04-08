@@ -60,11 +60,6 @@ export function SavedStoreCard({
             <Text numberOfLines={1} style={styles.storeName}>
               {store.store_name}
             </Text>
-            {store.verified ? (
-              <View style={styles.verifiedPill}>
-                <Text style={styles.verifiedPillText}>Verified</Text>
-              </View>
-            ) : null}
           </View>
 
           <Text numberOfLines={1} style={styles.categoryText}>
@@ -140,19 +135,6 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     fontSize: 18,
     fontWeight: "600",
-  },
-  verifiedPill: {
-    backgroundColor: "rgba(16, 185, 129, 0.15)",
-    borderRadius: theme.radius.pill,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  verifiedPillText: {
-    color: "#d1fae5",
-    fontSize: 10,
-    fontWeight: "600",
-    letterSpacing: 1.6,
-    textTransform: "uppercase",
   },
   categoryText: {
     color: "#cbd5e1",

@@ -21,7 +21,6 @@ export type SearchProductResult = {
   store_name?: string | null;
   variant?: string | null;
   variant_name?: string | null;
-  verified?: boolean | null;
 };
 
 type SearchApiEnvelope = {

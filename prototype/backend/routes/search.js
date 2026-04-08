@@ -138,7 +138,6 @@ function buildSearchResults(rows, { hasCoords, userLat, userLng }) {
     address: item.address,
     latitude: item.latitude,
     longitude: item.longitude,
-    verified: item.verified,
     product_id: item.product_id,
     product_name: item.product_name,
     description: item.description,
@@ -227,7 +226,6 @@ router.get("/", async (req, res) => {
           stores.address,
           stores.latitude,
           stores.longitude,
-          stores.verified,
           stores.image_url AS store_image_url,
           NULL::integer AS product_id,
           NULL::text AS product_name,
@@ -244,7 +242,7 @@ router.get("/", async (req, res) => {
         WHERE
           stores.store_name ILIKE $1
           OR COALESCE(stores.category, '') ILIKE $1
-        ORDER BY stores.verified DESC, stores.store_name ASC
+        ORDER BY stores.store_name ASC
         LIMIT $2
       `;
 
@@ -256,7 +254,6 @@ router.get("/", async (req, res) => {
           stores.address,
           stores.latitude,
           stores.longitude,
-          stores.verified,
           stores.image_url AS store_image_url,
           products.id AS product_id,
           products.product_name,
@@ -286,7 +283,7 @@ router.get("/", async (req, res) => {
           OR COALESCE(products.category, '') ILIKE $1
           OR COALESCE(stores.store_name, '') ILIKE $1
           OR COALESCE(stores.category, '') ILIKE $1
-        ORDER BY stores.verified DESC, stores.store_name ASC, products.product_name ASC
+        ORDER BY stores.store_name ASC, products.product_name ASC
         LIMIT $2
       `;
 
@@ -298,7 +295,6 @@ router.get("/", async (req, res) => {
           stores.address,
           stores.latitude,
           stores.longitude,
-          stores.verified,
           stores.image_url AS store_image_url,
           products.id AS product_id,
           products.product_name,
@@ -318,7 +314,7 @@ router.get("/", async (req, res) => {
           COALESCE(product_variants.variant_name, '') ILIKE $1
           OR COALESCE(products.product_name, '') ILIKE $1
           OR COALESCE(stores.store_name, '') ILIKE $1
-        ORDER BY stores.verified DESC, stores.store_name ASC, products.product_name ASC
+        ORDER BY stores.store_name ASC, products.product_name ASC
         LIMIT $2
       `;
 
@@ -387,7 +383,6 @@ router.get("/", async (req, res) => {
         stores.address,
         stores.latitude,
         stores.longitude,
-        stores.verified,
         stores.image_url AS store_image_url,
         NULL::integer AS product_id,
         NULL::text AS product_name,
@@ -404,7 +399,7 @@ router.get("/", async (req, res) => {
       WHERE
         stores.store_name ILIKE $1
         OR COALESCE(stores.category, '') ILIKE $1
-      ORDER BY stores.verified DESC, stores.store_name ASC
+      ORDER BY stores.store_name ASC
       LIMIT $2
     `;
 
@@ -416,7 +411,6 @@ router.get("/", async (req, res) => {
         stores.address,
         stores.latitude,
         stores.longitude,
-        stores.verified,
         stores.image_url AS store_image_url,
         products.id AS product_id,
         products.product_name,
@@ -452,7 +446,7 @@ router.get("/", async (req, res) => {
         OR COALESCE(products.category, '') ILIKE $1
         OR COALESCE(stores.store_name, '') ILIKE $1
         OR COALESCE(stores.category, '') ILIKE $1
-      ORDER BY stores.verified DESC, stores.store_name ASC, products.product_name ASC
+      ORDER BY stores.store_name ASC, products.product_name ASC
       LIMIT $2
     `;
 
@@ -464,7 +458,6 @@ router.get("/", async (req, res) => {
         stores.address,
         stores.latitude,
         stores.longitude,
-        stores.verified,
         stores.image_url AS store_image_url,
         products.id AS product_id,
         products.product_name,
@@ -484,7 +477,7 @@ router.get("/", async (req, res) => {
         COALESCE(product_variants.variant_name, '') ILIKE $1
         OR COALESCE(products.product_name, '') ILIKE $1
         OR COALESCE(stores.store_name, '') ILIKE $1
-      ORDER BY stores.verified DESC, stores.store_name ASC, products.product_name ASC
+      ORDER BY stores.store_name ASC, products.product_name ASC
       LIMIT $2
     `;
 

@@ -13,8 +13,6 @@ export type SavedStoreRecord = {
   phone_number?: string | null;
   store_id: number;
   store_name: string;
-  subscription_tier?: number | null;
-  verified?: boolean;
 };
 
 export type RecentStoreRecord = {
@@ -24,7 +22,6 @@ export type RecentStoreRecord = {
   phone_number?: string | null;
   store_id: number;
   store_name: string;
-  verified?: boolean;
   viewed_at: string;
 };
 
@@ -35,6 +32,15 @@ const MAX_RECENT_STORES = 8;
 type CollectionState = {
   recentStores: RecentStoreRecord[];
   savedStores: SavedStoreRecord[];
+};
+
+type PublicStoreRecord = {
+  address?: string | null;
+  category?: string | null;
+  id: number;
+  image_url?: string | null;
+  phone_number?: string | null;
+  store_name: string;
 };
 
 let collectionState: CollectionState = {
@@ -93,9 +99,6 @@ function normalizeSavedStore(value: unknown): SavedStoreRecord | null {
     phone_number: typeof raw.phone_number === "string" ? raw.phone_number : null,
     store_id: storeId,
     store_name: raw.store_name,
-    subscription_tier:
-      typeof raw.subscription_tier === "number" ? raw.subscription_tier : null,
-    verified: typeof raw.verified === "boolean" ? raw.verified : false,
   };
 }
 
@@ -125,9 +128,118 @@ function normalizeRecentStore(value: unknown): RecentStoreRecord | null {
     phone_number: typeof raw.phone_number === "string" ? raw.phone_number : null,
     store_id: storeId,
     store_name: raw.store_name,
-    verified: typeof raw.verified === "boolean" ? raw.verified : false,
     viewed_at: raw.viewed_at,
   };
+}
+
+function normalizePublicStore(value: unknown): PublicStoreRecord | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const raw = value as Partial<PublicStoreRecord> & { id?: unknown };
+  const storeId =
+    typeof raw.id === "number"
+      ? raw.id
+      : Number.parseInt(String(raw.id || ""), 10);
+
+  if (!Number.isFinite(storeId) || typeof raw.store_name !== "string") {
+    return null;
+  }
+
+  return {
+    address: typeof raw.address === "string" ? raw.address : null,
+    category: typeof raw.category === "string" ? raw.category : null,
+    id: storeId,
+    image_url: typeof raw.image_url === "string" ? raw.image_url : null,
+    phone_number: typeof raw.phone_number === "string" ? raw.phone_number : null,
+    store_name: raw.store_name,
+  };
+}
+
+async function fetchCurrentPublicStores() {
+  const result = await requestMobileApi<{ stores?: unknown[] }>("/stores", {
+    method: "GET",
+  });
+
+  if (!result.ok) {
+    return null;
+  }
+
+  return Array.isArray(result.data.stores)
+    ? result.data.stores
+        .map((item) => normalizePublicStore(item))
+        .filter((item): item is PublicStoreRecord => item !== null)
+    : [];
+}
+
+function buildPublicStoreIndexes(stores: PublicStoreRecord[]) {
+  return {
+    byId: new Map(stores.map((store) => [store.id, store])),
+    byName: new Map(
+      stores.map((store) => [store.store_name.trim().toLowerCase(), store]),
+    ),
+  };
+}
+
+function reconcileSavedStoreRecords(
+  stores: SavedStoreRecord[],
+  availableStores: PublicStoreRecord[],
+) {
+  const { byId, byName } = buildPublicStoreIndexes(availableStores);
+  const reconciledStores: SavedStoreRecord[] = [];
+
+  stores.forEach((store) => {
+    const currentStore =
+      byId.get(store.store_id) ??
+      byName.get(store.store_name.trim().toLowerCase());
+
+    if (!currentStore) {
+      return;
+    }
+
+    reconciledStores.push({
+      ...store,
+      address: currentStore.address ?? store.address ?? null,
+      category: currentStore.category ?? store.category ?? null,
+      image_url: currentStore.image_url ?? store.image_url ?? null,
+      phone_number: currentStore.phone_number ?? store.phone_number ?? null,
+      store_id: currentStore.id,
+      store_name: currentStore.store_name,
+    });
+  });
+
+  return sortSavedStores(reconciledStores);
+}
+
+function reconcileRecentStoreRecords(
+  stores: RecentStoreRecord[],
+  availableStores: PublicStoreRecord[],
+) {
+  const { byId, byName } = buildPublicStoreIndexes(availableStores);
+  const reconciledStores: RecentStoreRecord[] = [];
+
+  stores.forEach((store) => {
+    const currentStore =
+      byId.get(store.store_id) ??
+      byName.get(store.store_name.trim().toLowerCase());
+
+    if (!currentStore) {
+      return;
+    }
+
+    reconciledStores.push({
+      ...store,
+      address: currentStore.address ?? store.address ?? null,
+      category: currentStore.category ?? store.category ?? null,
+      image_url: currentStore.image_url ?? store.image_url ?? null,
+      phone_number: currentStore.phone_number ?? store.phone_number ?? null,
+      store_id: currentStore.id,
+      store_name: currentStore.store_name,
+    });
+  });
+
+  return sortRecentStores(reconciledStores).slice(0, MAX_RECENT_STORES);
 }
 
 function sortSavedStores(stores: SavedStoreRecord[]) {
@@ -272,7 +384,6 @@ export async function trackRecentStoreVisit(store: {
   image_url?: string | null;
   phone_number?: string | null;
   store_name: string;
-  verified?: boolean;
 }) {
   const currentStores = await readStoredRecentStores();
   const nextStores = currentStores.filter((item) => item.store_id !== store.id);
@@ -283,7 +394,6 @@ export async function trackRecentStoreVisit(store: {
     phone_number: store.phone_number ?? null,
     store_id: store.id,
     store_name: store.store_name,
-    verified: Boolean(store.verified),
     viewed_at: new Date().toISOString(),
   });
   await persistRecentStores(nextStores);
@@ -301,7 +411,20 @@ export async function loadSavedStoresForSession() {
     return [];
   }
 
-  const localStores = await readStoredSavedStores();
+  let localStores = await readStoredSavedStores();
+  const currentPublicStores = await fetchCurrentPublicStores();
+
+  if (currentPublicStores) {
+    const reconciledStores = reconcileSavedStoreRecords(
+      localStores,
+      currentPublicStores,
+    );
+
+    if (JSON.stringify(reconciledStores) !== JSON.stringify(localStores)) {
+      await persistSavedStores(reconciledStores);
+      localStores = reconciledStores;
+    }
+  }
 
   if (!session.authToken) {
     return localStores;
@@ -315,7 +438,23 @@ export async function loadSavedStoresForSession() {
 }
 
 export async function loadRecentStoresForSession() {
-  return readStoredRecentStores();
+  const localStores = await readStoredRecentStores();
+  const currentPublicStores = await fetchCurrentPublicStores();
+
+  if (!currentPublicStores) {
+    return localStores;
+  }
+
+  const reconciledStores = reconcileRecentStoreRecords(
+    localStores,
+    currentPublicStores,
+  );
+
+  if (JSON.stringify(reconciledStores) !== JSON.stringify(localStores)) {
+    await persistRecentStores(reconciledStores);
+  }
+
+  return reconciledStores;
 }
 
 export async function getSavedStores(token: string) {
@@ -345,7 +484,6 @@ export async function saveStore(token: string, store: {
   image_url?: string | null;
   phone_number?: string | null;
   store_name: string;
-  verified?: boolean;
 }) {
   const result = await requestMobileApi<{ message?: string }>("/saved-stores", {
     body: { store_id: store.id },
@@ -365,7 +503,6 @@ export async function saveStore(token: string, store: {
     phone_number: store.phone_number ?? null,
     store_id: store.id,
     store_name: store.store_name,
-    verified: Boolean(store.verified),
   });
 
   return result.data;

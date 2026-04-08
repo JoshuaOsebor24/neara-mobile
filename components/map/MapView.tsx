@@ -90,6 +90,7 @@ export function NearaMapView({
   isLoading,
   mapRecenterKey = 0,
   onMapMoveStart,
+  onMapMoveEnd,
   onRequestLocation,
   onSelectStore,
   permissionStatus,
@@ -105,6 +106,7 @@ export function NearaMapView({
   mapRecenterKey?: number;
   disableGestures?: boolean;
   onMapMoveStart?: () => void;
+  onMapMoveEnd?: () => void;
   onRequestLocation: () => void;
   onSelectStore?: (storeId: string) => void;
   permissionStatus: LocationPermissionState;
@@ -137,8 +139,7 @@ export function NearaMapView({
   );
 
   useEffect(() => {
-    if (focusedRegion) {
-      setUserInteracted(false);
+    if (focusedRegion && !userInteracted) {
       setDisplayRegion(focusedRegion);
       return;
     }
@@ -183,6 +184,7 @@ export function NearaMapView({
             : (nextRegion) => {
                 setUserInteracted(true);
                 setDisplayRegion(nextRegion);
+                onMapMoveEnd?.();
               }
         }
         maxZoomLevel={19}

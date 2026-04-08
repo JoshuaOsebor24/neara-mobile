@@ -113,8 +113,6 @@ router.get("/", authMiddleware, async (req, res) => {
         stores.latitude,
         stores.longitude,
         stores.phone_number,
-        stores.verified,
-        stores.subscription_tier,
         stores.image_url,
         saved_stores.created_at
       FROM saved_stores

@@ -55,6 +55,7 @@ type LastAddedProduct = {
 };
 
 const CATEGORY_OPTIONS = [
+  "Custom",
   "drink",
   "snack",
   "juice",
@@ -69,7 +70,6 @@ const CATEGORY_OPTIONS = [
   "toiletries",
   "cleaning",
   "beauty",
-  "Others",
 ];
 
 function createVariantId() {
@@ -90,6 +90,17 @@ function buildSelectedImageValue(asset: ImagePicker.ImagePickerAsset) {
   }
 
   return asset.uri;
+}
+
+function normalizeCustomCategoryValues(value: string) {
+  return Array.from(
+    new Set(
+      value
+        .split(",")
+        .map((item) => item.trim().toLowerCase())
+        .filter(Boolean),
+    ),
+  );
 }
 
 function VariantRows({
@@ -326,7 +337,7 @@ export default function AddStoreProductScreen() {
       .filter(Boolean)
       .slice(0, 4);
     const knownCategories = incomingCategories.filter(
-      (item) => item !== "Others" && CATEGORY_OPTIONS.includes(item),
+      (item) => item !== "Custom" && CATEGORY_OPTIONS.includes(item),
     );
     const unknownCategories = incomingCategories.filter(
       (item) => !CATEGORY_OPTIONS.includes(item),
@@ -337,10 +348,10 @@ export default function AddStoreProductScreen() {
     setPrice(defaultVariant?.price || "");
     setSelectedCategories(
       unknownCategories.length > 0
-        ? [...knownCategories, "Others"]
+        ? ["Custom", ...knownCategories]
         : knownCategories,
     );
-    setCustomCategory(unknownCategories[0] || "");
+    setCustomCategory(unknownCategories.join(", "));
     setDescription(product.description || "");
     setImageUrl(product.image_url || "");
     setVariants(defaultVariant ? [] : variantDrafts);
@@ -490,14 +501,13 @@ export default function AddStoreProductScreen() {
     }
 
     const normalizedCategoryValues = [
-      ...selectedCategories.filter((item) => item !== "Others"),
-      ...(selectedCategories.includes("Others") && customCategory.trim()
-        ? [customCategory.trim().toLowerCase()]
+      ...selectedCategories
+        .filter((item) => item !== "Custom")
+        .map((item) => item.trim().toLowerCase()),
+      ...(selectedCategories.includes("Custom")
+        ? normalizeCustomCategoryValues(customCategory)
         : []),
-    ]
-      .map((item) => item.trim().toLowerCase())
-      .filter(Boolean)
-      .slice(0, 4);
+    ].slice(0, 4);
 
     if (normalizedCategoryValues.length === 0) {
       setNotice({
@@ -845,15 +855,20 @@ export default function AddStoreProductScreen() {
                     Choose up to 4 categories. Exact name matches still rank
                     first in search, then category matches.
                   </Text>
-                  {selectedCategories.includes("Others") ? (
-                    <TextInput
-                      editable={!isSubmitting && !isLoadingProduct}
-                      onChangeText={setCustomCategory}
-                      placeholder="Enter custom category"
-                      placeholderTextColor={theme.colors.mutedText}
-                      style={styles.input}
-                      value={customCategory}
-                    />
+                  {selectedCategories.includes("Custom") ? (
+                    <>
+                      <TextInput
+                        editable={!isSubmitting && !isLoadingProduct}
+                        onChangeText={setCustomCategory}
+                        placeholder="Enter custom categories, separated by commas"
+                        placeholderTextColor={theme.colors.mutedText}
+                        style={styles.input}
+                        value={customCategory}
+                      />
+                      <Text style={styles.helperText}>
+                        Separate multiple custom categories with commas.
+                      </Text>
+                    </>
                   ) : null}
                 </View>
 

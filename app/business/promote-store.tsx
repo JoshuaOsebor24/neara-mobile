@@ -1,6 +1,6 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo } from "react";
 import {
   ScrollView,
   StyleSheet,
@@ -10,15 +10,10 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { buildSessionPatchFromStore, refreshMobileSessionFromBackend } from "@/services/auth-api";
-import { navigateBackOrFallback } from "@/services/navigation";
-import { updateMobileSession, useMobileSession } from "@/services/mobile-session";
-import { updateStoreWithBackend } from "@/services/store-api";
-
-type Notice = {
-  text: string;
-  type: "error" | "success";
-} | null;
+import { BackPillButton } from "@/components/ui/back-pill-button";
+import {
+  useMobileSession,
+} from "@/services/mobile-session";
 
 interface FeatureCardProps {
   title: string;
@@ -91,9 +86,6 @@ const FeatureCard: React.FC<FeatureCardProps> = ({
 export default function PromoteStorePage() {
   const router = useRouter();
   const session = useMobileSession();
-  const [notice, setNotice] = useState<Notice>(null);
-  const [isSubmittingVerification, setIsSubmittingVerification] =
-    useState(false);
 
   useEffect(() => {
     if (!session.isAuthenticated) {
@@ -111,71 +103,15 @@ export default function PromoteStorePage() {
       session.isStoreOwner && session.primaryStoreId
         ? {
             id: Number(session.primaryStoreId),
-            verified: session.storeVerified,
             name: session.primaryStoreName || "Your store",
-            planLabel:
-              session.storePlan === "verified" ? "Verified Store" : "Basic Store",
           }
         : null,
     [
       session.isStoreOwner,
       session.primaryStoreId,
       session.primaryStoreName,
-      session.storePlan,
-      session.storeVerified,
     ],
   );
-
-  const handleGetVerified = async () => {
-    if (
-      !selectedOwnerStore ||
-      isSubmittingVerification ||
-      !session.authToken ||
-      !session.primaryStoreId
-    ) {
-      return;
-    }
-
-    if (selectedOwnerStore.verified) {
-      setNotice({
-        text: "You are already verified ✔",
-        type: "success",
-      });
-      return;
-    }
-
-    setIsSubmittingVerification(true);
-    setNotice(null);
-
-    const result = await updateStoreWithBackend(
-      session.authToken,
-      session.primaryStoreId,
-      {
-        verified: true,
-      },
-    );
-
-    if (!result.ok || !result.store) {
-      setIsSubmittingVerification(false);
-      setNotice({
-        text: result.error || "Could not update verification.",
-        type: "error",
-      });
-      return;
-    }
-
-    updateMobileSession({
-      ...buildSessionPatchFromStore(result.store),
-      storePlan: "verified",
-      storeVerified: Boolean(result.store.verified),
-    });
-    await refreshMobileSessionFromBackend();
-    setIsSubmittingVerification(false);
-    setNotice({
-      text: result.message || "Your store is now verified ✔",
-      type: "success",
-    });
-  };
 
   const handleLearnMore = async () => {
     router.push("/help");
@@ -185,7 +121,11 @@ export default function PromoteStorePage() {
     return (
       <SafeAreaView edges={["top"]} style={styles.safeArea}>
         <LinearGradient
-          colors={["rgba(34, 197, 94, 0.16)", "transparent", "rgba(2, 6, 23, 1)"]}
+          colors={[
+            "rgba(34, 197, 94, 0.16)",
+            "transparent",
+            "rgba(2, 6, 23, 1)",
+          ]}
           start={{ x: 0.5, y: 0 }}
           end={{ x: 0.5, y: 1 }}
           style={styles.container}
@@ -218,12 +158,7 @@ export default function PromoteStorePage() {
         >
           {/* Header */}
           <View style={styles.header}>
-            <TouchableOpacity
-              style={styles.backButton}
-              onPress={() => navigateBackOrFallback(router, "/(tabs)/profile")}
-            >
-              <Text style={styles.backButtonText}>← Back</Text>
-            </TouchableOpacity>
+            <BackPillButton fallbackHref="/(tabs)/profile" />
             <Text style={styles.nearaBrand}>NEARA</Text>
           </View>
 
@@ -239,61 +174,14 @@ export default function PromoteStorePage() {
               {selectedOwnerStore ? (
                 <View style={styles.storePill}>
                   <Text style={styles.storePillText}>
-                    {selectedOwnerStore.name} • {selectedOwnerStore.planLabel}
+                    {selectedOwnerStore.name}
                   </Text>
                 </View>
               ) : null}
             </View>
 
-            {/* Notice */}
-            {notice && (
-              <View
-                style={[
-                  styles.notice,
-                  notice.type === "success"
-                    ? styles.noticeSuccess
-                    : styles.noticeError,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.noticeText,
-                    notice.type === "success"
-                      ? styles.noticeSuccessText
-                      : styles.noticeErrorText,
-                  ]}
-                >
-                  {notice.text}
-                </Text>
-              </View>
-            )}
-
             {/* Feature Cards */}
             <View style={styles.cardsContainer}>
-              <FeatureCard
-                title="Get Verified"
-                description="Build trust with customers and stand out from other stores."
-                price="₦2,000 / month"
-                badge="Recommended"
-                features={[
-                  "Everything in Basic",
-                  "Verified badge",
-                  "Increased customer trust",
-                  "Higher chance of being chosen",
-                ]}
-                actionLabel={
-                  selectedOwnerStore?.verified
-                    ? "You are already verified ✔"
-                    : isSubmittingVerification
-                      ? "Activating verification..."
-                      : "Get Verified"
-                }
-                onAction={handleGetVerified}
-                isDisabled={
-                  isSubmittingVerification || Boolean(selectedOwnerStore?.verified)
-                }
-              />
-
               <FeatureCard
                 title="Advertise on App"
                 description="Show your offers to customers who are already interested in your store."
@@ -418,33 +306,6 @@ const styles = StyleSheet.create({
     marginTop: 12,
     textAlign: "center",
     lineHeight: 21,
-  },
-  notice: {
-    marginTop: 16,
-    marginBottom: 16,
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  noticeSuccess: {
-    backgroundColor: "rgba(34, 197, 94, 0.12)",
-    borderWidth: 1,
-    borderColor: "rgba(134, 239, 172, 0.3)",
-  },
-  noticeError: {
-    backgroundColor: "rgba(239, 68, 68, 0.12)",
-    borderWidth: 1,
-    borderColor: "rgba(248, 113, 113, 0.3)",
-  },
-  noticeText: {
-    fontSize: 14,
-    fontWeight: "500",
-  },
-  noticeSuccessText: {
-    color: "#86efac",
-  },
-  noticeErrorText: {
-    color: "#fca5a5",
   },
   cardsContainer: {
     gap: 20,

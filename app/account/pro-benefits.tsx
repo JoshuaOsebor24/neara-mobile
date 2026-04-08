@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { BackPillButton } from "@/components/ui/back-pill-button";
 import { theme } from "@/constants/theme";
 import { useMobileSession } from "@/services/mobile-session";
 
@@ -50,13 +51,7 @@ export default function ProBenefitsScreen() {
       >
         <View style={styles.page}>
           <View style={styles.header}>
-            <TouchableOpacity
-              activeOpacity={0.85}
-              onPress={() => router.back()}
-              style={styles.backButton}
-            >
-              <Text style={styles.backButtonText}>← Back</Text>
-            </TouchableOpacity>
+            <BackPillButton fallbackHref="/(tabs)/home" />
             <Text style={styles.headerTitle}>Pro Benefits</Text>
             <View style={styles.headerSpacer} />
           </View>

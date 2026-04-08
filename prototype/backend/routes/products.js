@@ -6,45 +6,6 @@ const authMiddleware = require("../middleware/authMiddleware");
 
 const router = express.Router();
 
-const ALLOWED_TAGS = [
-  "drink",
-  "soft drink",
-  "juice",
-  "water",
-  "orange",
-  "soda",
-  "energy drink",
-  "tea",
-  "coffee",
-  "snack",
-  "cereal",
-  "dairy",
-  "bread",
-  "rice",
-  "frozen food",
-  "fruit",
-  "vegetable",
-  "spice",
-  "canned food",
-  "breakfast",
-  "baby product",
-  "electronics",
-  "charger",
-  "cable",
-  "earphones",
-  "phone accessory",
-  "battery",
-  "usb-c",
-  "fashion",
-  "beauty",
-  "personal care",
-  "cleaning",
-  "detergent",
-  "tissue",
-  "toiletries",
-  "kitchen item",
-];
-
 const pool = require("../config/db");
 
 function normalizeText(value) {
@@ -243,15 +204,6 @@ router.post("/", authMiddleware, async (req, res) => {
     ) {
       return res.status(400).json({
         message: "quantity_available must be a valid quantity",
-      });
-    }
-
-    const invalidTags = normalizedTags.filter((tag) => !ALLOWED_TAGS.includes(tag));
-
-    if (invalidTags.length > 0) {
-      return res.status(400).json({
-        message: "Invalid tags selected",
-        invalidTags,
       });
     }
 
@@ -568,15 +520,6 @@ router.put("/:id", authMiddleware, async (req, res) => {
 
     const finalTags =
       tags !== undefined ? normalizeTagList(tags) : product.tags || [];
-
-    const invalidTags = finalTags.filter((tag) => !ALLOWED_TAGS.includes(tag));
-
-    if (invalidTags.length > 0) {
-      return res.status(400).json({
-        message: "Invalid tags selected",
-        invalidTags,
-      });
-    }
 
     // Authorization: confirm requesting user is the store owner
     if (Number(product.owner_id) !== userId) {

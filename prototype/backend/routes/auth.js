@@ -153,8 +153,6 @@ async function findExistingOwnerStore(client, userId) {
         country,
         latitude,
         longitude,
-        verified,
-        subscription_tier,
         created_at
       FROM stores
       WHERE owner_id = $1
@@ -1275,7 +1273,7 @@ router.post("/register-owner", async (req, res) => {
       `INSERT INTO stores
         (owner_id, store_name, category, phone_number, description, image_url, header_images, address, state, country, latitude, longitude)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-       RETURNING id, owner_id, store_name, category, phone_number, description, image_url, header_images, address, state, country, latitude, longitude, verified, subscription_tier, created_at`,
+       RETURNING id, owner_id, store_name, category, phone_number, description, image_url, header_images, address, state, country, latitude, longitude, created_at`,
       [
         user.id,
         storeName,

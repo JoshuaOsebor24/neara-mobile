@@ -17,7 +17,10 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { StoreLocationPicker, type StoreCoordinates } from "@/components/map/store-location-picker";
+import {
+  StoreLocationPicker,
+  type StoreCoordinates,
+} from "@/components/map/store-location-picker";
 import { theme } from "@/constants/theme";
 import {
   buildSessionPatchFromAuthUser,
@@ -30,8 +33,10 @@ import {
   getCurrentUserLocation,
   requestForegroundLocationPermission,
 } from "@/services/location";
-import { updateMobileSession, useMobileSession } from "@/services/mobile-session";
-import { createStoreWithBackend } from "@/services/store-api";
+import {
+  updateMobileSession,
+  useMobileSession,
+} from "@/services/mobile-session";
 import {
   fetchPlaceSuggestions,
   geocodePlace,
@@ -39,6 +44,7 @@ import {
   hasPlaceAutocompleteToken,
   type PlaceSuggestion,
 } from "@/services/place-autocomplete";
+import { createStoreWithBackend } from "@/services/store-api";
 
 type RegisterErrors = {
   address?: string;
@@ -119,7 +125,9 @@ function getRegisterFieldError(
       return undefined;
     }
 
-    return value.length >= 6 ? undefined : "Use a password with at least 6 characters.";
+    return value.length >= 6
+      ? undefined
+      : "Use a password with at least 6 characters.";
   }
 
   if (field === "confirmPassword") {
@@ -141,7 +149,9 @@ function getRegisterFieldError(
   if (field === "ownerPhone" || field === "storePhone") {
     const digits = value.replace(/\D/g, "");
     if (!digits) {
-      return field === "ownerPhone" ? "Owner phone is required." : "Store phone is required.";
+      return field === "ownerPhone"
+        ? "Owner phone is required."
+        : "Store phone is required.";
     }
 
     return digits.length >= 7 ? undefined : "Enter a valid phone number.";
@@ -168,7 +178,9 @@ function getRegisterFieldError(
       return undefined;
     }
 
-    return value.trim().length >= 3 ? undefined : "Enter a clearer location search.";
+    return value.trim().length >= 3
+      ? undefined
+      : "Enter a clearer location search.";
   }
 
   if (field === "description") {
@@ -203,7 +215,11 @@ function buildStoreImageSlots(images: string[]) {
   return [...normalized, ""];
 }
 
-function buildAddressLookupQuery(address: string, stateRegion: string, country: string) {
+function buildAddressLookupQuery(
+  address: string,
+  stateRegion: string,
+  country: string,
+) {
   const normalizedAddress = address.trim();
   const normalizedAddressLower = normalizedAddress.toLowerCase();
 
@@ -222,13 +238,16 @@ function buildAddressLookupQuery(address: string, stateRegion: string, country: 
 export default function SignupScreen() {
   const router = useRouter();
   const session = useMobileSession();
-  const params = useLocalSearchParams<{ paymentStatus?: string; storePlan?: string }>();
+  const params = useLocalSearchParams<{
+    paymentStatus?: string;
+    storePlan?: string;
+  }>();
   const selectedStorePlan =
-    params.storePlan === "basic" || params.storePlan === "verified"
+    params.storePlan === "basic"
       ? params.storePlan
-      : session.storePlan === "basic" || session.storePlan === "verified"
+      : session.storePlan === "basic"
         ? session.storePlan
-      : null;
+        : null;
   const [name, setName] = useState(session.name || "");
   const [email, setEmail] = useState(session.email || "");
   const [ownerPhone, setOwnerPhone] = useState(session.phoneNumber || "");
@@ -251,19 +270,26 @@ export default function SignupScreen() {
   const [notice, setNotice] = useState<Notice>(null);
   const [errors, setErrors] = useState<RegisterErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [locationCoordinates, setLocationCoordinates] = useState<StoreCoordinates | null>(null);
+  const [locationCoordinates, setLocationCoordinates] =
+    useState<StoreCoordinates | null>(null);
   const [locationMessage, setLocationMessage] = useState(
     "Add an address, use current location, or place the pin manually on the map.",
   );
   const [isLocationConfirmed, setIsLocationConfirmed] = useState(false);
   const [isUsingCurrentLocation, setIsUsingCurrentLocation] = useState(false);
-  const [addressSuggestions, setAddressSuggestions] = useState<PlaceSuggestion[]>([]);
-  const [addressSearchState, setAddressSearchState] = useState<AddressSearchState>("idle");
-  const [addressSearchErrorMessage, setAddressSearchErrorMessage] = useState("");
+  const [addressSuggestions, setAddressSuggestions] = useState<
+    PlaceSuggestion[]
+  >([]);
+  const [addressSearchState, setAddressSearchState] =
+    useState<AddressSearchState>("idle");
+  const [addressSearchErrorMessage, setAddressSearchErrorMessage] =
+    useState("");
   const [isAddressSearching, setIsAddressSearching] = useState(false);
   const [isAddressInputFocused, setIsAddressInputFocused] = useState(false);
   const [isPickingImage, setIsPickingImage] = useState(false);
-  const [editingImageIndex, setEditingImageIndex] = useState<number | null>(null);
+  const [editingImageIndex, setEditingImageIndex] = useState<number | null>(
+    null,
+  );
   const addressSearchRequestIdRef = useRef(0);
 
   const trimmedName = name.trim();
@@ -277,39 +303,41 @@ export default function SignupScreen() {
   const trimmedStateRegion = stateRegion.trim();
   const trimmedAddress = address.trim();
   const trimmedDescription = description.trim();
-  const imageSlots = useMemo(() => buildStoreImageSlots(storeImages), [storeImages]);
-  const canSubmit =
-    selectedStorePlan
-      ? trimmedName.length > 0 &&
-        trimmedEmail.length > 0 &&
-        trimmedOwnerPhone.length > 0 &&
-        trimmedStoreName.length > 0 &&
-        trimmedCategory.length > 0 &&
-        trimmedStorePhone.length > 0 &&
-        trimmedCountry.length > 0 &&
-        trimmedStateRegion.length > 0 &&
-        trimmedDescription.length > 0 &&
-        !errors.name &&
-        !errors.email &&
-        !errors.password &&
-        !errors.confirmPassword &&
-        !errors.ownerPhone &&
-        !errors.storeName &&
-        !errors.category &&
-        !errors.storePhone &&
-        !errors.country &&
-        !errors.stateRegion &&
-        !errors.description &&
-        !isSubmitting
-      : trimmedName.length > 0 &&
-        trimmedEmail.length > 0 &&
-        trimmedPassword.length >= 6 &&
-        confirmPassword.trim().length > 0 &&
-        !errors.name &&
-        !errors.email &&
-        !errors.password &&
-        !errors.confirmPassword &&
-        !isSubmitting;
+  const imageSlots = useMemo(
+    () => buildStoreImageSlots(storeImages),
+    [storeImages],
+  );
+  const canSubmit = selectedStorePlan
+    ? trimmedName.length > 0 &&
+      trimmedEmail.length > 0 &&
+      trimmedOwnerPhone.length > 0 &&
+      trimmedStoreName.length > 0 &&
+      trimmedCategory.length > 0 &&
+      trimmedStorePhone.length > 0 &&
+      trimmedCountry.length > 0 &&
+      trimmedStateRegion.length > 0 &&
+      trimmedDescription.length > 0 &&
+      !errors.name &&
+      !errors.email &&
+      !errors.password &&
+      !errors.confirmPassword &&
+      !errors.ownerPhone &&
+      !errors.storeName &&
+      !errors.category &&
+      !errors.storePhone &&
+      !errors.country &&
+      !errors.stateRegion &&
+      !errors.description &&
+      !isSubmitting
+    : trimmedName.length > 0 &&
+      trimmedEmail.length > 0 &&
+      trimmedPassword.length >= 6 &&
+      confirmPassword.trim().length > 0 &&
+      !errors.name &&
+      !errors.email &&
+      !errors.password &&
+      !errors.confirmPassword &&
+      !isSubmitting;
 
   const canContinueOwnerStep =
     trimmedName.length > 0 &&
@@ -341,7 +369,11 @@ export default function SignupScreen() {
       ? !canContinueOwnerStep
       : ownerStep === 1
         ? !canContinueStoreStep
-        : !(Boolean(locationCoordinates) && isLocationConfirmed && !isSubmitting)
+        : !(
+            Boolean(locationCoordinates) &&
+            isLocationConfirmed &&
+            !isSubmitting
+          )
     : !canSubmit;
 
   const activeOwnerStep = OWNER_STEP_META[ownerStep];
@@ -576,21 +608,21 @@ export default function SignupScreen() {
             ? password
             : field === "confirmPassword"
               ? confirmPassword
-            : field === "ownerPhone"
-              ? ownerPhone
-              : field === "storeName"
-                ? storeName
-                : field === "category"
-                  ? category
-                  : field === "storePhone"
-                    ? storePhone
-                    : field === "country"
-                      ? country
-                    : field === "stateRegion"
-                      ? stateRegion
-                      : field === "description"
-                        ? description
-                        : address;
+              : field === "ownerPhone"
+                ? ownerPhone
+                : field === "storeName"
+                  ? storeName
+                  : field === "category"
+                    ? category
+                    : field === "storePhone"
+                      ? storePhone
+                      : field === "country"
+                        ? country
+                        : field === "stateRegion"
+                          ? stateRegion
+                          : field === "description"
+                            ? description
+                            : address;
 
     setErrors((current) => {
       const next = { ...current };
@@ -723,7 +755,9 @@ export default function SignupScreen() {
         return;
       }
 
-      updateMobileSession(buildSessionPatchFromAuthUser(result.user, result.token));
+      updateMobileSession(
+        buildSessionPatchFromAuthUser(result.user, result.token),
+      );
       setIsSubmitting(false);
       setNotice({
         type: "success",
@@ -734,12 +768,15 @@ export default function SignupScreen() {
     }
 
     if (session.isAuthenticated && session.authToken) {
-      const accountUpdateResult = await updateCurrentUserWithBackend(session.authToken, {
-        email: trimmedEmail.toLowerCase(),
-        name: trimmedName,
-        password: trimmedPassword || undefined,
-        phone_number: trimmedOwnerPhone,
-      });
+      const accountUpdateResult = await updateCurrentUserWithBackend(
+        session.authToken,
+        {
+          email: trimmedEmail.toLowerCase(),
+          name: trimmedName,
+          password: trimmedPassword || undefined,
+          phone_number: trimmedOwnerPhone,
+        },
+      );
 
       if (!accountUpdateResult.ok) {
         setIsSubmitting(false);
@@ -751,23 +788,31 @@ export default function SignupScreen() {
       }
 
       updateMobileSession(
-        buildSessionPatchFromAuthUser(accountUpdateResult.user, session.authToken),
+        buildSessionPatchFromAuthUser(
+          accountUpdateResult.user,
+          session.authToken,
+        ),
       );
 
-      const normalizedStoreImages = storeImages.filter(Boolean).slice(0, STORE_IMAGE_LIMIT);
-      const storeCreateResult = await createStoreWithBackend(session.authToken, {
-        address: trimmedAddress,
-        category: trimmedCategory,
-        country: trimmedCountry,
-        description: trimmedDescription,
-        header_images: normalizedStoreImages,
-        image_url: normalizedStoreImages[0] || null,
-        latitude: locationCoordinates?.latitude ?? null,
-        longitude: locationCoordinates?.longitude ?? null,
-        phone_number: trimmedStorePhone,
-        state: trimmedStateRegion,
-        store_name: trimmedStoreName,
-      });
+      const normalizedStoreImages = storeImages
+        .filter(Boolean)
+        .slice(0, STORE_IMAGE_LIMIT);
+      const storeCreateResult = await createStoreWithBackend(
+        session.authToken,
+        {
+          address: trimmedAddress,
+          category: trimmedCategory,
+          country: trimmedCountry,
+          description: trimmedDescription,
+          header_images: normalizedStoreImages,
+          image_url: normalizedStoreImages[0] || null,
+          latitude: locationCoordinates?.latitude ?? null,
+          longitude: locationCoordinates?.longitude ?? null,
+          phone_number: trimmedStorePhone,
+          state: trimmedStateRegion,
+          store_name: trimmedStoreName,
+        },
+      );
 
       if (!storeCreateResult.ok || !storeCreateResult.store) {
         setIsSubmitting(false);
@@ -783,18 +828,23 @@ export default function SignupScreen() {
         isStoreOwner: true,
         phoneNumber: trimmedOwnerPhone,
         storePlan: selectedStorePlan,
-        storeVerified: Boolean(storeCreateResult.store.verified),
       });
       setIsSubmitting(false);
       setNotice({
         type: "success",
         text: storeCreateResult.message || "Store created successfully.",
       });
-      router.replace("/(tabs)/home");
+      router.replace(
+        storeCreateResult.store.id
+          ? `/store/${String(storeCreateResult.store.id)}`
+          : "/(tabs)/home",
+      );
       return;
     }
 
-    const normalizedStoreImages = storeImages.filter(Boolean).slice(0, STORE_IMAGE_LIMIT);
+    const normalizedStoreImages = storeImages
+      .filter(Boolean)
+      .slice(0, STORE_IMAGE_LIMIT);
     const signupResult = await registerOwnerWithBackend({
       owner: {
         email: trimmedEmail.toLowerCase(),
@@ -825,19 +875,25 @@ export default function SignupScreen() {
         signupResult.store
       ) {
         updateMobileSession({
-          ...buildSessionPatchFromAuthUser(signupResult.user, signupResult.token),
+          ...buildSessionPatchFromAuthUser(
+            signupResult.user,
+            signupResult.token,
+          ),
           ...buildSessionPatchFromStore(signupResult.store),
           isStoreOwner: true,
           phoneNumber: trimmedOwnerPhone,
           storePlan: selectedStorePlan,
-          storeVerified: Boolean(signupResult.store.verified),
         });
         setIsSubmitting(false);
         setNotice({
           type: "success",
-          text: "You already have a store. Taking you home.",
+          text: "You already have a store. Taking you to your store dashboard.",
         });
-        router.replace("/(tabs)/home");
+        router.replace(
+          signupResult.store.id
+            ? `/store/${String(signupResult.store.id)}`
+            : "/(tabs)/home",
+        );
         return;
       }
 
@@ -860,14 +916,17 @@ export default function SignupScreen() {
       isStoreOwner: true,
       phoneNumber: trimmedOwnerPhone,
       storePlan: selectedStorePlan,
-      storeVerified: Boolean(signupResult.store?.verified),
     });
     setIsSubmitting(false);
     setNotice({
       type: "success",
       text: signupResult.message || "Store created successfully.",
     });
-    router.replace("/(tabs)/home");
+    router.replace(
+      signupResult.store?.id
+        ? `/store/${String(signupResult.store.id)}`
+        : "/(tabs)/home",
+    );
   };
 
   const validateOwnerStep = (step: OwnerSignupStep) => {
@@ -898,8 +957,14 @@ export default function SignupScreen() {
       const categoryError = getRegisterFieldError("category", category);
       const storePhoneError = getRegisterFieldError("storePhone", storePhone);
       const countryError = getRegisterFieldError("country", country);
-      const stateRegionError = getRegisterFieldError("stateRegion", stateRegion);
-      const descriptionError = getRegisterFieldError("description", description);
+      const stateRegionError = getRegisterFieldError(
+        "stateRegion",
+        stateRegion,
+      );
+      const descriptionError = getRegisterFieldError(
+        "description",
+        description,
+      );
 
       if (storeNameError) nextErrors.storeName = storeNameError;
       if (categoryError) nextErrors.category = categoryError;
@@ -968,7 +1033,8 @@ export default function SignupScreen() {
       );
       setErrors((current) => ({
         ...current,
-        location: "Location permission is denied. Place the pin manually or allow access and retry.",
+        location:
+          "Location permission is denied. Place the pin manually or allow access and retry.",
       }));
       return;
     }
@@ -985,9 +1051,12 @@ export default function SignupScreen() {
     } catch {
       setErrors((current) => ({
         ...current,
-        location: "We couldn’t get your location. Place the pin manually on the map.",
+        location:
+          "We couldn’t get your location. Place the pin manually on the map.",
       }));
-      setLocationMessage("We couldn’t get your location. Place the pin manually on the map.");
+      setLocationMessage(
+        "We couldn’t get your location. Place the pin manually on the map.",
+      );
     } finally {
       setIsUsingCurrentLocation(false);
     }
@@ -1010,16 +1079,15 @@ export default function SignupScreen() {
     setAddressSearchErrorMessage("");
 
     try {
-      const match =
-        suggestion.coordinates
-          ? {
-              coordinates: suggestion.coordinates,
-              formattedAddress: suggestion.placeName,
-            }
-          : await geocodePlace({
-              proximity: locationCoordinates,
-              query: suggestion.placeName,
-            });
+      const match = suggestion.coordinates
+        ? {
+            coordinates: suggestion.coordinates,
+            formattedAddress: suggestion.placeName,
+          }
+        : await geocodePlace({
+            proximity: locationCoordinates,
+            query: suggestion.placeName,
+          });
 
       if (!match?.coordinates) {
         throw new Error("We couldn’t load that place yet.");
@@ -1029,7 +1097,9 @@ export default function SignupScreen() {
       setLocationCoordinates(match.coordinates);
       setAddressSearchState("ready");
       setIsLocationConfirmed(false);
-      setLocationMessage("Place selected. Adjust the pin if needed, then confirm.");
+      setLocationMessage(
+        "Place selected. Adjust the pin if needed, then confirm.",
+      );
       setErrors((current) => {
         const next = { ...current };
         delete next.address;
@@ -1059,7 +1129,9 @@ export default function SignupScreen() {
         ...current,
         location: "Set the store pin before confirming the location.",
       }));
-      setLocationMessage("Place the pin on the map before confirming the location.");
+      setLocationMessage(
+        "Place the pin on the map before confirming the location.",
+      );
       return;
     }
 
@@ -1141,7 +1213,10 @@ export default function SignupScreen() {
         return next;
       });
     } catch {
-      Alert.alert("Image unavailable", "We couldn't load that image right now.");
+      Alert.alert(
+        "Image unavailable",
+        "We couldn't load that image right now.",
+      );
     } finally {
       setIsPickingImage(false);
       setEditingImageIndex(null);
@@ -1149,7 +1224,9 @@ export default function SignupScreen() {
   };
 
   const handleRemoveStoreImage = (slotIndex: number) => {
-    setStoreImages((current) => current.filter((_, index) => index !== slotIndex));
+    setStoreImages((current) =>
+      current.filter((_, index) => index !== slotIndex),
+    );
   };
 
   return (
@@ -1189,9 +1266,7 @@ export default function SignupScreen() {
                 </Text>
                 <Text style={styles.introText}>
                   {selectedStorePlan
-                    ? `Complete your ${
-                        selectedStorePlan === "verified" ? "Verified" : "Basic"
-                      } store plan on your existing account.`
+                    ? "Complete your Basic store plan on your existing account."
                     : "Create your account. Unlock Chat for ₦1,000 / month later from your profile."}
                 </Text>
                 {selectedStorePlan && session.primaryStoreName ? (
@@ -1201,724 +1276,944 @@ export default function SignupScreen() {
                 ) : null}
               </View>
 
-            {selectedStorePlan ? (
-              <View style={[styles.notice, styles.noticeSuccess]}>
-                <Text style={styles.noticeText}>
-                  Selected plan:{" "}
-                  {selectedStorePlan === "verified"
-                    ? "Verified Store"
-                    : "Basic Store"}
-                </Text>
-              </View>
-            ) : null}
-
-            <View style={styles.formStack}>
               {selectedStorePlan ? (
-                <View style={styles.stepPanel}>
-                  <Text style={styles.stepCounter}>
-                    Step {ownerStep + 1} of {OWNER_STEP_META.length}
+                <View style={[styles.notice, styles.noticeSuccess]}>
+                  <Text style={styles.noticeText}>
+                    Selected plan: Basic Store
                   </Text>
-                  <View style={styles.stepRow}>
-                    {OWNER_STEP_META.map((step, index) => {
-                      const active = ownerStep === index;
-                      const complete = ownerStep > index;
+                </View>
+              ) : null}
 
-                      return (
-                        <View
-                          key={step.title}
-                          style={[
-                            styles.stepCard,
-                            active && styles.stepCardActive,
-                            complete && styles.stepCardComplete,
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              styles.stepTitle,
-                              active && styles.stepTitleActive,
-                              complete && styles.stepTitleActive,
-                            ]}
-                          >
-                            {step.title}
-                          </Text>
-                          <Text
-                            style={[
-                              styles.stepDescription,
-                              active && styles.stepDescriptionActive,
-                            ]}
-                          >
-                            {step.description}
-                          </Text>
-                        </View>
-                      );
-                    })}
-                  </View>
-
-                  <View style={styles.fieldGroup}>
-                    <Text style={styles.sectionCardTitle}>{activeOwnerStep.title}</Text>
-                    <Text style={styles.sectionCardSubtitle}>
-                      {activeOwnerStep.description}
+              <View style={styles.formStack}>
+                {selectedStorePlan ? (
+                  <View style={styles.stepPanel}>
+                    <Text style={styles.stepCounter}>
+                      Step {ownerStep + 1} of {OWNER_STEP_META.length}
                     </Text>
-                  </View>
-                  {ownerStep === 0 ? (
-                    <>
-                      <View style={styles.fieldGroup}>
-                        <Text style={styles.fieldLabel}>Full Name</Text>
-                        <View style={[styles.inputShell, errors.name && styles.inputShellError]}>
-                          <Ionicons color="#64748b" name="person-outline" size={18} />
-                          <TextInput
-                            onBlur={() => handleFieldBlur("name")}
-                            onChangeText={(value) => setFieldValue("name", value)}
-                            placeholder="Your full name"
-                            placeholderTextColor={theme.colors.mutedText}
-                            selectionColor={theme.colors.accent}
-                            style={styles.input}
-                            value={name}
-                          />
-                        </View>
-                        {errors.name ? <Text style={styles.errorText}>{errors.name}</Text> : null}
-                      </View>
+                    <View style={styles.stepRow}>
+                      {OWNER_STEP_META.map((step, index) => {
+                        const active = ownerStep === index;
+                        const complete = ownerStep > index;
 
-                      <View style={styles.fieldGroup}>
-                        <Text style={styles.fieldLabel}>Email</Text>
-                        <View style={[styles.inputShell, errors.email && styles.inputShellError]}>
-                          <Ionicons color="#64748b" name="mail-outline" size={18} />
-                          <TextInput
-                            autoCapitalize="none"
-                            keyboardType="email-address"
-                            onBlur={() => handleFieldBlur("email")}
-                            onChangeText={(value) => setFieldValue("email", value)}
-                            placeholder="Your email"
-                            placeholderTextColor={theme.colors.mutedText}
-                            selectionColor={theme.colors.accent}
-                            style={styles.input}
-                            value={email}
-                          />
-                        </View>
-                        {errors.email ? <Text style={styles.errorText}>{errors.email}</Text> : null}
-                      </View>
-
-                      <View style={styles.fieldGroup}>
-                        <Text style={styles.fieldLabel}>Change to a stronger password (optional)</Text>
-                        <View style={[styles.inputShell, errors.password && styles.inputShellError]}>
-                          <Ionicons color="#64748b" name="lock-closed-outline" size={18} />
-                          <TextInput
-                            autoCapitalize="none"
-                            onBlur={() => handleFieldBlur("password")}
-                            onChangeText={(value) => setFieldValue("password", value)}
-                            placeholder="Leave blank to keep your current password"
-                            placeholderTextColor={theme.colors.mutedText}
-                            secureTextEntry={!showPassword}
-                            selectionColor={theme.colors.accent}
-                            style={styles.input}
-                            value={password}
-                          />
-                          <TouchableOpacity
-                            activeOpacity={0.85}
-                            onPress={() => setShowPassword((current) => !current)}
+                        return (
+                          <View
+                            key={step.title}
+                            style={[
+                              styles.stepCard,
+                              active && styles.stepCardActive,
+                              complete && styles.stepCardComplete,
+                            ]}
                           >
-                            <Ionicons
-                              color="#94a3b8"
-                              name={showPassword ? "eye-off-outline" : "eye-outline"}
-                              size={18}
-                            />
-                          </TouchableOpacity>
-                        </View>
-                        {errors.password ? (
-                          <Text style={styles.errorText}>{errors.password}</Text>
-                        ) : null}
-                      </View>
-                      <Text style={styles.helperText}>
-                        You are already signed in. Only enter a new password if you want to replace the current one.
-                      </Text>
-
-                      <View style={styles.fieldGroup}>
-                        <Text style={styles.fieldLabel}>Confirm new password</Text>
-                        <View
-                          style={[
-                            styles.inputShell,
-                            errors.confirmPassword && styles.inputShellError,
-                          ]}
-                        >
-                          <Ionicons
-                            color="#64748b"
-                            name="shield-checkmark-outline"
-                            size={18}
-                          />
-                          <TextInput
-                            autoCapitalize="none"
-                            onBlur={() => handleFieldBlur("confirmPassword")}
-                            onChangeText={(value) => setFieldValue("confirmPassword", value)}
-                            placeholder="Repeat the new password"
-                            placeholderTextColor={theme.colors.mutedText}
-                            secureTextEntry={!showPassword}
-                            selectionColor={theme.colors.accent}
-                            style={styles.input}
-                            value={confirmPassword}
-                          />
-                        </View>
-                        {errors.confirmPassword ? (
-                          <Text style={styles.errorText}>{errors.confirmPassword}</Text>
-                        ) : null}
-                      </View>
-
-                      <View style={styles.fieldGroup}>
-                        <Text style={styles.fieldLabel}>Phone Number</Text>
-                        <View
-                          style={[
-                            styles.inputShell,
-                            errors.ownerPhone && styles.inputShellError,
-                          ]}
-                        >
-                          <Ionicons color="#64748b" name="call-outline" size={18} />
-                          <TextInput
-                            keyboardType="phone-pad"
-                            onBlur={() => handleFieldBlur("ownerPhone")}
-                            onChangeText={(value) => setFieldValue("ownerPhone", value)}
-                            placeholder="+1 555 123 4567"
-                            placeholderTextColor={theme.colors.mutedText}
-                            selectionColor={theme.colors.accent}
-                            style={styles.input}
-                            value={ownerPhone}
-                          />
-                        </View>
-                        {errors.ownerPhone ? (
-                          <Text style={styles.errorText}>{errors.ownerPhone}</Text>
-                        ) : null}
-                      </View>
-                    </>
-                  ) : ownerStep === 1 ? (
-                    <>
-                      <View style={styles.fieldGroup}>
-                        <Text style={styles.fieldLabel}>Store Name</Text>
-                        <View
-                          style={[
-                            styles.inputShell,
-                            errors.storeName && styles.inputShellError,
-                          ]}
-                        >
-                          <Ionicons color="#64748b" name="storefront-outline" size={18} />
-                          <TextInput
-                            onBlur={() => handleFieldBlur("storeName")}
-                            onChangeText={(value) => setFieldValue("storeName", value)}
-                            placeholder="Nana Grocery"
-                            placeholderTextColor={theme.colors.mutedText}
-                            selectionColor={theme.colors.accent}
-                            style={styles.input}
-                            value={storeName}
-                          />
-                        </View>
-                        {errors.storeName ? (
-                          <Text style={styles.errorText}>{errors.storeName}</Text>
-                        ) : null}
-                      </View>
-
-                      <View style={styles.fieldGroup}>
-                        <Text style={styles.fieldLabel}>Category</Text>
-                        <ScrollView
-                          horizontal
-                          contentContainerStyle={styles.chipRow}
-                          showsHorizontalScrollIndicator={false}
-                        >
-                          {STORE_CATEGORY_OPTIONS.map((option) => {
-                            const active = category === option;
-
-                            return (
-                              <TouchableOpacity
-                                key={option}
-                                activeOpacity={0.85}
-                                onPress={() => setFieldValue("category", option)}
-                                style={[styles.chip, active && styles.chipActive]}
-                              >
-                                <Text
-                                  style={[styles.chipText, active && styles.chipTextActive]}
-                                >
-                                  {option}
-                                </Text>
-                              </TouchableOpacity>
-                            );
-                          })}
-                        </ScrollView>
-                        {errors.category ? (
-                          <Text style={styles.errorText}>{errors.category}</Text>
-                        ) : null}
-                      </View>
-
-                      <View style={styles.fieldGroup}>
-                        <Text style={styles.fieldLabel}>Store Phone</Text>
-                        <View
-                          style={[
-                            styles.inputShell,
-                            errors.storePhone && styles.inputShellError,
-                          ]}
-                        >
-                          <Ionicons color="#64748b" name="call-outline" size={18} />
-                          <TextInput
-                            keyboardType="phone-pad"
-                            onBlur={() => handleFieldBlur("storePhone")}
-                            onChangeText={(value) => setFieldValue("storePhone", value)}
-                            placeholder="+1 555 987 6543"
-                            placeholderTextColor={theme.colors.mutedText}
-                            selectionColor={theme.colors.accent}
-                            style={styles.input}
-                            value={storePhone}
-                          />
-                        </View>
-                        {errors.storePhone ? (
-                          <Text style={styles.errorText}>{errors.storePhone}</Text>
-                        ) : null}
-                      </View>
-
-                      <View style={styles.fieldGroup}>
-                        <Text style={styles.fieldLabel}>Country</Text>
-                        <View
-                          style={[
-                            styles.inputShell,
-                            errors.country && styles.inputShellError,
-                          ]}
-                        >
-                          <Ionicons color="#64748b" name="earth-outline" size={18} />
-                          <TextInput
-                            onBlur={() => handleFieldBlur("country")}
-                            onChangeText={(value) => setFieldValue("country", value)}
-                            placeholder="Nigeria"
-                            placeholderTextColor={theme.colors.mutedText}
-                            selectionColor={theme.colors.accent}
-                            style={styles.input}
-                            value={country}
-                          />
-                        </View>
-                        {errors.country ? (
-                          <Text style={styles.errorText}>{errors.country}</Text>
-                        ) : null}
-                      </View>
-
-                      <View style={styles.fieldGroup}>
-                        <Text style={styles.fieldLabel}>State / City</Text>
-                        <View
-                          style={[
-                            styles.inputShell,
-                            errors.stateRegion && styles.inputShellError,
-                          ]}
-                        >
-                          <Ionicons color="#64748b" name="location-outline" size={18} />
-                          <TextInput
-                            onBlur={() => handleFieldBlur("stateRegion")}
-                            onChangeText={(value) => setFieldValue("stateRegion", value)}
-                            placeholder="California / San Francisco"
-                            placeholderTextColor={theme.colors.mutedText}
-                            selectionColor={theme.colors.accent}
-                            style={styles.input}
-                            value={stateRegion}
-                          />
-                        </View>
-                        {errors.stateRegion ? (
-                          <Text style={styles.errorText}>{errors.stateRegion}</Text>
-                        ) : null}
-                      </View>
-
-                      <View style={styles.fieldGroup}>
-                        <Text style={styles.fieldLabel}>Store Description</Text>
-                        <View
-                          style={[
-                            styles.textAreaShell,
-                            errors.description && styles.inputShellError,
-                          ]}
-                        >
-                          <TextInput
-                            multiline
-                            numberOfLines={4}
-                            onBlur={() => handleFieldBlur("description")}
-                            onChangeText={(value) => setFieldValue("description", value)}
-                            placeholder="Describe what your store sells and what makes it useful."
-                            placeholderTextColor={theme.colors.mutedText}
-                            selectionColor={theme.colors.accent}
-                            style={styles.textArea}
-                            textAlignVertical="top"
-                            value={description}
-                          />
-                        </View>
-                        {errors.description ? (
-                          <Text style={styles.errorText}>{errors.description}</Text>
-                        ) : null}
-                      </View>
-
-                      <View style={styles.fieldGroup}>
-                        <Text style={styles.fieldLabel}>Store Photos</Text>
-                        <Text style={styles.helperText}>
-                          The first image becomes your store header background. Add up to 3 images.
-                        </Text>
-                        <View style={styles.storeImageGrid}>
-                          {imageSlots.map((image, index) => (
-                            <View
-                              key={`signup-store-image:${index}`}
+                            <Text
                               style={[
-                                styles.storeImageSlot,
-                                index === 0 && styles.storeImageSlotPrimary,
-                                imageSlots.length === 1 && styles.storeImageSlotSingle,
-                                imageSlots.length === 2 && index > 0 && styles.storeImageSlotHalf,
+                                styles.stepTitle,
+                                active && styles.stepTitleActive,
+                                complete && styles.stepTitleActive,
                               ]}
                             >
-                              {image ? (
-                                <Image
-                                  resizeMode="cover"
-                                  source={{ uri: image }}
-                                  style={[
-                                    styles.storeImagePreview,
-                                    index === 0 && styles.storeImagePreviewPrimary,
-                                  ]}
-                                />
-                              ) : (
-                                <View
-                                  style={[
-                                    styles.storeImagePlaceholder,
-                                    index === 0 && styles.storeImagePlaceholderPrimary,
-                                  ]}
-                                >
-                                  <Ionicons color="#94a3b8" name="image-outline" size={28} />
-                                  <Text style={styles.storeImagePlaceholderText}>
-                                    Add image
-                                  </Text>
-                                </View>
-                              )}
+                              {step.title}
+                            </Text>
+                            <Text
+                              style={[
+                                styles.stepDescription,
+                                active && styles.stepDescriptionActive,
+                              ]}
+                            >
+                              {step.description}
+                            </Text>
+                          </View>
+                        );
+                      })}
+                    </View>
 
-                              <View style={styles.storeImageActions}>
+                    <View style={styles.fieldGroup}>
+                      <Text style={styles.sectionCardTitle}>
+                        {activeOwnerStep.title}
+                      </Text>
+                      <Text style={styles.sectionCardSubtitle}>
+                        {activeOwnerStep.description}
+                      </Text>
+                    </View>
+                    {ownerStep === 0 ? (
+                      <>
+                        <View style={styles.fieldGroup}>
+                          <Text style={styles.fieldLabel}>Full Name</Text>
+                          <View
+                            style={[
+                              styles.inputShell,
+                              errors.name && styles.inputShellError,
+                            ]}
+                          >
+                            <Ionicons
+                              color="#64748b"
+                              name="person-outline"
+                              size={18}
+                            />
+                            <TextInput
+                              onBlur={() => handleFieldBlur("name")}
+                              onChangeText={(value) =>
+                                setFieldValue("name", value)
+                              }
+                              placeholder="Your full name"
+                              placeholderTextColor={theme.colors.mutedText}
+                              selectionColor={theme.colors.accent}
+                              style={styles.input}
+                              value={name}
+                            />
+                          </View>
+                          {errors.name ? (
+                            <Text style={styles.errorText}>{errors.name}</Text>
+                          ) : null}
+                        </View>
+
+                        <View style={styles.fieldGroup}>
+                          <Text style={styles.fieldLabel}>Email</Text>
+                          <View
+                            style={[
+                              styles.inputShell,
+                              errors.email && styles.inputShellError,
+                            ]}
+                          >
+                            <Ionicons
+                              color="#64748b"
+                              name="mail-outline"
+                              size={18}
+                            />
+                            <TextInput
+                              autoCapitalize="none"
+                              keyboardType="email-address"
+                              onBlur={() => handleFieldBlur("email")}
+                              onChangeText={(value) =>
+                                setFieldValue("email", value)
+                              }
+                              placeholder="Your email"
+                              placeholderTextColor={theme.colors.mutedText}
+                              selectionColor={theme.colors.accent}
+                              style={styles.input}
+                              value={email}
+                            />
+                          </View>
+                          {errors.email ? (
+                            <Text style={styles.errorText}>{errors.email}</Text>
+                          ) : null}
+                        </View>
+
+                        <View style={styles.fieldGroup}>
+                          <Text style={styles.fieldLabel}>
+                            Change to a stronger password (optional)
+                          </Text>
+                          <View
+                            style={[
+                              styles.inputShell,
+                              errors.password && styles.inputShellError,
+                            ]}
+                          >
+                            <Ionicons
+                              color="#64748b"
+                              name="lock-closed-outline"
+                              size={18}
+                            />
+                            <TextInput
+                              autoCapitalize="none"
+                              onBlur={() => handleFieldBlur("password")}
+                              onChangeText={(value) =>
+                                setFieldValue("password", value)
+                              }
+                              placeholder="Leave blank to keep your current password"
+                              placeholderTextColor={theme.colors.mutedText}
+                              secureTextEntry={!showPassword}
+                              selectionColor={theme.colors.accent}
+                              style={styles.input}
+                              value={password}
+                            />
+                            <TouchableOpacity
+                              activeOpacity={0.85}
+                              onPress={() =>
+                                setShowPassword((current) => !current)
+                              }
+                            >
+                              <Ionicons
+                                color="#94a3b8"
+                                name={
+                                  showPassword
+                                    ? "eye-off-outline"
+                                    : "eye-outline"
+                                }
+                                size={18}
+                              />
+                            </TouchableOpacity>
+                          </View>
+                          {errors.password ? (
+                            <Text style={styles.errorText}>
+                              {errors.password}
+                            </Text>
+                          ) : null}
+                        </View>
+                        <Text style={styles.helperText}>
+                          You are already signed in. Only enter a new password
+                          if you want to replace the current one.
+                        </Text>
+
+                        <View style={styles.fieldGroup}>
+                          <Text style={styles.fieldLabel}>
+                            Confirm new password
+                          </Text>
+                          <View
+                            style={[
+                              styles.inputShell,
+                              errors.confirmPassword && styles.inputShellError,
+                            ]}
+                          >
+                            <Ionicons
+                              color="#64748b"
+                              name="shield-checkmark-outline"
+                              size={18}
+                            />
+                            <TextInput
+                              autoCapitalize="none"
+                              onBlur={() => handleFieldBlur("confirmPassword")}
+                              onChangeText={(value) =>
+                                setFieldValue("confirmPassword", value)
+                              }
+                              placeholder="Repeat the new password"
+                              placeholderTextColor={theme.colors.mutedText}
+                              secureTextEntry={!showPassword}
+                              selectionColor={theme.colors.accent}
+                              style={styles.input}
+                              value={confirmPassword}
+                            />
+                          </View>
+                          {errors.confirmPassword ? (
+                            <Text style={styles.errorText}>
+                              {errors.confirmPassword}
+                            </Text>
+                          ) : null}
+                        </View>
+
+                        <View style={styles.fieldGroup}>
+                          <Text style={styles.fieldLabel}>Phone Number</Text>
+                          <View
+                            style={[
+                              styles.inputShell,
+                              errors.ownerPhone && styles.inputShellError,
+                            ]}
+                          >
+                            <Ionicons
+                              color="#64748b"
+                              name="call-outline"
+                              size={18}
+                            />
+                            <TextInput
+                              keyboardType="phone-pad"
+                              onBlur={() => handleFieldBlur("ownerPhone")}
+                              onChangeText={(value) =>
+                                setFieldValue("ownerPhone", value)
+                              }
+                              placeholder="+1 555 123 4567"
+                              placeholderTextColor={theme.colors.mutedText}
+                              selectionColor={theme.colors.accent}
+                              style={styles.input}
+                              value={ownerPhone}
+                            />
+                          </View>
+                          {errors.ownerPhone ? (
+                            <Text style={styles.errorText}>
+                              {errors.ownerPhone}
+                            </Text>
+                          ) : null}
+                        </View>
+                      </>
+                    ) : ownerStep === 1 ? (
+                      <>
+                        <View style={styles.fieldGroup}>
+                          <Text style={styles.fieldLabel}>Store Name</Text>
+                          <View
+                            style={[
+                              styles.inputShell,
+                              errors.storeName && styles.inputShellError,
+                            ]}
+                          >
+                            <Ionicons
+                              color="#64748b"
+                              name="storefront-outline"
+                              size={18}
+                            />
+                            <TextInput
+                              onBlur={() => handleFieldBlur("storeName")}
+                              onChangeText={(value) =>
+                                setFieldValue("storeName", value)
+                              }
+                              placeholder="Nana Grocery"
+                              placeholderTextColor={theme.colors.mutedText}
+                              selectionColor={theme.colors.accent}
+                              style={styles.input}
+                              value={storeName}
+                            />
+                          </View>
+                          {errors.storeName ? (
+                            <Text style={styles.errorText}>
+                              {errors.storeName}
+                            </Text>
+                          ) : null}
+                        </View>
+
+                        <View style={styles.fieldGroup}>
+                          <Text style={styles.fieldLabel}>Category</Text>
+                          <ScrollView
+                            horizontal
+                            contentContainerStyle={styles.chipRow}
+                            showsHorizontalScrollIndicator={false}
+                          >
+                            {STORE_CATEGORY_OPTIONS.map((option) => {
+                              const active = category === option;
+
+                              return (
                                 <TouchableOpacity
+                                  key={option}
                                   activeOpacity={0.85}
-                                  disabled={isPickingImage}
-                                  onPress={() => void handlePickStoreImage(index, "library")}
-                                  style={styles.imageActionButton}
+                                  onPress={() =>
+                                    setFieldValue("category", option)
+                                  }
+                                  style={[
+                                    styles.chip,
+                                    active && styles.chipActive,
+                                  ]}
                                 >
-                                  <Text style={styles.imageActionButtonText}>
-                                    {editingImageIndex === index && isPickingImage
-                                      ? "Loading..."
-                                      : image
-                                        ? "Replace"
-                                        : "Gallery"}
+                                  <Text
+                                    style={[
+                                      styles.chipText,
+                                      active && styles.chipTextActive,
+                                    ]}
+                                  >
+                                    {option}
                                   </Text>
                                 </TouchableOpacity>
-                                <TouchableOpacity
-                                  activeOpacity={0.85}
-                                  disabled={isPickingImage}
-                                  onPress={() => void handlePickStoreImage(index, "camera")}
-                                  style={styles.imageActionButton}
-                                >
-                                  <Text style={styles.imageActionButtonText}>Camera</Text>
-                                </TouchableOpacity>
+                              );
+                            })}
+                          </ScrollView>
+                          {errors.category ? (
+                            <Text style={styles.errorText}>
+                              {errors.category}
+                            </Text>
+                          ) : null}
+                        </View>
+
+                        <View style={styles.fieldGroup}>
+                          <Text style={styles.fieldLabel}>Store Phone</Text>
+                          <View
+                            style={[
+                              styles.inputShell,
+                              errors.storePhone && styles.inputShellError,
+                            ]}
+                          >
+                            <Ionicons
+                              color="#64748b"
+                              name="call-outline"
+                              size={18}
+                            />
+                            <TextInput
+                              keyboardType="phone-pad"
+                              onBlur={() => handleFieldBlur("storePhone")}
+                              onChangeText={(value) =>
+                                setFieldValue("storePhone", value)
+                              }
+                              placeholder="+1 555 987 6543"
+                              placeholderTextColor={theme.colors.mutedText}
+                              selectionColor={theme.colors.accent}
+                              style={styles.input}
+                              value={storePhone}
+                            />
+                          </View>
+                          {errors.storePhone ? (
+                            <Text style={styles.errorText}>
+                              {errors.storePhone}
+                            </Text>
+                          ) : null}
+                        </View>
+
+                        <View style={styles.fieldGroup}>
+                          <Text style={styles.fieldLabel}>Country</Text>
+                          <View
+                            style={[
+                              styles.inputShell,
+                              errors.country && styles.inputShellError,
+                            ]}
+                          >
+                            <Ionicons
+                              color="#64748b"
+                              name="earth-outline"
+                              size={18}
+                            />
+                            <TextInput
+                              onBlur={() => handleFieldBlur("country")}
+                              onChangeText={(value) =>
+                                setFieldValue("country", value)
+                              }
+                              placeholder="Nigeria"
+                              placeholderTextColor={theme.colors.mutedText}
+                              selectionColor={theme.colors.accent}
+                              style={styles.input}
+                              value={country}
+                            />
+                          </View>
+                          {errors.country ? (
+                            <Text style={styles.errorText}>
+                              {errors.country}
+                            </Text>
+                          ) : null}
+                        </View>
+
+                        <View style={styles.fieldGroup}>
+                          <Text style={styles.fieldLabel}>State / City</Text>
+                          <View
+                            style={[
+                              styles.inputShell,
+                              errors.stateRegion && styles.inputShellError,
+                            ]}
+                          >
+                            <Ionicons
+                              color="#64748b"
+                              name="location-outline"
+                              size={18}
+                            />
+                            <TextInput
+                              onBlur={() => handleFieldBlur("stateRegion")}
+                              onChangeText={(value) =>
+                                setFieldValue("stateRegion", value)
+                              }
+                              placeholder="California / San Francisco"
+                              placeholderTextColor={theme.colors.mutedText}
+                              selectionColor={theme.colors.accent}
+                              style={styles.input}
+                              value={stateRegion}
+                            />
+                          </View>
+                          {errors.stateRegion ? (
+                            <Text style={styles.errorText}>
+                              {errors.stateRegion}
+                            </Text>
+                          ) : null}
+                        </View>
+
+                        <View style={styles.fieldGroup}>
+                          <Text style={styles.fieldLabel}>
+                            Store Description
+                          </Text>
+                          <View
+                            style={[
+                              styles.textAreaShell,
+                              errors.description && styles.inputShellError,
+                            ]}
+                          >
+                            <TextInput
+                              multiline
+                              numberOfLines={4}
+                              onBlur={() => handleFieldBlur("description")}
+                              onChangeText={(value) =>
+                                setFieldValue("description", value)
+                              }
+                              placeholder="Describe what your store sells and what makes it useful."
+                              placeholderTextColor={theme.colors.mutedText}
+                              selectionColor={theme.colors.accent}
+                              style={styles.textArea}
+                              textAlignVertical="top"
+                              value={description}
+                            />
+                          </View>
+                          {errors.description ? (
+                            <Text style={styles.errorText}>
+                              {errors.description}
+                            </Text>
+                          ) : null}
+                        </View>
+
+                        <View style={styles.fieldGroup}>
+                          <Text style={styles.fieldLabel}>Store Photos</Text>
+                          <Text style={styles.helperText}>
+                            The first image becomes your store header
+                            background. Add up to 3 images.
+                          </Text>
+                          <View style={styles.storeImageGrid}>
+                            {imageSlots.map((image, index) => (
+                              <View
+                                key={`signup-store-image:${index}`}
+                                style={[
+                                  styles.storeImageSlot,
+                                  index === 0 && styles.storeImageSlotPrimary,
+                                  imageSlots.length === 1 &&
+                                    styles.storeImageSlotSingle,
+                                  imageSlots.length === 2 &&
+                                    index > 0 &&
+                                    styles.storeImageSlotHalf,
+                                ]}
+                              >
                                 {image ? (
+                                  <Image
+                                    resizeMode="cover"
+                                    source={{ uri: image }}
+                                    style={[
+                                      styles.storeImagePreview,
+                                      index === 0 &&
+                                        styles.storeImagePreviewPrimary,
+                                    ]}
+                                  />
+                                ) : (
+                                  <View
+                                    style={[
+                                      styles.storeImagePlaceholder,
+                                      index === 0 &&
+                                        styles.storeImagePlaceholderPrimary,
+                                    ]}
+                                  >
+                                    <Ionicons
+                                      color="#94a3b8"
+                                      name="image-outline"
+                                      size={28}
+                                    />
+                                    <Text
+                                      style={styles.storeImagePlaceholderText}
+                                    >
+                                      Add image
+                                    </Text>
+                                  </View>
+                                )}
+
+                                <View style={styles.storeImageActions}>
                                   <TouchableOpacity
                                     activeOpacity={0.85}
-                                    onPress={() => handleRemoveStoreImage(index)}
-                                    style={styles.imageActionButtonSecondary}
+                                    disabled={isPickingImage}
+                                    onPress={() =>
+                                      void handlePickStoreImage(
+                                        index,
+                                        "library",
+                                      )
+                                    }
+                                    style={styles.imageActionButton}
                                   >
-                                    <Text style={styles.imageActionButtonSecondaryText}>Remove</Text>
-                                  </TouchableOpacity>
-                                ) : null}
-                              </View>
-                            </View>
-                          ))}
-                        </View>
-                      </View>
-                    </>
-                  ) : (
-                    <>
-                      <View style={styles.noticeInline}>
-                        <Text style={styles.noticeInlineTitle}>Location</Text>
-                        <Text style={styles.noticeInlineText}>{locationMessage}</Text>
-                      </View>
-                      <Text style={styles.helperText}>
-                        Tap to move the pin. The pin position is the final saved store location.
-                      </Text>
-
-                      <View style={styles.fieldGroup}>
-                        <Text style={styles.fieldLabel}>Search store location</Text>
-                        <View
-                          style={[
-                            styles.inputShell,
-                            errors.address && styles.inputShellError,
-                          ]}
-                        >
-                          <Ionicons color="#64748b" name="search-outline" size={18} />
-                          <TextInput
-                            autoCorrect={false}
-                            onBlur={() => {
-                              setTimeout(() => {
-                                setIsAddressInputFocused(false);
-                              }, 120);
-                              handleFieldBlur("address");
-                            }}
-                            onChangeText={(value) => setFieldValue("address", value)}
-                            onFocus={() => setIsAddressInputFocused(true)}
-                            placeholder="Search store location"
-                            placeholderTextColor={theme.colors.mutedText}
-                            selectionColor={theme.colors.accent}
-                            style={styles.input}
-                            value={address}
-                          />
-                        </View>
-                        {canShowAddressSuggestions ? (
-                          <View style={styles.suggestionsCard}>
-                            {isAddressSearching ? (
-                              <Text style={styles.suggestionMetaText}>
-                                Searching nearby places...
-                              </Text>
-                            ) : null}
-
-                            {!isAddressSearching &&
-                            addressSearchState === "empty" ? (
-                              <Text style={styles.suggestionMetaText}>
-                                No matching places found yet.
-                              </Text>
-                            ) : null}
-
-                            {!isAddressSearching &&
-                            addressSearchState === "error" ? (
-                              <Text style={styles.suggestionMetaText}>
-                                {addressSearchErrorMessage}
-                              </Text>
-                            ) : null}
-
-                            {addressSuggestions.map((suggestion) => (
-                              <TouchableOpacity
-                                key={suggestion.id}
-                                activeOpacity={0.85}
-                                onPress={() => void handleSelectAddressSuggestion(suggestion)}
-                                style={styles.suggestionItem}
-                              >
-                                <View style={styles.suggestionDot} />
-                                <View style={styles.suggestionContent}>
-                                  <Text numberOfLines={1} style={styles.suggestionTitle}>
-                                    {suggestion.title}
-                                  </Text>
-                                  {suggestion.subtitle ? (
-                                    <Text
-                                      numberOfLines={2}
-                                      style={styles.suggestionSubtitle}
-                                    >
-                                      {suggestion.subtitle}
+                                    <Text style={styles.imageActionButtonText}>
+                                      {editingImageIndex === index &&
+                                      isPickingImage
+                                        ? "Loading..."
+                                        : image
+                                          ? "Replace"
+                                          : "Gallery"}
                                     </Text>
+                                  </TouchableOpacity>
+                                  <TouchableOpacity
+                                    activeOpacity={0.85}
+                                    disabled={isPickingImage}
+                                    onPress={() =>
+                                      void handlePickStoreImage(index, "camera")
+                                    }
+                                    style={styles.imageActionButton}
+                                  >
+                                    <Text style={styles.imageActionButtonText}>
+                                      Camera
+                                    </Text>
+                                  </TouchableOpacity>
+                                  {image ? (
+                                    <TouchableOpacity
+                                      activeOpacity={0.85}
+                                      onPress={() =>
+                                        handleRemoveStoreImage(index)
+                                      }
+                                      style={styles.imageActionButtonSecondary}
+                                    >
+                                      <Text
+                                        style={
+                                          styles.imageActionButtonSecondaryText
+                                        }
+                                      >
+                                        Remove
+                                      </Text>
+                                    </TouchableOpacity>
                                   ) : null}
                                 </View>
-                              </TouchableOpacity>
+                              </View>
                             ))}
                           </View>
-                        ) : null}
-                        {errors.address ? (
-                          <Text style={styles.errorText}>{errors.address}</Text>
-                        ) : null}
+                        </View>
+                      </>
+                    ) : (
+                      <>
+                        <View style={styles.noticeInline}>
+                          <Text style={styles.noticeInlineTitle}>Location</Text>
+                          <Text style={styles.noticeInlineText}>
+                            {locationMessage}
+                          </Text>
+                        </View>
                         <Text style={styles.helperText}>
-                          Search helps you find places quickly. Your final store location still
-                          comes from the map pin you confirm below.
+                          Tap to move the pin. The pin position is the final
+                          saved store location.
                         </Text>
-                      </View>
 
-                      <TouchableOpacity
-                        activeOpacity={0.85}
-                        disabled={isUsingCurrentLocation}
-                        onPress={() => void handleUseCurrentLocation()}
-                        style={styles.secondaryButton}
-                      >
-                        <Text style={styles.secondaryButtonText}>
-                          {isUsingCurrentLocation ? "Getting current location..." : "Use current location"}
-                        </Text>
-                      </TouchableOpacity>
+                        <View style={styles.fieldGroup}>
+                          <Text style={styles.fieldLabel}>
+                            Search store location
+                          </Text>
+                          <View
+                            style={[
+                              styles.inputShell,
+                              errors.address && styles.inputShellError,
+                            ]}
+                          >
+                            <Ionicons
+                              color="#64748b"
+                              name="search-outline"
+                              size={18}
+                            />
+                            <TextInput
+                              autoCorrect={false}
+                              onBlur={() => {
+                                setTimeout(() => {
+                                  setIsAddressInputFocused(false);
+                                }, 120);
+                                handleFieldBlur("address");
+                              }}
+                              onChangeText={(value) =>
+                                setFieldValue("address", value)
+                              }
+                              onFocus={() => setIsAddressInputFocused(true)}
+                              placeholder="Search store location"
+                              placeholderTextColor={theme.colors.mutedText}
+                              selectionColor={theme.colors.accent}
+                              style={styles.input}
+                              value={address}
+                            />
+                          </View>
+                          {canShowAddressSuggestions ? (
+                            <View style={styles.suggestionsCard}>
+                              {isAddressSearching ? (
+                                <Text style={styles.suggestionMetaText}>
+                                  Searching nearby places...
+                                </Text>
+                              ) : null}
 
-                      <View style={styles.fieldGroup}>
-                        <Text style={styles.fieldLabel}>Place your pin</Text>
-                        <StoreLocationPicker
-                          address={address}
-                          coordinates={locationCoordinates}
-                          onChange={handleMapChange}
-                          storeName={storeName}
-                        />
-                        {errors.location ? (
-                          <Text style={styles.errorText}>{errors.location}</Text>
-                        ) : null}
-                      </View>
+                              {!isAddressSearching &&
+                              addressSearchState === "empty" ? (
+                                <Text style={styles.suggestionMetaText}>
+                                  No matching places found yet.
+                                </Text>
+                              ) : null}
 
-                      <TouchableOpacity
-                        activeOpacity={0.85}
-                        disabled={!locationCoordinates}
-                        onPress={handleConfirmLocation}
+                              {!isAddressSearching &&
+                              addressSearchState === "error" ? (
+                                <Text style={styles.suggestionMetaText}>
+                                  {addressSearchErrorMessage}
+                                </Text>
+                              ) : null}
+
+                              {addressSuggestions.map((suggestion) => (
+                                <TouchableOpacity
+                                  key={suggestion.id}
+                                  activeOpacity={0.85}
+                                  onPress={() =>
+                                    void handleSelectAddressSuggestion(
+                                      suggestion,
+                                    )
+                                  }
+                                  style={styles.suggestionItem}
+                                >
+                                  <View style={styles.suggestionDot} />
+                                  <View style={styles.suggestionContent}>
+                                    <Text
+                                      numberOfLines={1}
+                                      style={styles.suggestionTitle}
+                                    >
+                                      {suggestion.title}
+                                    </Text>
+                                    {suggestion.subtitle ? (
+                                      <Text
+                                        numberOfLines={2}
+                                        style={styles.suggestionSubtitle}
+                                      >
+                                        {suggestion.subtitle}
+                                      </Text>
+                                    ) : null}
+                                  </View>
+                                </TouchableOpacity>
+                              ))}
+                            </View>
+                          ) : null}
+                          {errors.address ? (
+                            <Text style={styles.errorText}>
+                              {errors.address}
+                            </Text>
+                          ) : null}
+                          <Text style={styles.helperText}>
+                            Search helps you find places quickly. Your final
+                            store location still comes from the map pin you
+                            confirm below.
+                          </Text>
+                        </View>
+
+                        <TouchableOpacity
+                          activeOpacity={0.85}
+                          disabled={isUsingCurrentLocation}
+                          onPress={() => void handleUseCurrentLocation()}
+                          style={styles.secondaryButton}
+                        >
+                          <Text style={styles.secondaryButtonText}>
+                            {isUsingCurrentLocation
+                              ? "Getting current location..."
+                              : "Use current location"}
+                          </Text>
+                        </TouchableOpacity>
+
+                        <View style={styles.fieldGroup}>
+                          <Text style={styles.fieldLabel}>Place your pin</Text>
+                          <StoreLocationPicker
+                            address={address}
+                            coordinates={locationCoordinates}
+                            onChange={handleMapChange}
+                            storeName={storeName}
+                          />
+                          {errors.location ? (
+                            <Text style={styles.errorText}>
+                              {errors.location}
+                            </Text>
+                          ) : null}
+                        </View>
+
+                        <TouchableOpacity
+                          activeOpacity={0.85}
+                          disabled={!locationCoordinates}
+                          onPress={handleConfirmLocation}
+                          style={[
+                            styles.secondaryButton,
+                            !locationCoordinates && styles.submitButtonDisabled,
+                            isLocationConfirmed &&
+                              styles.locationConfirmedButton,
+                          ]}
+                        >
+                          <Text style={styles.secondaryButtonText}>
+                            {isLocationConfirmed
+                              ? "Location confirmed"
+                              : "Confirm location"}
+                          </Text>
+                        </TouchableOpacity>
+                      </>
+                    )}
+                  </View>
+                ) : null}
+
+                {!selectedStorePlan ? (
+                  <>
+                    <View style={styles.fieldGroup}>
+                      <Text style={styles.fieldLabel}>Name</Text>
+                      <View
                         style={[
-                          styles.secondaryButton,
-                          !locationCoordinates && styles.submitButtonDisabled,
-                          isLocationConfirmed && styles.locationConfirmedButton,
+                          styles.inputShell,
+                          errors.name && styles.inputShellError,
                         ]}
                       >
-                        <Text style={styles.secondaryButtonText}>
-                          {isLocationConfirmed ? "Location confirmed" : "Confirm location"}
-                        </Text>
-                      </TouchableOpacity>
-                    </>
-                  )}
-                </View>
-              ) : null}
-
-              {!selectedStorePlan ? (
-                <>
-                  <View style={styles.fieldGroup}>
-                    <Text style={styles.fieldLabel}>Name</Text>
-                    <View style={[styles.inputShell, errors.name && styles.inputShellError]}>
-                      <Ionicons color="#64748b" name="person-outline" size={18} />
-                      <TextInput
-                        onBlur={() => handleFieldBlur("name")}
-                        onChangeText={(value) => setFieldValue("name", value)}
-                        placeholder="Enter your name"
-                        placeholderTextColor={theme.colors.mutedText}
-                        selectionColor={theme.colors.accent}
-                        style={styles.input}
-                        value={name}
-                      />
-                    </View>
-                    {errors.name ? <Text style={styles.errorText}>{errors.name}</Text> : null}
-                  </View>
-
-                  <View style={styles.fieldGroup}>
-                    <Text style={styles.fieldLabel}>Email</Text>
-                    <View style={[styles.inputShell, errors.email && styles.inputShellError]}>
-                      <Ionicons color="#64748b" name="mail-outline" size={18} />
-                      <TextInput
-                        autoCapitalize="none"
-                        keyboardType="email-address"
-                        onBlur={() => handleFieldBlur("email")}
-                        onChangeText={(value) => setFieldValue("email", value)}
-                        placeholder="Enter your email"
-                        placeholderTextColor={theme.colors.mutedText}
-                        selectionColor={theme.colors.accent}
-                        style={styles.input}
-                        value={email}
-                      />
-                    </View>
-                    {errors.email ? <Text style={styles.errorText}>{errors.email}</Text> : null}
-                  </View>
-
-                  <View style={styles.fieldGroup}>
-                    <Text style={styles.fieldLabel}>Password</Text>
-                    <View style={[styles.inputShell, errors.password && styles.inputShellError]}>
-                      <Ionicons color="#64748b" name="lock-closed-outline" size={18} />
-                      <TextInput
-                        autoCapitalize="none"
-                        onBlur={() => handleFieldBlur("password")}
-                        onChangeText={(value) => setFieldValue("password", value)}
-                        placeholder="Enter your password"
-                        placeholderTextColor={theme.colors.mutedText}
-                        secureTextEntry={!showPassword}
-                        selectionColor={theme.colors.accent}
-                        style={styles.input}
-                        value={password}
-                      />
-                      <TouchableOpacity
-                        activeOpacity={0.85}
-                        onPress={() => setShowPassword((current) => !current)}
-                      >
                         <Ionicons
-                          color="#94a3b8"
-                          name={showPassword ? "eye-off-outline" : "eye-outline"}
+                          color="#64748b"
+                          name="person-outline"
                           size={18}
                         />
-                      </TouchableOpacity>
+                        <TextInput
+                          onBlur={() => handleFieldBlur("name")}
+                          onChangeText={(value) => setFieldValue("name", value)}
+                          placeholder="Enter your name"
+                          placeholderTextColor={theme.colors.mutedText}
+                          selectionColor={theme.colors.accent}
+                          style={styles.input}
+                          value={name}
+                        />
+                      </View>
+                      {errors.name ? (
+                        <Text style={styles.errorText}>{errors.name}</Text>
+                      ) : null}
                     </View>
-                    {errors.password ? (
-                      <Text style={styles.errorText}>{errors.password}</Text>
-                    ) : null}
-                  </View>
 
-                  <View style={styles.fieldGroup}>
-                    <Text style={styles.fieldLabel}>Confirm Password</Text>
-                    <View
-                      style={[
-                        styles.inputShell,
-                        errors.confirmPassword && styles.inputShellError,
-                      ]}
-                    >
-                      <Ionicons color="#64748b" name="shield-checkmark-outline" size={18} />
-                      <TextInput
-                        autoCapitalize="none"
-                        onBlur={() => handleFieldBlur("confirmPassword")}
-                        onChangeText={(value) => setFieldValue("confirmPassword", value)}
-                        placeholder="Confirm your password"
-                        placeholderTextColor={theme.colors.mutedText}
-                        secureTextEntry={!showPassword}
-                        selectionColor={theme.colors.accent}
-                        style={styles.input}
-                        value={confirmPassword}
-                      />
+                    <View style={styles.fieldGroup}>
+                      <Text style={styles.fieldLabel}>Email</Text>
+                      <View
+                        style={[
+                          styles.inputShell,
+                          errors.email && styles.inputShellError,
+                        ]}
+                      >
+                        <Ionicons
+                          color="#64748b"
+                          name="mail-outline"
+                          size={18}
+                        />
+                        <TextInput
+                          autoCapitalize="none"
+                          keyboardType="email-address"
+                          onBlur={() => handleFieldBlur("email")}
+                          onChangeText={(value) =>
+                            setFieldValue("email", value)
+                          }
+                          placeholder="Enter your email"
+                          placeholderTextColor={theme.colors.mutedText}
+                          selectionColor={theme.colors.accent}
+                          style={styles.input}
+                          value={email}
+                        />
+                      </View>
+                      {errors.email ? (
+                        <Text style={styles.errorText}>{errors.email}</Text>
+                      ) : null}
                     </View>
-                    {errors.confirmPassword ? (
-                      <Text style={styles.errorText}>{errors.confirmPassword}</Text>
-                    ) : null}
+
+                    <View style={styles.fieldGroup}>
+                      <Text style={styles.fieldLabel}>Password</Text>
+                      <View
+                        style={[
+                          styles.inputShell,
+                          errors.password && styles.inputShellError,
+                        ]}
+                      >
+                        <Ionicons
+                          color="#64748b"
+                          name="lock-closed-outline"
+                          size={18}
+                        />
+                        <TextInput
+                          autoCapitalize="none"
+                          onBlur={() => handleFieldBlur("password")}
+                          onChangeText={(value) =>
+                            setFieldValue("password", value)
+                          }
+                          placeholder="Enter your password"
+                          placeholderTextColor={theme.colors.mutedText}
+                          secureTextEntry={!showPassword}
+                          selectionColor={theme.colors.accent}
+                          style={styles.input}
+                          value={password}
+                        />
+                        <TouchableOpacity
+                          activeOpacity={0.85}
+                          onPress={() => setShowPassword((current) => !current)}
+                        >
+                          <Ionicons
+                            color="#94a3b8"
+                            name={
+                              showPassword ? "eye-off-outline" : "eye-outline"
+                            }
+                            size={18}
+                          />
+                        </TouchableOpacity>
+                      </View>
+                      {errors.password ? (
+                        <Text style={styles.errorText}>{errors.password}</Text>
+                      ) : null}
+                    </View>
+
+                    <View style={styles.fieldGroup}>
+                      <Text style={styles.fieldLabel}>Confirm Password</Text>
+                      <View
+                        style={[
+                          styles.inputShell,
+                          errors.confirmPassword && styles.inputShellError,
+                        ]}
+                      >
+                        <Ionicons
+                          color="#64748b"
+                          name="shield-checkmark-outline"
+                          size={18}
+                        />
+                        <TextInput
+                          autoCapitalize="none"
+                          onBlur={() => handleFieldBlur("confirmPassword")}
+                          onChangeText={(value) =>
+                            setFieldValue("confirmPassword", value)
+                          }
+                          placeholder="Confirm your password"
+                          placeholderTextColor={theme.colors.mutedText}
+                          secureTextEntry={!showPassword}
+                          selectionColor={theme.colors.accent}
+                          style={styles.input}
+                          value={confirmPassword}
+                        />
+                      </View>
+                      {errors.confirmPassword ? (
+                        <Text style={styles.errorText}>
+                          {errors.confirmPassword}
+                        </Text>
+                      ) : null}
+                    </View>
+                  </>
+                ) : null}
+
+                {notice ? (
+                  <View
+                    style={[
+                      styles.notice,
+                      notice.type === "error"
+                        ? styles.noticeError
+                        : styles.noticeSuccess,
+                    ]}
+                  >
+                    <Text style={styles.noticeText}>{notice.text}</Text>
                   </View>
-                </>
-              ) : null}
+                ) : null}
 
-              {notice ? (
-                <View
-                  style={[
-                    styles.notice,
-                    notice.type === "error" ? styles.noticeError : styles.noticeSuccess,
-                  ]}
-                >
-                  <Text style={styles.noticeText}>{notice.text}</Text>
-                </View>
-              ) : null}
-
-              <TouchableOpacity
-                activeOpacity={0.85}
-                disabled={primaryActionDisabled}
-                onPress={
-                  selectedStorePlan
-                    ? ownerStep < 2
-                      ? handleContinueOwnerSignup
-                      : handleSubmit
-                    : handleSubmit
-                }
-                style={[
-                  styles.submitButton,
-                  primaryActionDisabled && styles.submitButtonDisabled,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.submitButtonText,
-                    primaryActionDisabled && styles.submitButtonTextDisabled,
-                  ]}
-                >
-                  {isSubmitting
-                    ? "Creating account..."
-                    : selectedStorePlan
-                      ? ownerStep < 2
-                        ? "Continue"
-                        : "Finish store setup"
-                      : "Create account"}
-                </Text>
-              </TouchableOpacity>
-
-              {selectedStorePlan && ownerStep > 0 ? (
                 <TouchableOpacity
                   activeOpacity={0.85}
-                  onPress={() => setOwnerStep((current) => (current > 0 ? ((current - 1) as OwnerSignupStep) : 0))}
-                  style={styles.secondaryButton}
+                  disabled={primaryActionDisabled}
+                  onPress={
+                    selectedStorePlan
+                      ? ownerStep < 2
+                        ? handleContinueOwnerSignup
+                        : handleSubmit
+                      : handleSubmit
+                  }
+                  style={[
+                    styles.submitButton,
+                    primaryActionDisabled && styles.submitButtonDisabled,
+                  ]}
                 >
-                  <Text style={styles.secondaryButtonText}>
-                    {ownerStep === 1 ? "Back to owner account" : "Back to store details"}
+                  <Text
+                    style={[
+                      styles.submitButtonText,
+                      primaryActionDisabled && styles.submitButtonTextDisabled,
+                    ]}
+                  >
+                    {isSubmitting
+                      ? "Creating account..."
+                      : selectedStorePlan
+                        ? ownerStep < 2
+                          ? "Continue"
+                          : "Finish store setup"
+                        : "Create account"}
                   </Text>
                 </TouchableOpacity>
-              ) : null}
-            </View>
-          </View>
 
-          {!selectedStorePlan ? (
-            <Text style={styles.footerText}>
-              Already have an account?{" "}
-              <Text
-                onPress={() => router.push("/login")}
-                style={styles.footerLink}
-              >
-                Log in
+                {selectedStorePlan && ownerStep > 0 ? (
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={() =>
+                      setOwnerStep((current) =>
+                        current > 0 ? ((current - 1) as OwnerSignupStep) : 0,
+                      )
+                    }
+                    style={styles.secondaryButton}
+                  >
+                    <Text style={styles.secondaryButtonText}>
+                      {ownerStep === 1
+                        ? "Back to owner account"
+                        : "Back to store details"}
+                    </Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+            </View>
+
+            {!selectedStorePlan ? (
+              <Text style={styles.footerText}>
+                Already have an account?{" "}
+                <Text
+                  onPress={() => router.push("/login")}
+                  style={styles.footerLink}
+                >
+                  Log in
+                </Text>
               </Text>
-            </Text>
-          ) : null}
+            ) : null}
           </View>
         </ScrollView>
       </KeyboardAvoidingView>

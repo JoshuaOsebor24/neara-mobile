@@ -537,6 +537,254 @@ const STORE_BLUEPRINTS = [
       },
     ],
   },
+  {
+    store: {
+      store_name: "Elegushi Fresh Basket",
+      category: "Grocery",
+      address: "18 Meadow Hall Way, Lekki, Lagos",
+      state: "Lagos",
+      country: "Nigeria",
+      latitude: 6.43291,
+      longitude: 3.47682,
+      phone_number: "+234 801 555 4111",
+      verified: true,
+      subscription_tier: 2,
+      image_url:
+        "https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=1200&q=80",
+      header_images: [
+        "https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=1200&q=80",
+      ],
+      description:
+        "Quick neighborhood grocery for fruit, breakfast staples, pantry top-ups, and convenience pickups around Elegushi.",
+      owner: {
+        name: "Dami Ojo",
+        email: "owner+elegushi-fresh-basket@neara.test",
+        phone_number: "+234 801 555 5111",
+      },
+    },
+    products: [
+      {
+        product_name: "Golden Morn Cereal",
+        category: "Breakfast",
+        description: "Popular maize and soy cereal for quick breakfast bowls and easy family mornings.",
+        image_url:
+          "https://images.unsplash.com/photo-1515003197210-e0cd71810b5f?auto=format&fit=crop&w=1200&q=80",
+        tags: ["cereal", "breakfast"],
+        variants: [
+          { variant_name: "500g Pack", price: 1800, stock_quantity: 22, in_stock: true },
+          { variant_name: "1kg Pack", price: 3200, stock_quantity: 12, in_stock: true },
+        ],
+      },
+      {
+        product_name: "Fresh Strawberries",
+        category: "Produce",
+        description: "Sweet fresh strawberries packed for smoothies, snacking, and fruit platters.",
+        image_url:
+          "https://images.unsplash.com/photo-1464965911861-746a04b4bca6?auto=format&fit=crop&w=1200&q=80",
+        tags: ["fruit", "berries"],
+        variants: [{ variant_name: "250g Punnet", price: 4200, stock_quantity: 14, in_stock: true }],
+      },
+    ],
+  },
+  {
+    store: {
+      store_name: "Palm Springs Pharmacy",
+      category: "Pharmacy",
+      address: "9 Palm Springs Road, Lekki, Lagos",
+      state: "Lagos",
+      country: "Nigeria",
+      latitude: 6.43584,
+      longitude: 3.47866,
+      phone_number: "+234 801 555 4112",
+      verified: true,
+      subscription_tier: 2,
+      image_url:
+        "https://images.unsplash.com/photo-1587854692152-cbe660dbde88?auto=format&fit=crop&w=1200&q=80",
+      header_images: [
+        "https://images.unsplash.com/photo-1587854692152-cbe660dbde88?auto=format&fit=crop&w=1200&q=80",
+      ],
+      description:
+        "Nearby pharmacy for OTC medication, wellness supplements, and daily health essentials.",
+      owner: {
+        name: "Amarachi Ibe",
+        email: "owner+palm-springs-pharmacy@neara.test",
+        phone_number: "+234 801 555 5112",
+      },
+    },
+    products: [
+      {
+        product_name: "Ibuprofen Capsules",
+        category: "Pain Relief",
+        description: "Fast-acting ibuprofen capsules for routine pain relief and inflammation support.",
+        image_url:
+          "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&fit=crop&w=1200&q=80",
+        tags: ["pharmacy", "pain relief"],
+        variants: [
+          { variant_name: "Pack of 10", price: 1600, stock_quantity: 30, in_stock: true },
+          { variant_name: "Pack of 30", price: 4200, stock_quantity: 16, in_stock: true },
+        ],
+      },
+      {
+        product_name: "Vitamin C",
+        category: "Supplements",
+        description: "Daily vitamin C tablets for immune support and everyday wellness.",
+        image_url:
+          "https://images.unsplash.com/photo-1584362917165-526a968579e8?auto=format&fit=crop&w=1200&q=80",
+        tags: ["supplements", "vitamin c"],
+        variants: [
+          { variant_name: "1000mg x 20", price: 2900, stock_quantity: 20, in_stock: true },
+          { variant_name: "1000mg x 60", price: 7600, stock_quantity: 10, in_stock: true },
+        ],
+      },
+    ],
+  },
+  {
+    store: {
+      store_name: "Meadow Grill Kitchen",
+      category: "Restaurant",
+      address: "27 Meadow Hall Way, Lekki, Lagos",
+      state: "Lagos",
+      country: "Nigeria",
+      latitude: 6.43088,
+      longitude: 3.47794,
+      phone_number: "+234 801 555 4113",
+      verified: false,
+      subscription_tier: 1,
+      image_url:
+        "https://images.unsplash.com/photo-1552566626-52f8b828add9?auto=format&fit=crop&w=1200&q=80",
+      header_images: [
+        "https://images.unsplash.com/photo-1552566626-52f8b828add9?auto=format&fit=crop&w=1200&q=80",
+      ],
+      description:
+        "Fast casual kitchen serving rice bowls, grilled proteins, and takeaway trays for the Lekki neighborhood.",
+      owner: {
+        name: "Sade Bakare",
+        email: "owner+meadow-grill-kitchen@neara.test",
+        phone_number: "+234 801 555 5113",
+      },
+    },
+    products: [
+      {
+        product_name: "Smoky Jollof Rice Tray",
+        category: "Meals",
+        description: "Party-style jollof rice served hot for quick lunch and dinner orders.",
+        image_url:
+          "https://images.unsplash.com/photo-1512058564366-18510be2db19?auto=format&fit=crop&w=1200&q=80",
+        tags: ["meal", "jollof"],
+        variants: [
+          { variant_name: "Regular", price: 6500, stock_quantity: 16, in_stock: true },
+          { variant_name: "Large", price: 9200, stock_quantity: 10, in_stock: true },
+        ],
+      },
+      {
+        product_name: "Peppered Turkey Bowl",
+        category: "Meals",
+        description: "Peppered turkey served with fries or rice for quick takeaway orders.",
+        image_url:
+          "https://images.unsplash.com/photo-1529042410759-befb1204b468?auto=format&fit=crop&w=1200&q=80",
+        tags: ["turkey", "meal"],
+        variants: [{ variant_name: "Single Bowl", price: 7800, stock_quantity: 11, in_stock: true }],
+      },
+    ],
+  },
+  {
+    store: {
+      store_name: "Coastal Tech Hub",
+      category: "Electronics",
+      address: "6 Kusenla Road, Lekki, Lagos",
+      state: "Lagos",
+      country: "Nigeria",
+      latitude: 6.43422,
+      longitude: 3.48021,
+      phone_number: "+234 801 555 4114",
+      verified: true,
+      subscription_tier: 2,
+      image_url:
+        "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&w=1200&q=80",
+      header_images: [
+        "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&w=1200&q=80",
+      ],
+      description:
+        "Neighborhood gadget store for chargers, earbuds, cables, and quick mobile accessories.",
+      owner: {
+        name: "Lanre Bello",
+        email: "owner+coastal-tech-hub@neara.test",
+        phone_number: "+234 801 555 5114",
+      },
+    },
+    products: [
+      {
+        product_name: "65W Fast Charger",
+        category: "Accessories",
+        description: "Compact USB-C fast charger for phones, tablets, and lightweight laptops.",
+        image_url:
+          "https://images.unsplash.com/photo-1583863788434-e58a36330cf0?auto=format&fit=crop&w=1200&q=80",
+        tags: ["charger", "electronics"],
+        variants: [{ variant_name: "Single Unit", price: 18000, stock_quantity: 13, in_stock: true }],
+      },
+      {
+        product_name: "Wireless Earbuds",
+        category: "Audio",
+        description: "Bluetooth earbuds with charging case for calls, music, and everyday commuting.",
+        image_url:
+          "https://images.unsplash.com/photo-1588423771073-b8903fbb85b5?auto=format&fit=crop&w=1200&q=80",
+        tags: ["audio", "earbuds"],
+        variants: [{ variant_name: "Standard", price: 32000, stock_quantity: 8, in_stock: true }],
+      },
+    ],
+  },
+  {
+    store: {
+      store_name: "Beachside Bakery House",
+      category: "Bakery",
+      address: "11 Admiralty Close, Off Lekki-Epe Expressway, Lekki, Lagos",
+      state: "Lagos",
+      country: "Nigeria",
+      latitude: 6.42976,
+      longitude: 3.47493,
+      phone_number: "+234 801 555 4115",
+      verified: true,
+      subscription_tier: 2,
+      image_url:
+        "https://images.unsplash.com/photo-1517433670267-08bbd4be890f?auto=format&fit=crop&w=1200&q=80",
+      header_images: [
+        "https://images.unsplash.com/photo-1517433670267-08bbd4be890f?auto=format&fit=crop&w=1200&q=80",
+      ],
+      description:
+        "Local bakery for savory pies, pastries, celebration cakes, and breakfast pickups near the beachside corridor.",
+      owner: {
+        name: "Moyin Balogun",
+        email: "owner+beachside-bakery-house@neara.test",
+        phone_number: "+234 801 555 5115",
+      },
+    },
+    products: [
+      {
+        product_name: "Chicken Pie",
+        category: "Savory Snacks",
+        description: "Buttery chicken pie baked fresh throughout the day.",
+        image_url:
+          "https://images.unsplash.com/photo-1601050690597-df0568f70950?auto=format&fit=crop&w=1200&q=80",
+        tags: ["pie", "snack"],
+        variants: [
+          { variant_name: "Single", price: 1900, stock_quantity: 24, in_stock: true },
+          { variant_name: "Pack of 4", price: 7200, stock_quantity: 10, in_stock: true },
+        ],
+      },
+      {
+        product_name: "Butter Croissant",
+        category: "Pastries",
+        description: "Layered croissant with a crisp exterior and soft buttery center.",
+        image_url:
+          "https://images.unsplash.com/photo-1555507036-ab794f4afe5d?auto=format&fit=crop&w=1200&q=80",
+        tags: ["pastry", "breakfast"],
+        variants: [
+          { variant_name: "Single", price: 1600, stock_quantity: 18, in_stock: true },
+          { variant_name: "Box of 4", price: 5900, stock_quantity: 7, in_stock: true },
+        ],
+      },
+    ],
+  },
 ];
 
 async function purgeManagedSeedStores(client) {

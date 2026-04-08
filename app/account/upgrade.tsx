@@ -12,13 +12,17 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { BackPillButton } from "@/components/ui/back-pill-button";
 import { theme } from "@/constants/theme";
 import {
   buildSessionPatchFromAuthUser,
   initializeProSubscriptionWithBackend,
   verifyProSubscriptionWithBackend,
 } from "@/services/auth-api";
-import { updateMobileSession, useMobileSession } from "@/services/mobile-session";
+import {
+  updateMobileSession,
+  useMobileSession,
+} from "@/services/mobile-session";
 import { navigateBackOrFallback } from "@/services/navigation";
 import {
   NEARA_PRO_LIMIT_MESSAGE,
@@ -79,13 +83,7 @@ export default function UpgradeScreen() {
       >
         <View style={styles.page}>
           <View style={styles.header}>
-            <TouchableOpacity
-              activeOpacity={0.85}
-              onPress={() => navigateBackOrFallback(router, "/(tabs)/profile")}
-              style={styles.backButton}
-            >
-              <Text style={styles.backButtonText}>← Back</Text>
-            </TouchableOpacity>
+            <BackPillButton fallbackHref="/(tabs)/profile" />
             <Text style={styles.headerLabel}>Neara</Text>
           </View>
 
@@ -99,7 +97,9 @@ export default function UpgradeScreen() {
 
               {!isPro ? (
                 <View style={styles.limitCard}>
-                  <Text style={styles.limitTitle}>{NEARA_PRO_LIMIT_MESSAGE}</Text>
+                  <Text style={styles.limitTitle}>
+                    {NEARA_PRO_LIMIT_MESSAGE}
+                  </Text>
                   <Text style={styles.limitText}>
                     Upgrade to continue chatting with stores instantly.
                   </Text>
@@ -161,7 +161,9 @@ export default function UpgradeScreen() {
 
                     <TouchableOpacity
                       activeOpacity={0.85}
-                      onPress={() => navigateBackOrFallback(router, "/(tabs)/profile")}
+                      onPress={() =>
+                        navigateBackOrFallback(router, "/(tabs)/profile")
+                      }
                       style={styles.secondaryCta}
                     >
                       <Text style={styles.secondaryCtaText}>Not now</Text>
@@ -193,9 +195,10 @@ export default function UpgradeScreen() {
                           return;
                         }
 
-                        const initResult = await initializeProSubscriptionWithBackend(
-                          session.authToken,
-                        );
+                        const initResult =
+                          await initializeProSubscriptionWithBackend(
+                            session.authToken,
+                          );
 
                         if (!initResult.ok) {
                           setIsSubmitting(false);
@@ -210,9 +213,10 @@ export default function UpgradeScreen() {
                           initResult.provider !== "mock" &&
                           initResult.authorizationUrl
                         ) {
-                          const browserResult = await WebBrowser.openBrowserAsync(
-                            initResult.authorizationUrl,
-                          );
+                          const browserResult =
+                            await WebBrowser.openBrowserAsync(
+                              initResult.authorizationUrl,
+                            );
 
                           if (browserResult.type === "cancel") {
                             setIsSubmitting(false);
@@ -224,10 +228,11 @@ export default function UpgradeScreen() {
                           }
                         }
 
-                        const verifyResult = await verifyProSubscriptionWithBackend(
-                          session.authToken,
-                          initResult.reference,
-                        );
+                        const verifyResult =
+                          await verifyProSubscriptionWithBackend(
+                            session.authToken,
+                            initResult.reference,
+                          );
 
                         if (!verifyResult.ok) {
                           setIsSubmitting(false);
@@ -260,7 +265,9 @@ export default function UpgradeScreen() {
 
                     <TouchableOpacity
                       activeOpacity={0.85}
-                      onPress={() => navigateBackOrFallback(router, "/(tabs)/profile")}
+                      onPress={() =>
+                        navigateBackOrFallback(router, "/(tabs)/profile")
+                      }
                       style={styles.secondaryCta}
                     >
                       <Text style={styles.secondaryCtaText}>Not now</Text>

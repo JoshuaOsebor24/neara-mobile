@@ -1,20 +1,36 @@
 import { useFocusEffect, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useState } from "react";
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import {
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { EmptyCard, ErrorCard, LoadingCard, SkeletonCard } from "@/components/ux-state";
+import { BackPillButton } from "@/components/ui/back-pill-button";
+import {
+  EmptyCard,
+  ErrorCard,
+  LoadingCard,
+  SkeletonCard,
+} from "@/components/ux-state";
 import { theme } from "@/constants/theme";
-import { fetchChatConversations, type ChatConversationSummary } from "@/services/chat-api";
-import { navigateBackOrFallback } from "@/services/navigation";
+import {
+  fetchChatConversations,
+  type ChatConversationSummary,
+} from "@/services/chat-api";
 import { useMobileSession } from "@/services/mobile-session";
 
 export default function StoreChatsScreen() {
   const router = useRouter();
   const session = useMobileSession();
   const storeName = session.primaryStoreName || "Store inbox";
-  const [conversations, setConversations] = useState<ChatConversationSummary[]>([]);
+  const [conversations, setConversations] = useState<ChatConversationSummary[]>(
+    [],
+  );
   const [errorMessage, setErrorMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
@@ -30,46 +46,46 @@ export default function StoreChatsScreen() {
   }, [router, session.isAuthenticated, session.isPro, session.isStoreOwner]);
 
   const loadOwnerConversations = useCallback(async () => {
-      if (
-        !session.isAuthenticated ||
-        !session.isStoreOwner ||
-        !session.isPro ||
-        !session.authToken
-      ) {
+    if (
+      !session.isAuthenticated ||
+      !session.isStoreOwner ||
+      !session.isPro ||
+      !session.authToken
+    ) {
+      return;
+    }
+
+    setIsLoading(true);
+    setErrorMessage("");
+
+    const result = await fetchChatConversations(session.authToken, "owner");
+
+    if (!result.ok) {
+      if (result.status === 401) {
+        router.replace("/login");
         return;
       }
 
-      setIsLoading(true);
-      setErrorMessage("");
-
-      const result = await fetchChatConversations(session.authToken, "owner");
-
-      if (!result.ok) {
-        if (result.status === 401) {
-          router.replace("/login");
-          return;
-        }
-
-        if (result.status === 403) {
-          router.replace("/store/chats/locked");
-          return;
-        }
-
-        setErrorMessage(result.error);
-        setConversations([]);
-        setIsLoading(false);
+      if (result.status === 403) {
+        router.replace("/store/chats/locked");
         return;
       }
 
-      setConversations(result.conversations);
+      setErrorMessage(result.error);
+      setConversations([]);
       setIsLoading(false);
-    }, [
-      router,
-      session.authToken,
-      session.isAuthenticated,
-      session.isPro,
-      session.isStoreOwner,
-    ]);
+      return;
+    }
+
+    setConversations(result.conversations);
+    setIsLoading(false);
+  }, [
+    router,
+    session.authToken,
+    session.isAuthenticated,
+    session.isPro,
+    session.isStoreOwner,
+  ]);
 
   useFocusEffect(
     useCallback(() => {
@@ -99,13 +115,7 @@ export default function StoreChatsScreen() {
       >
         <View style={styles.page}>
           <View style={styles.header}>
-            <TouchableOpacity
-              activeOpacity={0.85}
-              onPress={() => navigateBackOrFallback(router, "/(tabs)/profile")}
-              style={styles.backButton}
-            >
-              <Text style={styles.backButtonText}>← Back</Text>
-            </TouchableOpacity>
+            <BackPillButton fallbackHref="/(tabs)/profile" />
             <View>
               <Text style={styles.title}>Inbox</Text>
               <Text style={styles.subtitle}>{storeName} owner inbox</Text>
@@ -117,7 +127,9 @@ export default function StoreChatsScreen() {
               activeOpacity={0.85}
               onPress={() =>
                 router.push(
-                  session.primaryStoreId ? `/store/${session.primaryStoreId}` : "/(tabs)/profile",
+                  session.primaryStoreId
+                    ? `/store/${session.primaryStoreId}`
+                    : "/(tabs)/profile",
                 )
               }
               style={styles.secondaryAction}
@@ -166,7 +178,9 @@ export default function StoreChatsScreen() {
                 style={styles.card}
               >
                 <View style={styles.cardHeader}>
-                  <Text style={styles.customerName}>{conversation.user_name}</Text>
+                  <Text style={styles.customerName}>
+                    {conversation.user_name}
+                  </Text>
                   <Text style={styles.statusText}>
                     {conversation.unread_count > 0
                       ? `${conversation.unread_count} unread`
@@ -174,7 +188,8 @@ export default function StoreChatsScreen() {
                   </Text>
                 </View>
                 <Text style={styles.preview}>
-                  {conversation.last_message || "Open this conversation to view messages."}
+                  {conversation.last_message ||
+                    "Open this conversation to view messages."}
                 </Text>
               </TouchableOpacity>
             ))}

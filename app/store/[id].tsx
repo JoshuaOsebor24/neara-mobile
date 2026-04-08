@@ -41,7 +41,6 @@ import { fetchStoreFullData } from "@/services/store-api";
 type StoreData = {
   id: string;
   storeName: string;
-  verified: boolean;
   isOpen: boolean;
   category: string;
   address: string;
@@ -77,7 +76,7 @@ type ProductGroup = {
 const STORE_PHOTO_LIMIT = 3;
 
 function normalizeStorePhotos(
-  photos: Array<string | null | undefined>,
+  photos: (string | null | undefined)[],
   fallback = "",
 ) {
   const normalized = photos
@@ -111,7 +110,6 @@ function createEmptyStore(storeId: string): StoreData {
     phoneNumber: "",
     photos: [],
     storeName: "",
-    verified: false,
   };
 }
 
@@ -148,7 +146,6 @@ function buildOwnerSessionStore(
     phoneNumber: session.storePhoneNumber || "",
     photos,
     storeName: session.primaryStoreName || "",
-    verified: session.storeVerified,
   };
 }
 
@@ -465,7 +462,6 @@ export default function StoreScreen() {
             phoneNumber: result.store.phone_number || "",
             photos: nextStorePhotos,
             storeName: result.store.store_name || "",
-            verified: Boolean(result.store.verified),
           }
         : null;
 
@@ -605,7 +601,6 @@ export default function StoreScreen() {
               remoteStore?.storeName ||
               ownerSessionStore?.storeName ||
               "",
-            verified: session.storeVerified || Boolean(remoteStore?.verified),
           }
         : remoteStore || ownerSessionStore || createEmptyStore(String(storeId));
 
@@ -638,7 +633,6 @@ export default function StoreScreen() {
     session.primaryStoreImageUrl,
     session.primaryStoreName,
     session.storePhoneNumber,
-    session.storeVerified,
     storeId,
   ]);
   const isOwnerViewingStore =
@@ -794,7 +788,6 @@ export default function StoreScreen() {
       image_url: resolvedStore.heroImage,
       phone_number: resolvedStore.phoneNumber,
       store_name: resolvedStore.storeName,
-      verified: resolvedStore.verified,
     });
   }, [
     resolvedStore.address,
@@ -802,7 +795,6 @@ export default function StoreScreen() {
     resolvedStore.heroImage,
     resolvedStore.phoneNumber,
     resolvedStore.storeName,
-    resolvedStore.verified,
     storeId,
   ]);
 
@@ -880,18 +872,6 @@ export default function StoreScreen() {
                       <Text style={styles.heroTitle}>
                         {resolvedStore.storeName || "Store"}
                       </Text>
-                      {resolvedStore.verified ? (
-                        <View style={styles.verifiedBadge}>
-                          <Ionicons
-                            color="#7dd3fc"
-                            name="checkmark-circle"
-                            size={14}
-                          />
-                          <Text style={styles.verifiedBadgeText}>
-                            Verified Store
-                          </Text>
-                        </View>
-                      ) : null}
                     </View>
 
                     <View style={styles.heroMetaRow}>
@@ -986,7 +966,6 @@ export default function StoreScreen() {
                                       phone_number: resolvedStore.phoneNumber,
                                       store_name:
                                         resolvedStore.storeName || "Store",
-                                      verified: resolvedStore.verified,
                                     });
                                     setSaved(true);
                                   }
@@ -1545,22 +1524,6 @@ const styles = StyleSheet.create({
     fontSize: 30,
     fontWeight: "800",
     lineHeight: 34,
-  },
-  verifiedBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: "rgba(125, 211, 252, 0.22)",
-    backgroundColor: "rgba(56, 189, 248, 0.12)",
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  verifiedBadgeText: {
-    color: "#e0f2fe",
-    fontSize: 11,
-    fontWeight: "700",
   },
   heroMetaRow: {
     flexDirection: "row",

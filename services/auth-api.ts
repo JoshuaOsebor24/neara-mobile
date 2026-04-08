@@ -36,8 +36,6 @@ type BackendStore = {
   phone_number?: string | null;
   state?: string | null;
   store_name?: string | null;
-  subscription_tier?: string | null;
-  verified?: boolean | null;
 };
 
 type AuthResponse = {
@@ -193,7 +191,6 @@ export function buildSessionPatchFromAuthUser(
     roles: buildActiveRoles(isPro, isStoreOwner),
     storePhoneNumber: "",
     storePlan: null,
-    storeVerified: false,
   };
 }
 
@@ -203,11 +200,6 @@ export function buildSessionPatchFromStore(
   if (!store) {
     return {};
   }
-
-  const plan =
-    store.subscription_tier === "verified" || store.verified
-      ? "verified"
-      : "basic";
 
   return {
     isStoreOwner: true,
@@ -220,8 +212,7 @@ export function buildSessionPatchFromStore(
     primaryStoreLongitude: normalizeCoordinate(store.longitude),
     primaryStoreName: store.store_name?.trim() || "",
     storePhoneNumber: store.phone_number?.trim() || "",
-    storePlan: plan,
-    storeVerified: Boolean(store.verified),
+    storePlan: "basic",
   };
 }
 

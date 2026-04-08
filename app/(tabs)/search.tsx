@@ -1,4 +1,3 @@
-import Ionicons from "@expo/vector-icons/Ionicons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -14,21 +13,18 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { NearaMapView } from "@/components/map/MapView";
-import { HamburgerButton } from "@/components/navigation/hamburger-button";
+import { BackPillButton } from "@/components/ui/back-pill-button";
 import { theme } from "@/constants/theme";
-import type { UserCoordinates } from "@/services/location";
 import {
   searchProducts,
   type SearchProductResult,
 } from "@/services/search-api";
-import type { BackendStore } from "@/services/store-api";
 
 type SearchResultItem = {
   id: string;
+  productId: string;
   storeId: string;
   store: string;
-  verified: boolean;
   productName: string;
   variant: string;
   category: string;
@@ -48,9 +44,9 @@ type SearchCardVariant = {
 
 type SearchCardItem = {
   key: string;
+  productId: string;
   storeId: string;
   store: string;
-  verified: boolean;
   productName: string;
   variants: SearchCardVariant[];
   image?: string | null;
@@ -86,8 +82,11 @@ function buildStoreInitial(name: string) {
 function groupSearchResults(items: SearchResultItem[]) {
   const groups = new Map<string, SearchCardItem>();
 
-  items.forEach((item, index) => {
-    const key = `${item.storeId}::${item.productName.trim().toLowerCase() || index}`;
+  items.forEach((item) => {
+    const normalizedProductName = item.productName.trim().toLowerCase();
+    const key = item.productId
+      ? `${item.storeId}::${item.productId}`
+      : `${item.storeId}::${normalizedProductName}`;
     const priceLabel =
       item.price !== null ? formatPrice(item.price) : undefined;
     const variantLabel = item.variant.trim() || null;
@@ -97,9 +96,9 @@ function groupSearchResults(items: SearchResultItem[]) {
     if (!existing) {
       groups.set(key, {
         key,
+        productId: item.productId,
         storeId: item.storeId,
         store: item.store,
-        verified: item.verified,
         productName: item.productName,
         variants: [{ key: variantKey, label: variantLabel, priceLabel }],
         image: item.image || null,
@@ -132,7 +131,10 @@ export default function SearchTab() {
   const router = useRouter();
   const params = useLocalSearchParams<{ q?: string }>();
   const [query, setQuery] = useState(() => String(params.q || "").trim());
-  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [recentSearches, setRecentSearches] = useState<string[]>(() => {
+    const initialQuery = normalizeQuery(String(params.q || ""));
+    return initialQuery ? [initialQuery] : [];
+  });
   const [activeId, setActiveId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -182,11 +184,11 @@ export default function SearchTab() {
             typeof item.price === "number"
               ? item.price
               : Number(item.price || 0),
+          productId: String(item.product_id || ""),
           productName: item.product_name || "",
           store: item.store_name || "",
           storeId: String(item.store_id),
           variant: item.variant_name || item.variant || "",
-          verified: Boolean(item.verified),
           id: `${item.store_id}-${item.product_id || index}`,
           image: item.image_url || null,
         }));
@@ -214,43 +216,6 @@ export default function SearchTab() {
   }, [query, remoteResults]);
 
   const groupedResults = useMemo(() => groupSearchResults(results), [results]);
-
-  const searchMapStores: BackendStore[] = useMemo(
-    () =>
-      groupedResults
-        .filter((item) => item.latitude != null && item.longitude != null)
-        .map((item) => ({
-          id: item.storeId,
-          store_name: item.store,
-          verified: item.verified,
-          latitude: item.latitude!,
-          longitude: item.longitude!,
-        })),
-    [groupedResults],
-  );
-
-  const searchFocusCoordinates = useMemo<UserCoordinates | null>(() => {
-    const activeItem =
-      groupedResults.find((item) => item.key === activeId) ?? groupedResults[0];
-    if (activeItem?.latitude == null || activeItem.longitude == null) {
-      return null;
-    }
-
-    return {
-      latitude: activeItem.latitude,
-      longitude: activeItem.longitude,
-      accuracy: null,
-      fetchedAt: 0,
-    };
-  }, [activeId, groupedResults]);
-
-  const activeSearchStoreId = useMemo(
-    () =>
-      groupedResults.find((item) => item.key === activeId)?.storeId ??
-      groupedResults[0]?.storeId ??
-      null,
-    [activeId, groupedResults],
-  );
 
   const tooShort = query.trim().length > 0 && query.trim().length < 2;
   const hasQuery = normalizeQuery(query).length >= 2;
@@ -299,18 +264,6 @@ export default function SearchTab() {
                       <Text numberOfLines={1} style={styles.resultStoreName}>
                         {item.store}
                       </Text>
-                      {item.verified && (
-                        <View style={styles.resultVerifiedBadge}>
-                          <Ionicons
-                            color="#7ce9c0"
-                            name="checkmark"
-                            size={14}
-                          />
-                          <Text style={styles.resultVerifiedText}>
-                            Verified
-                          </Text>
-                        </View>
-                      )}
                     </View>
                     <Text numberOfLines={1} style={styles.resultProductName}>
                       {item.productName}
@@ -381,59 +334,61 @@ export default function SearchTab() {
     <SafeAreaView edges={["top"]} style={styles.safeArea}>
       <StatusBar style="light" />
       <View style={styles.screen}>
-        <View style={styles.header}>
-          <View style={styles.headerInner}>
-            <HamburgerButton />
-            <TouchableOpacity
-              style={styles.headerCancel}
-              onPress={() => setShowIdle(true)}
-            >
-              <Text style={styles.headerCancelText}>Cancel</Text>
-            </TouchableOpacity>
+        <View style={styles.searchTopBar}>
+          <BackPillButton fallbackHref="/(tabs)/home" />
+
+          <View style={styles.searchShell}>
+            <TextInput
+              value={query}
+              onChangeText={setQuery}
+              onSubmitEditing={handleSubmitSearch}
+              placeholder="Search stores and products"
+              placeholderTextColor={theme.colors.mutedText}
+              selectionColor={theme.colors.accent}
+              style={styles.searchInput}
+              returnKeyType="search"
+              autoFocus
+            />
           </View>
         </View>
 
-        <View style={styles.searchShell}>
-          <Ionicons color={theme.colors.mutedText} name="search" size={22} />
-          <TextInput
-            value={query}
-            onChangeText={setQuery}
-            onSubmitEditing={handleSubmitSearch}
-            placeholder="Search stores and products"
-            placeholderTextColor={theme.colors.mutedText}
-            selectionColor={theme.colors.accent}
-            style={styles.searchInput}
-            returnKeyType="search"
-            autoFocus={!showIdle}
-          />
-        </View>
-
-        {showIdle ? (
-          <View style={styles.idleContent}>
-            <Text style={styles.idleTitle}>Search stores and products</Text>
-            <Text style={styles.idleSubtitle}>Discover what&apos;s nearby</Text>
-            {recentSearches.length > 0 && (
-              <View style={styles.recentSection}>
-                <Text style={styles.recentLabel}>Recent</Text>
-                <View style={styles.recentChips}>
-                  {recentSearches.map((search, idx) => (
-                    <TouchableOpacity
-                      key={idx}
-                      onPress={() => {
-                        setQuery(search);
-                        setShowIdle(false);
-                      }}
-                      style={styles.recentChip}
-                    >
-                      <Text style={styles.recentChipText}>{search}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
+        <View style={styles.resultsContainer}>
+          {recentSearches.length > 0 ? (
+            <View style={styles.recentSearchesCard}>
+              <View style={styles.recentSearchesHeader}>
+                <Text style={styles.recentSearchesLabel}>RECENT SEARCHES</Text>
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={() => setRecentSearches([])}
+                >
+                  <Text style={styles.recentSearchesClear}>Clear</Text>
+                </TouchableOpacity>
               </View>
-            )}
-          </View>
-        ) : (
-          <View style={styles.resultsContainer}>
+              <View style={styles.recentChips}>
+                {recentSearches.map((search, idx) => (
+                  <TouchableOpacity
+                    key={`${search}-${idx}`}
+                    onPress={() => {
+                      setQuery(search);
+                      setShowIdle(false);
+                    }}
+                    style={styles.recentChip}
+                  >
+                    <Text style={styles.recentChipText}>{search}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          ) : null}
+
+          {showIdle ? (
+            <View style={styles.idleContent}>
+              <Text style={styles.idleTitle}>Search stores and products</Text>
+              <Text style={styles.idleSubtitle}>
+                Discover what&apos;s nearby
+              </Text>
+            </View>
+          ) : (
             <FlatList
               data={groupedResults}
               renderItem={renderResultCard}
@@ -443,23 +398,8 @@ export default function SearchTab() {
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
             />
-            <NearaMapView
-              coordinates={null}
-              disableGestures={true}
-              errorMessage=""
-              focusedCoordinates={searchFocusCoordinates}
-              isLoading={false}
-              mapRecenterKey={0}
-              onMapMoveStart={() => {}}
-              onRequestLocation={() => {}}
-              onSelectStore={() => {}}
-              permissionStatus="undetermined"
-              selectedStoreId={activeSearchStoreId}
-              stores={searchMapStores}
-              style={styles.resultsMap}
-            />
-          </View>
-        )}
+          )}
+        </View>
       </View>
     </SafeAreaView>
   );
@@ -468,44 +408,65 @@ export default function SearchTab() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: "#0b1220" },
   screen: { flex: 1, backgroundColor: "#0b1220" },
-  header: {
+  searchTopBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
     paddingHorizontal: 20,
     paddingTop: 18,
+    paddingBottom: 18,
   },
-  headerInner: {
-    flexDirection: "row",
+  backButton: {
+    width: 56,
+    height: 56,
+    borderRadius: 18,
     alignItems: "center",
-    justifyContent: "space-between",
-  },
-  headerCancel: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  headerCancelText: {
-    color: "#60a5fa",
-    fontSize: 16,
-    fontWeight: "600",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.08)",
   },
   searchShell: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginHorizontal: 20,
-    marginTop: 16,
-    marginBottom: 24,
-    gap: 14,
-    height: 64,
-    borderRadius: 24,
+    flex: 1,
+    height: 72,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
     backgroundColor: "rgba(16,26,46,0.92)",
-    paddingHorizontal: 20,
+    justifyContent: "center",
+    paddingHorizontal: 18,
   },
   searchInput: {
     flex: 1,
     color: theme.colors.text,
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: "500",
     paddingVertical: 0,
+  },
+  recentSearchesCard: {
+    marginHorizontal: 20,
+    marginBottom: 22,
+    borderRadius: 26,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(10, 18, 32, 0.92)",
+    paddingHorizontal: 20,
+    paddingVertical: 18,
+    gap: 16,
+  },
+  recentSearchesHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  recentSearchesLabel: {
+    color: "#a5b4cf",
+    fontSize: 12,
+    fontWeight: "800",
+    letterSpacing: 3,
+  },
+  recentSearchesClear: {
+    color: "#8ec1ff",
+    fontSize: 14,
+    fontWeight: "700",
   },
   idleContent: {
     flex: 1,
@@ -527,19 +488,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 24,
   },
-  recentSection: {
-    position: "absolute",
-    bottom: 40,
-    left: 20,
-    right: 20,
-  },
-  recentLabel: {
-    color: "#94a3b8",
-    fontSize: 12,
-    fontWeight: "700",
-    marginBottom: 12,
-    textTransform: "uppercase",
-  },
   recentChips: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -558,15 +506,12 @@ const styles = StyleSheet.create({
   },
   resultsContainer: {
     flex: 1,
+    paddingBottom: 12,
   },
   resultsList: {
     paddingHorizontal: 20,
     paddingBottom: 20,
     flexGrow: 1,
-  },
-  resultsMap: {
-    flex: 1,
-    minHeight: 300,
   },
   resultCardWrap: {},
   resultCard: {
@@ -629,22 +574,6 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
     fontSize: 15,
     fontWeight: "800",
-  },
-  resultVerifiedBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: "rgba(16,185,129,0.28)",
-    backgroundColor: "rgba(16,185,129,0.16)",
-  },
-  resultVerifiedText: {
-    color: "#b7f7df",
-    fontSize: 11,
-    fontWeight: "700",
   },
   resultProductName: {
     marginTop: 4,

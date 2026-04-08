@@ -11,9 +11,9 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { BackPillButton } from "@/components/ui/back-pill-button";
 import { theme } from "@/constants/theme";
 import { useMobileSession } from "@/services/mobile-session";
-import { navigateBackOrFallback } from "@/services/navigation";
 import {
   loadRecentStoresForSession,
   loadSavedStoresForSession,
@@ -47,8 +47,7 @@ export default function CartScreen() {
     }
   }, [session.isAuthenticated, session.authToken]);
 
-  const recommendedStores =
-    savedStores.length > 0 ? savedStores : recentStores;
+  const recommendedStores = savedStores.length > 0 ? savedStores : recentStores;
 
   return (
     <SafeAreaView edges={["top"]} style={styles.safeArea}>
@@ -61,13 +60,7 @@ export default function CartScreen() {
       >
         <View style={styles.page}>
           <View style={styles.header}>
-            <TouchableOpacity
-              activeOpacity={0.85}
-              onPress={() => navigateBackOrFallback(router, "/")}
-              style={styles.backButton}
-            >
-              <Text style={styles.backButtonText}>← Back</Text>
-            </TouchableOpacity>
+            <BackPillButton fallbackHref="/(tabs)/home" />
             <Text style={styles.headerLabel}>Cart</Text>
           </View>
 
@@ -93,7 +86,9 @@ export default function CartScreen() {
                 onPress={() => router.push("/(tabs)/saved")}
                 style={styles.secondaryButton}
               >
-                <Text style={styles.secondaryButtonText}>Open saved stores</Text>
+                <Text style={styles.secondaryButtonText}>
+                  Open saved stores
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -149,13 +144,6 @@ export default function CartScreen() {
                     <View style={styles.storeBody}>
                       <View style={styles.storeTitleRow}>
                         <Text style={styles.storeName}>{store.store_name}</Text>
-                        {store.verified ? (
-                          <View style={styles.verifiedPill}>
-                            <Text style={styles.verifiedPillText}>
-                              Verified
-                            </Text>
-                          </View>
-                        ) : null}
                       </View>
                       <Text style={styles.storeMeta}>
                         {formatStoreMeta(store.category, store.address)}
@@ -359,18 +347,6 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     fontSize: 16,
     fontWeight: "700",
-  },
-  verifiedPill: {
-    backgroundColor: "rgba(56, 189, 248, 0.12)",
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  verifiedPillText: {
-    color: "#bae6fd",
-    fontSize: 11,
-    fontWeight: "800",
-    textTransform: "uppercase",
   },
   storeMeta: {
     color: theme.colors.mutedText,

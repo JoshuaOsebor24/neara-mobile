@@ -1,43 +1,36 @@
 import { LinearGradient } from "expo-linear-gradient";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useMemo, useState } from "react";
-import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import {
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
+import { BackPillButton } from "@/components/ui/back-pill-button";
 import { theme } from "@/constants/theme";
+import {
+  updateMobileSession,
+  useMobileSession,
+} from "@/services/mobile-session";
 import { navigateBackOrFallback } from "@/services/navigation";
-import { updateMobileSession, useMobileSession } from "@/services/mobile-session";
 
-type StorePlanId = "basic" | "verified";
-
-const STORE_PLAN_META: Record<
-  StorePlanId,
-  {
-    description: string;
-    price: string;
-    title: string;
-  }
-> = {
-  basic: {
-    description: "Start selling with a simple store presence across Neara.",
-    price: "₦1,000 / month",
-    title: "Basic Store",
-  },
-  verified: {
-    description: "Includes the full Basic plan, plus stronger trust and visibility.",
-    price: "₦2,000 / month",
-    title: "Verified Store",
-  },
+const STORE_PLAN_META = {
+  description: "Start selling with a simple store presence across Neara.",
+  price: "₦1,000 / month",
+  title: "Basic Store",
 };
 
 export default function StorePaymentScreen() {
   const router = useRouter();
   const session = useMobileSession();
-  const params = useLocalSearchParams<{ storePlan?: string }>();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [notice, setNotice] = useState("");
-  const storePlan: StorePlanId = params.storePlan === "basic" ? "basic" : "verified";
-  const plan = useMemo(() => STORE_PLAN_META[storePlan], [storePlan]);
+  const plan = useMemo(() => STORE_PLAN_META, []);
 
   const handleContinue = async () => {
     if (isSubmitting) {
@@ -48,11 +41,11 @@ export default function StorePaymentScreen() {
     setNotice("");
 
     updateMobileSession({
-      storePlan,
+      storePlan: "basic",
     });
 
     setNotice("Payment confirmed. Continuing to registration...");
-    router.replace(`/signup?storePlan=${storePlan}&paymentStatus=success`);
+    router.replace("/signup?storePlan=basic&paymentStatus=success");
   };
 
   return (
@@ -64,16 +57,14 @@ export default function StorePaymentScreen() {
         end={{ x: 0.5, y: 1 }}
         style={StyleSheet.absoluteFillObject}
       />
-      <ScrollView bounces={false} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        bounces={false}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.page}>
           <View style={styles.header}>
-            <TouchableOpacity
-              activeOpacity={0.85}
-              onPress={() => navigateBackOrFallback(router, "/store-mode")}
-              style={styles.backButton}
-            >
-              <Text style={styles.backButtonText}>← Back</Text>
-            </TouchableOpacity>
+            <BackPillButton fallbackHref="/store-mode" />
             <Text style={styles.headerLabel}>Store payment</Text>
           </View>
 
@@ -81,7 +72,8 @@ export default function StorePaymentScreen() {
             <Text style={styles.eyebrow}>Neara Store Mode</Text>
             <Text style={styles.title}>Complete Your Payment</Text>
             <Text style={styles.subtitle}>
-              Continue with the same store setup flow after payment is confirmed.
+              Continue with the same store setup flow after payment is
+              confirmed.
             </Text>
 
             <View style={styles.planCard}>
@@ -93,7 +85,9 @@ export default function StorePaymentScreen() {
             <View style={styles.noticeCard}>
               <Text style={styles.noticeTitle}>Payment step</Text>
               <Text style={styles.noticeText}>
-                Real payment can be wired into this step later. For now, this keeps the correct flow and success transition from pricing to registration.
+                Real payment can be wired into this step later. For now, this
+                keeps the correct flow and success transition from pricing to
+                registration.
               </Text>
             </View>
 
@@ -107,7 +101,10 @@ export default function StorePaymentScreen() {
               activeOpacity={0.85}
               disabled={isSubmitting}
               onPress={() => void handleContinue()}
-              style={[styles.primaryButton, isSubmitting && styles.primaryButtonDisabled]}
+              style={[
+                styles.primaryButton,
+                isSubmitting && styles.primaryButtonDisabled,
+              ]}
             >
               <Text style={styles.primaryButtonText}>
                 {isSubmitting ? "Confirming..." : "Confirm payment"}
@@ -124,7 +121,8 @@ export default function StorePaymentScreen() {
 
             {session.isAuthenticated ? (
               <Text style={styles.sameAccountText}>
-                This continues on the same Neara account for {session.email || "your login"}.
+                This continues on the same Neara account for{" "}
+                {session.email || "your login"}.
               </Text>
             ) : null}
           </View>

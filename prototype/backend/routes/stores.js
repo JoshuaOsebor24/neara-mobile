@@ -304,8 +304,6 @@ router.get("/", async (req, res) => {
             latitude,
             longitude,
             phone_number,
-            verified,
-            subscription_tier,
             image_url,
             header_images,
             description,
@@ -341,8 +339,6 @@ router.get("/", async (req, res) => {
             latitude,
             longitude,
             phone_number,
-            verified,
-            subscription_tier,
             image_url,
             header_images,
             description
@@ -417,8 +413,6 @@ router.get("/:id/full", async (req, res, next) => {
           'latitude', s.latitude,
           'longitude', s.longitude,
           'phone_number', s.phone_number,
-          'verified', s.verified,
-          'subscription_tier', s.subscription_tier,
           'image_url', s.image_url,
           'header_images', COALESCE(s.header_images, '[]'::jsonb),
           'description', s.description
@@ -511,7 +505,6 @@ router.get("/:id", async (req, res) => {
         address,
         latitude,
         longitude,
-        verified,
         image_url,
         header_images
       FROM stores
@@ -583,14 +576,7 @@ router.put("/:id", storeWriteLimiter, authMiddleware, async (req, res) => {
       image_url,
       header_images,
       description,
-      verified,
     } = req.body;
-
-    if (verified !== undefined && typeof verified !== "boolean") {
-      return res.status(400).json({
-        message: "Verified must be a boolean value",
-      });
-    }
 
     const storeResult = await pool.query(
       "SELECT * FROM stores WHERE id = $1",
@@ -636,9 +622,8 @@ router.put("/:id", storeWriteLimiter, authMiddleware, async (req, res) => {
            phone_number = $9,
            image_url = $10,
            header_images = $11,
-           description = $12,
-           verified = $13
-       WHERE id = $14
+           description = $12
+       WHERE id = $13
        RETURNING *`,
       [
         store_name || store.store_name,
@@ -653,7 +638,6 @@ router.put("/:id", storeWriteLimiter, authMiddleware, async (req, res) => {
         primaryStoreImage,
         serializeHeaderImages(nextHeaderImages),
         description !== undefined ? description : store.description,
-        verified !== undefined ? verified : Boolean(store.verified),
         id,
       ]
     );

@@ -15,8 +15,6 @@ export type BackendStore = {
   phone_number?: string | null;
   state?: string | null;
   store_name?: string | null;
-  subscription_tier?: string | null;
-  verified?: boolean | null;
 };
 
 type UpdateStoreResponse = {
@@ -55,7 +53,6 @@ type StoreFullResponse = {
     header_images?: string[] | null;
     latitude?: number | string | null;
     longitude?: number | string | null;
-    subscription_tier?: string | null;
   };
 };
 
@@ -183,7 +180,6 @@ export async function updateStoreWithBackend(
     phone_number?: string;
     state?: string;
     store_name?: string;
-    verified?: boolean;
   },
 ) {
   const result = await requestMobileApi<UpdateStoreResponse>(`/stores/${storeId}`, {

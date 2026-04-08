@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Image,
   KeyboardAvoidingView,
+  LayoutAnimation,
   PanResponder,
   Platform,
   ScrollView,
@@ -43,11 +44,24 @@ type HomePreviewResult = {
   id: string;
   image?: string | null;
   price: number | null;
+  productId: string;
   productName: string;
   storeId: string;
   storeName: string;
   variant: string;
-  verified: boolean;
+};
+
+type HomePreviewCard = {
+  id: string;
+  image?: string | null;
+  productName: string;
+  storeId: string;
+  storeName: string;
+  variants: {
+    id: string;
+    label: string;
+    price: number | null;
+  }[];
 };
 
 type HomeStoreCard = {
@@ -59,7 +73,6 @@ type HomeStoreCard = {
   latitude?: number | null;
   longitude?: number | null;
   name: string;
-  verified: boolean;
 };
 
 type SelectedMapStore = {
@@ -68,7 +81,6 @@ type SelectedMapStore = {
   id: string;
   image?: string | null;
   name: string;
-  verified: boolean;
 };
 
 const NEARBY_STORE_RADIUS_KM = 2;
@@ -99,6 +111,50 @@ function resolveStoreCoordinates(store: BackendStore | HomeStoreCard) {
   return { latitude: Number(latitude), longitude: Number(longitude) };
 }
 
+function groupPreviewResults(items: HomePreviewResult[]) {
+  const groups = new Map<string, HomePreviewCard>();
+
+  items.forEach((item) => {
+    const key = item.productId
+      ? `${item.storeId}::${item.productId}`
+      : `${item.storeId}::${item.productName.trim().toLowerCase()}`;
+    const existing = groups.get(key);
+
+    if (!existing) {
+      groups.set(key, {
+        id: key,
+        image: item.image || null,
+        productName: item.productName,
+        storeId: item.storeId,
+        storeName: item.storeName,
+        variants: [
+          {
+            id: item.id,
+            label: item.variant || "Product details available in store",
+            price: item.price,
+          },
+        ],
+      });
+      return;
+    }
+
+    if (
+      !existing.variants.some(
+        (variant) =>
+          variant.label === item.variant && variant.price === item.price,
+      )
+    ) {
+      existing.variants.push({
+        id: item.id,
+        label: item.variant || "Product details available in store",
+        price: item.price,
+      });
+    }
+  });
+
+  return Array.from(groups.values());
+}
+
 export default function HomeScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{
@@ -118,7 +174,7 @@ export default function HomeScreen() {
     requestLocationPermission,
   } = useLocation({ requestOnMount: true });
   const { height: windowHeight } = useWindowDimensions();
-  const [homeQuery] = useState("");
+  const [homeQuery, setHomeQuery] = useState("");
   const [previewResults, setPreviewResults] = useState<HomePreviewResult[]>([]);
   const [nearbyStores, setNearbyStores] = useState<HomeStoreCard[]>([]);
   const [browseStores, setBrowseStores] = useState<HomeStoreCard[]>([]);
@@ -129,6 +185,8 @@ export default function HomeScreen() {
   const [storeMarkers, setStoreMarkers] = useState<BackendStore[]>([]);
   const [storesError, setStoresError] = useState("");
   const [isSheetCollapsed, setIsSheetCollapsed] = useState(false);
+  const [isSearchOverlayOpen, setIsSearchOverlayOpen] = useState(false);
+  const [overlaySearchQuery, setOverlaySearchQuery] = useState("");
   const [userInteractedWithMap, setUserInteractedWithMap] = useState(false);
   const [mapRecenterKey, setMapRecenterKey] = useState(0);
   const recentStores = useRecentStores();
@@ -149,9 +207,7 @@ export default function HomeScreen() {
   );
 
   const focusStoreId =
-    wasReturnedFromStorePage.current || typeof params.focusStore !== "string"
-      ? null
-      : params.focusStore;
+    typeof params.focusStore === "string" ? params.focusStore : null;
   const focusLatitude = parseCoordinate(params.lat);
   const focusLongitude = parseCoordinate(params.lng);
   const focusedCoordinates = useMemo(
@@ -178,6 +234,12 @@ export default function HomeScreen() {
   const [sheetTranslateY, setSheetTranslateY] = useState(0);
   const dragStartOffsetRef = useRef(0);
   const sheetOffsetRef = useRef(0);
+  const mapSheetInteractionRef = useRef({
+    autoCollapsed: false,
+    isMapMoving: false,
+    originalOffset: 0,
+    panelManuallyControlled: false,
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -236,7 +298,6 @@ export default function HomeScreen() {
                 ? Number(store.longitude)
                 : null,
           name: store.store_name || "",
-          verified: Boolean(store.verified),
         }));
 
       setBrowseStores(mappedStores.slice(0, 6));
@@ -293,6 +354,7 @@ export default function HomeScreen() {
       const normalized = homeQuery.replace(/\s+/g, " ").trim();
 
       if (normalized.length < 2) {
+        setPreviewResults([]);
         setPreviewError("");
         setIsLoadingPreview(false);
         return;
@@ -328,11 +390,11 @@ export default function HomeScreen() {
                 : item.price !== null && item.price !== undefined
                   ? Number(item.price)
                   : null,
+            productId: String(item.product_id || ""),
             productName: item.product_name || "",
             storeId: String(item.store_id),
             storeName: item.store_name || "",
             variant: item.variant_name || item.variant || "",
-            verified: Boolean(item.verified),
           })),
       );
       setIsLoadingPreview(false);
@@ -348,13 +410,11 @@ export default function HomeScreen() {
     };
   }, [homeQuery]);
 
-  const quickResultsTitle = useMemo(() => {
-    const normalized = homeQuery.replace(/\s+/g, " ").trim();
-    if (normalized.length >= 2) {
-      return "Quick matches";
-    }
-    return "Near you";
-  }, [homeQuery]);
+  const groupedPreviewResults = useMemo(
+    () => groupPreviewResults(previewResults),
+    [previewResults],
+  );
+
   const selectedMapStore = useMemo<SelectedMapStore | null>(() => {
     if (!selectedStoreId) {
       return null;
@@ -374,7 +434,6 @@ export default function HomeScreen() {
       id: String(store.id ?? ""),
       image: store.image_url || null,
       name: store.store_name || "Store",
-      verified: Boolean(store.verified),
     };
   }, [selectedStoreId, storeMarkers]);
 
@@ -386,6 +445,14 @@ export default function HomeScreen() {
       setSheetTranslateY(clamped);
     },
     [maxSheetOffset],
+  );
+
+  const animateSheetOffset = useCallback(
+    (nextOffset: number) => {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      setSheetOffset(nextOffset);
+    },
+    [setSheetOffset],
   );
 
   useEffect(() => {
@@ -441,7 +508,39 @@ export default function HomeScreen() {
     setUserInteractedWithMap(true);
     setSelectedStoreId(null);
     setMapFocusCoordinates(null);
-  }, []);
+    const state = mapSheetInteractionRef.current;
+
+    if (state.isMapMoving) {
+      return;
+    }
+
+    state.isMapMoving = true;
+    state.panelManuallyControlled = false;
+    state.originalOffset = sheetOffsetRef.current;
+    state.autoCollapsed = sheetOffsetRef.current < maxSheetOffset;
+
+    if (state.autoCollapsed) {
+      animateSheetOffset(maxSheetOffset);
+    }
+  }, [animateSheetOffset, maxSheetOffset]);
+
+  const handleMapMoveEnd = useCallback(() => {
+    const state = mapSheetInteractionRef.current;
+
+    if (!state.isMapMoving) {
+      return;
+    }
+
+    state.isMapMoving = false;
+
+    if (state.autoCollapsed && !state.panelManuallyControlled) {
+      animateSheetOffset(state.originalOffset);
+    }
+
+    state.autoCollapsed = false;
+    state.originalOffset = sheetOffsetRef.current;
+    state.panelManuallyControlled = false;
+  }, [animateSheetOffset]);
 
   const snapSheet = useCallback(
     (velocityY: number) => {
@@ -470,6 +569,8 @@ export default function HomeScreen() {
           Math.abs(gestureState.dy) > Math.abs(gestureState.dx),
         onPanResponderGrant: () => {
           dragStartOffsetRef.current = sheetOffsetRef.current;
+          mapSheetInteractionRef.current.panelManuallyControlled = true;
+          mapSheetInteractionRef.current.autoCollapsed = false;
         },
         onPanResponderMove: (_, gestureState) => {
           const nextOffset = dragStartOffsetRef.current + gestureState.dy;
@@ -501,6 +602,7 @@ export default function HomeScreen() {
             isLoading={isLocationLoading}
             mapRecenterKey={mapRecenterKey}
             onMapMoveStart={handleMapMoveStart}
+            onMapMoveEnd={handleMapMoveEnd}
             onRequestLocation={handleRequestLocation}
             onSelectStore={handleSelectStore}
             permissionStatus={permissionStatus}
@@ -568,15 +670,6 @@ export default function HomeScreen() {
                     <Ionicons color="#94a3b8" name="close" size={16} />
                   </TouchableOpacity>
                 </View>
-                {selectedMapStore.verified ? (
-                  <View style={styles.mapPreviewVerifiedRow}>
-                    <View style={styles.mapPreviewVerifiedBadge}>
-                      <Text style={styles.mapPreviewVerifiedText}>
-                        Verified
-                      </Text>
-                    </View>
-                  </View>
-                ) : null}
                 <Text numberOfLines={1} style={styles.mapPreviewCategory}>
                   {selectedMapStore.category || "Store"}
                 </Text>
@@ -594,6 +687,227 @@ export default function HomeScreen() {
                   <Ionicons color="#dbeafe" name="chevron-forward" size={14} />
                 </TouchableOpacity>
               </View>
+            </View>
+          </View>
+        ) : null}
+
+        {isSearchOverlayOpen ? (
+          <View style={styles.searchOverlayWrap}>
+            <View style={styles.searchOverlayBackdrop} />
+            <View
+              style={[
+                styles.searchOverlayCard,
+                { marginTop: Math.max(insets.top + 56, 84) },
+              ]}
+            >
+              <View style={styles.searchOverlayHeader}>
+                <Text style={styles.searchOverlayTitle}>Search</Text>
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={() => setIsSearchOverlayOpen(false)}
+                  style={styles.searchOverlayCloseButton}
+                >
+                  <Ionicons color="#f8fafc" name="close" size={22} />
+                </TouchableOpacity>
+              </View>
+
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={handleRequestLocation}
+                style={styles.searchOverlayLocationCard}
+              >
+                <Text style={styles.searchOverlayLocationEyebrow}>
+                  USE YOUR LOCATION
+                </Text>
+                <Text style={styles.searchOverlayLocationText}>
+                  Using your location
+                </Text>
+              </TouchableOpacity>
+
+              <SearchInput
+                onChangeText={(value) => {
+                  setOverlaySearchQuery(value);
+                  setHomeQuery(value);
+                }}
+                onSubmitEditing={() => {
+                  const normalized = overlaySearchQuery
+                    .replace(/\s+/g, " ")
+                    .trim();
+
+                  if (normalized.length < 2) {
+                    return;
+                  }
+
+                  setIsSearchOverlayOpen(false);
+                  router.push({
+                    pathname: "/search",
+                    params: { q: normalized },
+                  });
+                }}
+                placeholder="Search stores, products, or locations"
+                returnKeyType="search"
+                style={styles.searchOverlayInput}
+                value={overlaySearchQuery}
+              />
+
+              <View style={styles.searchOverlaySectionHeader}>
+                <Text style={styles.searchOverlaySectionTitle}>
+                  {overlaySearchQuery.trim().length >= 2
+                    ? "Results"
+                    : "Recent stores"}
+                </Text>
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={() => {
+                    if (overlaySearchQuery.trim().length >= 2) {
+                      setOverlaySearchQuery("");
+                      setHomeQuery("");
+                      return;
+                    }
+
+                    void clearRecentStores();
+                  }}
+                >
+                  <Text style={styles.clearText}>Clear</Text>
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView
+                bounces={false}
+                contentContainerStyle={styles.searchOverlayRecentList}
+                showsVerticalScrollIndicator={false}
+              >
+                {overlaySearchQuery.trim().length >= 2 && previewError ? (
+                  <View style={styles.infoCard}>
+                    <Text style={styles.infoCardTitle}>Search unavailable</Text>
+                    <Text style={styles.infoCardText}>{previewError}</Text>
+                  </View>
+                ) : overlaySearchQuery.trim().length >= 2 &&
+                  isLoadingPreview ? (
+                  <View style={styles.infoCard}>
+                    <Text style={styles.infoCardTitle}>Loading matches</Text>
+                    <Text style={styles.infoCardText}>
+                      Checking products and stores around you.
+                    </Text>
+                  </View>
+                ) : overlaySearchQuery.trim().length >= 2 &&
+                  groupedPreviewResults.length > 0 ? (
+                  groupedPreviewResults.map((item) => (
+                    <TouchableOpacity
+                      key={item.id}
+                      activeOpacity={0.85}
+                      onPress={() => {
+                        setIsSearchOverlayOpen(false);
+                        router.push(`/store/${item.storeId}`);
+                      }}
+                      style={styles.previewCard}
+                    >
+                      {item.image ? (
+                        <Image
+                          source={{ uri: item.image }}
+                          style={styles.previewImage}
+                        />
+                      ) : (
+                        <View style={styles.previewImageFallback}>
+                          <Text style={styles.previewImageFallbackText}>
+                            {buildStoreInitial(item.storeName)}
+                          </Text>
+                        </View>
+                      )}
+                      <View style={styles.previewBody}>
+                        <View style={styles.previewTopRow}>
+                          <Text
+                            numberOfLines={1}
+                            style={styles.previewStoreName}
+                          >
+                            {item.storeName}
+                          </Text>
+                        </View>
+                        <Text
+                          numberOfLines={2}
+                          style={styles.previewProductName}
+                        >
+                          {item.productName}
+                        </Text>
+                        {item.variants.map((variant) => (
+                          <View
+                            key={variant.id}
+                            style={styles.previewVariantRow}
+                          >
+                            <Text
+                              numberOfLines={1}
+                              style={styles.previewVariantText}
+                            >
+                              {variant.label}
+                            </Text>
+                            <Text style={styles.previewPriceText}>
+                              {variant.price !== null
+                                ? `₦${variant.price.toLocaleString("en-NG")}`
+                                : "View"}
+                            </Text>
+                          </View>
+                        ))}
+                      </View>
+                    </TouchableOpacity>
+                  ))
+                ) : overlaySearchQuery.trim().length >= 2 ? (
+                  <View style={styles.infoCard}>
+                    <Text style={styles.infoCardTitle}>No matches found</Text>
+                    <Text style={styles.infoCardText}>
+                      Try another search term.
+                    </Text>
+                  </View>
+                ) : recentStores.length > 0 ? (
+                  recentStores.map((store, index) => (
+                    <TouchableOpacity
+                      key={`${store.store_id}-${index}`}
+                      activeOpacity={0.85}
+                      onPress={() => {
+                        setIsSearchOverlayOpen(false);
+                        router.push(`/store/${store.store_id}`);
+                      }}
+                      style={styles.storeRowCard}
+                    >
+                      {store.image_url ? (
+                        <Image
+                          source={{ uri: store.image_url }}
+                          style={styles.storeRowImage}
+                        />
+                      ) : (
+                        <View style={styles.storeRowImageFallback}>
+                          <Text style={styles.storeRowImageFallbackText}>
+                            {store.store_name.slice(0, 1).toUpperCase()}
+                          </Text>
+                        </View>
+                      )}
+                      <View style={styles.storeRowBody}>
+                        <View style={styles.storeRowTitleWrap}>
+                          <Text style={styles.storeRowTitle}>
+                            {store.store_name}
+                          </Text>
+                        </View>
+                        <Text numberOfLines={1} style={styles.storeRowMeta}>
+                          {store.category || "Store"}
+                        </Text>
+                        <Text numberOfLines={2} style={styles.storeRowAddress}>
+                          {store.address || "View store"}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))
+                ) : (
+                  <View style={styles.recentCard}>
+                    <View style={styles.recentStoreInfo}>
+                      <Text style={styles.recentStoreTitle}>
+                        No recent stores yet
+                      </Text>
+                      <Text style={styles.recentStoreSubtitle}>
+                        Stores you open from backend results will appear here.
+                      </Text>
+                    </View>
+                  </View>
+                )}
+              </ScrollView>
             </View>
           </View>
         ) : null}
@@ -632,7 +946,7 @@ export default function HomeScreen() {
             >
               <SearchInput
                 mode="pressable"
-                onPress={() => router.replace("/search?mode=preview&from=home")}
+                onPress={() => setIsSearchOverlayOpen(true)}
                 placeholder="Search stores, products, or locations"
                 style={styles.searchBar}
               />
@@ -664,185 +978,6 @@ export default function HomeScreen() {
                 scrollEnabled
                 style={styles.sheetScroll}
               >
-                <View style={styles.section}>
-                  <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>{quickResultsTitle}</Text>
-                    {homeQuery.trim().length >= 2 ? (
-                      <TouchableOpacity
-                        activeOpacity={0.85}
-                        onPress={() => router.push("/search")}
-                      >
-                        <Text style={styles.clearText}>Open search</Text>
-                      </TouchableOpacity>
-                    ) : null}
-                  </View>
-
-                  {homeQuery.trim().length >= 2 && previewError ? (
-                    <View style={styles.infoCard}>
-                      <Text style={styles.infoCardTitle}>
-                        Search preview unavailable
-                      </Text>
-                      <Text style={styles.infoCardText}>{previewError}</Text>
-                    </View>
-                  ) : homeQuery.trim().length >= 2 && isLoadingPreview ? (
-                    <View style={styles.infoCard}>
-                      <Text style={styles.infoCardTitle}>Loading matches</Text>
-                      <Text style={styles.infoCardText}>
-                        Checking products and stores around you.
-                      </Text>
-                    </View>
-                  ) : homeQuery.trim().length >= 2 &&
-                    previewResults.length > 0 ? (
-                    previewResults.map((item, index) => (
-                      <TouchableOpacity
-                        key={`${item.id}-${index}`}
-                        activeOpacity={0.85}
-                        onPress={() => router.push(`/store/${item.storeId}`)}
-                        style={styles.previewCard}
-                      >
-                        {item.image ? (
-                          <Image
-                            source={{ uri: item.image }}
-                            style={styles.previewImage}
-                          />
-                        ) : (
-                          <View style={styles.previewImageFallback}>
-                            <Text style={styles.previewImageFallbackText}>
-                              {buildStoreInitial(item.storeName)}
-                            </Text>
-                          </View>
-                        )}
-                        <View style={styles.previewBody}>
-                          <View style={styles.previewTopRow}>
-                            <Text
-                              numberOfLines={1}
-                              style={styles.previewStoreName}
-                            >
-                              {item.storeName}
-                            </Text>
-                            {item.verified ? (
-                              <View style={styles.previewVerifiedBadge}>
-                                <Text style={styles.previewVerifiedText}>
-                                  Verified
-                                </Text>
-                              </View>
-                            ) : null}
-                          </View>
-                          <Text
-                            numberOfLines={2}
-                            style={styles.previewProductName}
-                          >
-                            {item.productName}
-                          </Text>
-                          <Text
-                            numberOfLines={1}
-                            style={styles.previewVariantText}
-                          >
-                            {item.variant ||
-                              "Product details available in store"}
-                          </Text>
-                        </View>
-                        <View style={styles.previewRightMeta}>
-                          <Text style={styles.previewPriceText}>
-                            {item.price !== null
-                              ? `₦${item.price.toLocaleString("en-NG")}`
-                              : "View"}
-                          </Text>
-                          <Text style={styles.previewLinkText}>Open</Text>
-                        </View>
-                      </TouchableOpacity>
-                    ))
-                  ) : isLoadingStores ? (
-                    <View style={styles.infoCard}>
-                      <Text style={styles.infoCardTitle}>Loading stores</Text>
-                      <Text style={styles.infoCardText}>
-                        Fetching nearby stores from the backend.
-                      </Text>
-                    </View>
-                  ) : storesError ? (
-                    <View style={styles.infoCard}>
-                      <Text style={styles.infoCardTitle}>
-                        Could not load stores
-                      </Text>
-                      <Text style={styles.infoCardText}>{storesError}</Text>
-                    </View>
-                  ) : nearbyStores.length > 0 ? (
-                    nearbyStores.map((store, index) => (
-                      <TouchableOpacity
-                        key={`${store.id}-nearby-${index}`}
-                        activeOpacity={0.85}
-                        onPress={() => {
-                          handleSelectStore(store.id);
-                          router.push(`/store/${store.id}`);
-                        }}
-                        style={[
-                          styles.storeRowCard,
-                          selectedStoreId === store.id
-                            ? styles.storeRowCardSelected
-                            : null,
-                        ]}
-                      >
-                        {store.image ? (
-                          <Image
-                            source={{ uri: store.image }}
-                            style={styles.storeRowImage}
-                          />
-                        ) : (
-                          <View style={styles.storeRowImageFallback}>
-                            <Text style={styles.storeRowImageFallbackText}>
-                              {buildStoreInitial(store.name)}
-                            </Text>
-                          </View>
-                        )}
-                        <View style={styles.storeRowBody}>
-                          <View style={styles.storeRowTitleWrap}>
-                            <Text style={styles.storeRowTitle}>
-                              {store.name}
-                            </Text>
-                            {store.verified ? (
-                              <View style={styles.storeRowVerifiedBadge}>
-                                <Text style={styles.storeRowVerifiedText}>
-                                  Verified
-                                </Text>
-                              </View>
-                            ) : null}
-                          </View>
-                          <Text numberOfLines={1} style={styles.storeRowMeta}>
-                            {store.distanceKm &&
-                            Number.isFinite(store.distanceKm)
-                              ? `${store.category || "Store"} • ${store.distanceKm.toFixed(1)} km`
-                              : store.category || "Store"}
-                          </Text>
-                          <Text
-                            numberOfLines={2}
-                            style={styles.storeRowAddress}
-                          >
-                            {store.address || "Address not available"}
-                          </Text>
-                        </View>
-                      </TouchableOpacity>
-                    ))
-                  ) : homeQuery.trim().length >= 2 ? (
-                    <View style={styles.infoCard}>
-                      <Text style={styles.infoCardTitle}>No matches found</Text>
-                      <Text style={styles.infoCardText}>
-                        Try another search term or open full search for more
-                        results.
-                      </Text>
-                    </View>
-                  ) : (
-                    <View style={styles.infoCard}>
-                      <Text style={styles.infoCardTitle}>
-                        No stores found near you
-                      </Text>
-                      <Text style={styles.infoCardText}>
-                        Stores will appear here when nearby results are
-                        available.
-                      </Text>
-                    </View>
-                  )}
-                </View>
-
                 <View style={styles.section}>
                   <View style={styles.sectionHeader}>
                     <Text style={styles.sectionTitle}>Recent stores</Text>
@@ -908,6 +1043,83 @@ export default function HomeScreen() {
 
                 <View style={styles.section}>
                   <View style={styles.sectionHeader}>
+                    <Text style={styles.sectionTitle}>Near you</Text>
+                  </View>
+
+                  {isLoadingStores ? (
+                    <View style={styles.infoCard}>
+                      <Text style={styles.infoCardTitle}>Loading stores</Text>
+                      <Text style={styles.infoCardText}>
+                        Fetching nearby stores from the backend.
+                      </Text>
+                    </View>
+                  ) : storesError ? (
+                    <View style={styles.infoCard}>
+                      <Text style={styles.infoCardTitle}>
+                        Could not load stores
+                      </Text>
+                      <Text style={styles.infoCardText}>{storesError}</Text>
+                    </View>
+                  ) : nearbyStores.length > 0 ? (
+                    nearbyStores.map((store, index) => (
+                      <TouchableOpacity
+                        key={`${store.id}-nearby-${index}`}
+                        activeOpacity={0.85}
+                        onPress={() => router.push(`/store/${store.id}`)}
+                        style={[
+                          styles.storeRowCard,
+                          selectedStoreId === store.id
+                            ? styles.storeRowCardSelected
+                            : null,
+                        ]}
+                      >
+                        {store.image ? (
+                          <Image
+                            source={{ uri: store.image }}
+                            style={styles.storeRowImage}
+                          />
+                        ) : (
+                          <View style={styles.storeRowImageFallback}>
+                            <Text style={styles.storeRowImageFallbackText}>
+                              {buildStoreInitial(store.name)}
+                            </Text>
+                          </View>
+                        )}
+                        <View style={styles.storeRowBody}>
+                        <View style={styles.storeRowTitleWrap}>
+                          <Text style={styles.storeRowTitle}>
+                            {store.name}
+                          </Text>
+                        </View>
+                          <Text numberOfLines={1} style={styles.storeRowMeta}>
+                            {store.distanceKm &&
+                            Number.isFinite(store.distanceKm)
+                              ? `${store.category || "Store"} • ${store.distanceKm.toFixed(1)} km`
+                              : store.category || "Store"}
+                          </Text>
+                          <Text
+                            numberOfLines={2}
+                            style={styles.storeRowAddress}
+                          >
+                            {store.address || "Address not available"}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    ))
+                  ) : (
+                    <View style={styles.infoCard}>
+                      <Text style={styles.infoCardTitle}>
+                        No stores found near you
+                      </Text>
+                      <Text style={styles.infoCardText}>
+                        Stores will show here when they are within 1 km of you.
+                      </Text>
+                    </View>
+                  )}
+                </View>
+
+                <View style={styles.section}>
+                  <View style={styles.sectionHeader}>
                     <Text style={styles.sectionTitle}>Browse stores</Text>
                     <TouchableOpacity
                       activeOpacity={0.85}
@@ -962,18 +1174,11 @@ export default function HomeScreen() {
                           </View>
                         )}
                         <View style={styles.storeRowBody}>
-                          <View style={styles.storeRowTitleWrap}>
-                            <Text style={styles.storeRowTitle}>
-                              {store.name}
-                            </Text>
-                            {store.verified ? (
-                              <View style={styles.storeRowVerifiedBadge}>
-                                <Text style={styles.storeRowVerifiedText}>
-                                  Verified
-                                </Text>
-                              </View>
-                            ) : null}
-                          </View>
+                        <View style={styles.storeRowTitleWrap}>
+                          <Text style={styles.storeRowTitle}>
+                            {store.name}
+                          </Text>
+                        </View>
                           <Text numberOfLines={1} style={styles.storeRowMeta}>
                             {store.distanceKm &&
                             Number.isFinite(store.distanceKm)
@@ -1100,6 +1305,93 @@ const styles = StyleSheet.create({
     top: 140,
     zIndex: 58,
   },
+  searchOverlayWrap: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 70,
+    alignItems: "center",
+    paddingHorizontal: 18,
+  },
+  searchOverlayBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(2, 6, 23, 0.36)",
+  },
+  searchOverlayCard: {
+    width: "100%",
+    maxWidth: 540,
+    maxHeight: "72%",
+    borderRadius: 30,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
+    backgroundColor: "rgba(11, 18, 32, 0.96)",
+    paddingHorizontal: 18,
+    paddingTop: 18,
+    paddingBottom: 20,
+    shadowColor: "#020617",
+    shadowOffset: { width: 0, height: 18 },
+    shadowOpacity: 0.28,
+    shadowRadius: 28,
+    elevation: 18,
+  },
+  searchOverlayHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 18,
+  },
+  searchOverlayTitle: {
+    color: theme.colors.text,
+    fontSize: 22,
+    fontWeight: "800",
+  },
+  searchOverlayCloseButton: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.10)",
+  },
+  searchOverlayLocationCard: {
+    borderRadius: 30,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(255,255,255,0.08)",
+    paddingHorizontal: 18,
+    paddingVertical: 18,
+    marginBottom: 18,
+  },
+  searchOverlayLocationEyebrow: {
+    color: "#9ca3af",
+    fontSize: 12,
+    fontWeight: "800",
+    letterSpacing: 1.2,
+  },
+  searchOverlayLocationText: {
+    marginTop: 12,
+    color: theme.colors.text,
+    fontSize: 18,
+    fontWeight: "800",
+  },
+  searchOverlayInput: {
+    marginBottom: 28,
+    backgroundColor: "rgba(12, 22, 42, 0.96)",
+  },
+  searchOverlaySectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 16,
+  },
+  searchOverlaySectionTitle: {
+    color: theme.colors.text,
+    fontSize: 18,
+    fontWeight: "800",
+    letterSpacing: -0.3,
+  },
+  searchOverlayRecentList: {
+    gap: 12,
+    paddingBottom: 4,
+  },
   mapPreviewCard: {
     flexDirection: "row",
     overflow: "hidden",
@@ -1151,25 +1443,6 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     alignItems: "center",
     justifyContent: "center",
-  },
-  mapPreviewVerifiedRow: {
-    marginTop: 8,
-  },
-  mapPreviewVerifiedBadge: {
-    alignSelf: "flex-start",
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: "rgba(147,197,253,0.18)",
-    backgroundColor: "rgba(59,130,246,0.12)",
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-  },
-  mapPreviewVerifiedText: {
-    color: "#dbeafe",
-    fontSize: 9,
-    fontWeight: "800",
-    letterSpacing: 0.3,
-    textTransform: "uppercase",
   },
   mapPreviewCategory: {
     marginTop: 10,
@@ -1357,17 +1630,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "800",
   },
-  previewVerifiedBadge: {
-    borderRadius: 999,
-    backgroundColor: "rgba(56,189,248,0.12)",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  previewVerifiedText: {
-    color: "#dff5ff",
-    fontSize: 10,
-    fontWeight: "700",
-  },
   previewProductName: {
     marginTop: 4,
     color: "#E2E8F0",
@@ -1380,9 +1642,17 @@ const styles = StyleSheet.create({
     color: "#94a8bf",
     fontSize: 12,
   },
+  previewVariantRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    marginTop: 4,
+  },
   previewRightMeta: {
     alignItems: "flex-end",
     gap: 4,
+    justifyContent: "center",
   },
   previewPriceText: {
     color: theme.colors.text,
@@ -1514,17 +1784,6 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
     fontSize: 15,
     fontWeight: "800",
-  },
-  storeRowVerifiedBadge: {
-    borderRadius: 999,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    backgroundColor: "rgba(56,189,248,0.12)",
-  },
-  storeRowVerifiedText: {
-    color: "#dff5ff",
-    fontSize: 10,
-    fontWeight: "700",
   },
   storeRowMeta: {
     color: "#b9c6d8",

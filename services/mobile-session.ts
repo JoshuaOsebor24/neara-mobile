@@ -24,8 +24,7 @@ export type MobileUser = {
   primaryStoreName: string;
   roles: ActiveRole[];
   storePhoneNumber: string;
-  storePlan: "basic" | "verified" | null;
-  storeVerified: boolean;
+  storePlan: "basic" | null;
 };
 
 const defaultUser: MobileUser = {
@@ -50,7 +49,6 @@ const defaultUser: MobileUser = {
   roles: ["user"],
   storePlan: null,
   storePhoneNumber: "",
-  storeVerified: false,
 };
 
 const MOBILE_SESSION_STORAGE_KEY = "neara-mobile-session:v1";
@@ -159,9 +157,7 @@ function sanitizeMobileSession(value: unknown): MobileUser | null {
       isAuthenticated && typeof parsed.storePhoneNumber === "string"
         ? parsed.storePhoneNumber
         : "",
-    storePlan:
-      parsed.storePlan === "basic" || parsed.storePlan === "verified" ? parsed.storePlan : null,
-    storeVerified: isAuthenticated && Boolean(parsed.storeVerified),
+    storePlan: parsed.storePlan === "basic" ? parsed.storePlan : null,
   };
 }
 

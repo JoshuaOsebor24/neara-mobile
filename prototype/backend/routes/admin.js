@@ -105,7 +105,6 @@ router.get("/stores", async (req, res) => {
         s.owner_id,
         s.store_name,
         s.category,
-        s.verified,
         s.is_suspended,
         s.created_at,
         u.name AS owner_name,
@@ -126,7 +125,6 @@ router.get("/stores", async (req, res) => {
         owner_name: store.owner_name ?? null,
         owner_email: store.owner_email ?? null,
         category: store.category ?? null,
-        verified: Boolean(store.verified),
         is_suspended: Boolean(store.is_suspended),
         product_count: Number(store.product_count || 0),
         created_at: store.created_at,
@@ -136,56 +134,6 @@ router.get("/stores", async (req, res) => {
     console.error("admin stores failed", error);
     res.status(500).json({
       message: "Could not load stores",
-    });
-  }
-});
-
-router.patch("/stores/:storeId/verify", async (req, res) => {
-  const storeId = parseInteger(req.params.storeId);
-  const verified = parseBooleanFlag(req.body?.verified);
-
-  if (!storeId) {
-    return res.status(400).json({
-      message: "Invalid store id",
-    });
-  }
-
-  if (verified === null) {
-    return res.status(400).json({
-      message: "verified must be true or false",
-    });
-  }
-
-  try {
-    const { rows } = await pool.query(
-      `
-        UPDATE stores
-        SET verified = $1
-        WHERE id = $2
-        RETURNING id, store_name, verified, is_suspended
-      `,
-      [verified, storeId],
-    );
-
-    if (rows.length === 0) {
-      return res.status(404).json({
-        message: "Store not found",
-      });
-    }
-
-    res.json({
-      message: verified ? "Store verified" : "Store unverified",
-      store: {
-        id: Number(rows[0].id),
-        store_name: rows[0].store_name,
-        verified: Boolean(rows[0].verified),
-        is_suspended: Boolean(rows[0].is_suspended),
-      },
-    });
-  } catch (error) {
-    console.error("admin verify store failed", error);
-    res.status(500).json({
-      message: "Could not update store verification",
     });
   }
 });
@@ -212,7 +160,7 @@ router.patch("/stores/:storeId/status", async (req, res) => {
         UPDATE stores
         SET is_suspended = $1
         WHERE id = $2
-        RETURNING id, store_name, verified, is_suspended
+        RETURNING id, store_name, is_suspended
       `,
       [isSuspended, storeId],
     );
@@ -228,7 +176,6 @@ router.patch("/stores/:storeId/status", async (req, res) => {
       store: {
         id: Number(rows[0].id),
         store_name: rows[0].store_name,
-        verified: Boolean(rows[0].verified),
         is_suspended: Boolean(rows[0].is_suspended),
       },
     });

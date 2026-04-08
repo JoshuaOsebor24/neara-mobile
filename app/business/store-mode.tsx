@@ -1,3 +1,4 @@
+import { useMobileSession } from "@/services/mobile-session";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import React, { useEffect } from "react";
@@ -9,10 +10,11 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { useMobileSession } from "@/services/mobile-session";
+
+import { BackPillButton } from "@/components/ui/back-pill-button";
 
 interface StorePlan {
-  id: "basic" | "verified";
+  id: "basic";
   title: string;
   description: string;
   price: string;
@@ -37,31 +39,12 @@ const STORE_PLANS: StorePlan[] = [
     isRecommended: false,
     buttonLabel: "Choose Basic",
   },
-  {
-    id: "verified",
-    title: "Verified Store",
-    description:
-      "Includes the full Basic plan, plus stronger trust and visibility.",
-    price: "₦2,000 / month",
-    features: [
-      "Everything in Basic",
-      "Verified badge",
-      "Increased customer trust",
-      "Higher chance of being chosen",
-    ],
-    isRecommended: true,
-    buttonLabel: "Choose Verified",
-    includesLabel: "Includes everything in Basic",
-  },
 ];
 
 export default function StoreModeScreen() {
   const router = useRouter();
   const session = useMobileSession();
-  const draftPlan =
-    session.storePlan === "basic" || session.storePlan === "verified"
-      ? session.storePlan
-      : "verified";
+  const draftPlan = "basic";
   const hasOwnerDraft =
     Boolean(session.primaryStoreName) ||
     Boolean(session.primaryStoreCategory) ||
@@ -76,15 +59,21 @@ export default function StoreModeScreen() {
     if (session.isStoreOwner && session.primaryStoreId) {
       router.replace("/(tabs)/home");
     }
-  }, [router, session.isAuthenticated, session.isStoreOwner, session.primaryStoreId]);
+  }, [
+    router,
+    session.isAuthenticated,
+    session.isStoreOwner,
+    session.primaryStoreId,
+  ]);
 
-  const handleChoosePlan = (planId: "basic" | "verified") => {
+  const handleChoosePlan = (planId: "basic") => {
     router.push(`/store-payment?storePlan=${planId}`);
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      {!session.isAuthenticated || (session.isStoreOwner && session.primaryStoreId) ? (
+      {!session.isAuthenticated ||
+      (session.isStoreOwner && session.primaryStoreId) ? (
         <View style={styles.loadingWrap}>
           <Text style={styles.loadingText}>
             {!session.isAuthenticated ? "Opening login..." : "Opening home..."}
@@ -103,6 +92,7 @@ export default function StoreModeScreen() {
       >
         {/* Header */}
         <View style={styles.headerContainer}>
+          <BackPillButton fallbackHref="/(tabs)/profile" />
           <Text style={styles.eyebrow}>Neara Store Mode</Text>
           <Text style={styles.title}>Start Your Store</Text>
           <Text style={styles.subtitle}>
@@ -113,29 +103,23 @@ export default function StoreModeScreen() {
           {session.isAuthenticated && hasOwnerDraft && !session.isStoreOwner ? (
             <View style={styles.draftPill}>
               <Text style={styles.draftPillText}>
-                Existing draft: {session.primaryStoreName || "Store details saved on this device"}
+                Existing draft:{" "}
+                {session.primaryStoreName ||
+                  "Store details saved on this device"}
               </Text>
             </View>
           ) : null}
           {session.isAuthenticated && hasOwnerDraft && !session.isStoreOwner ? (
-              <TouchableOpacity
+            <TouchableOpacity
               activeOpacity={0.85}
-              onPress={() => router.push(`/store-payment?storePlan=${draftPlan}`)}
+              onPress={() =>
+                router.push(`/store-payment?storePlan=${draftPlan}`)
+              }
               style={styles.resumeButton}
             >
               <Text style={styles.resumeButtonText}>Continue Store Setup</Text>
             </TouchableOpacity>
           ) : null}
-        </View>
-
-        {/* Notice */}
-        <View style={styles.noticeContainer}>
-          <View style={styles.notice}>
-            <Text style={styles.noticeText}>
-              Verified Store is a complete ₦2,000 / month plan. It already
-              includes everything in Basic.
-            </Text>
-          </View>
         </View>
 
         {/* Plans */}
