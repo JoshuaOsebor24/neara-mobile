@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: neara-backend
+    env: node
+    rootDir: prototype/backend
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: TRUST_PROXY
+        value: "true"
+      - key: DATABASE_SSL_MODE
+        value: require

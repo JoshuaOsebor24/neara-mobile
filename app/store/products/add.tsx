@@ -5,16 +5,16 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useMemo, useState } from "react";
 import {
-    Alert,
-    Image,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -22,20 +22,18 @@ import { theme } from "@/constants/theme";
 import { showFlashFeedback } from "@/services/flash-feedback";
 import { useMobileSession } from "@/services/mobile-session";
 import {
-    createProductWithBackend,
-    updateProductWithBackend,
-    type BackendProduct,
+  createProductWithBackend,
+  updateProductWithBackend,
+  type BackendProduct,
 } from "@/services/product-api";
 import { fetchStoreFullData } from "@/services/store-api";
 
 type SaveMode = "edit-next" | "start-new" | "update";
 
-type Notice =
-  | {
-      type: "success" | "error";
-      message: string;
-    }
-  | null;
+type Notice = {
+  type: "success" | "error";
+  message: string;
+} | null;
 
 type VariantDraft = {
   id: string;
@@ -308,14 +306,17 @@ export default function AddStoreProductScreen() {
             ? String(variant.price)
             : "",
         quantity:
-          variant.stock_quantity !== null && variant.stock_quantity !== undefined
+          variant.stock_quantity !== null &&
+          variant.stock_quantity !== undefined
             ? String(variant.stock_quantity)
             : "",
         variantName: variant.variant_name || "",
       })) ?? [];
 
     const defaultVariant =
-      variantDrafts.length === 1 && !variantDrafts[0].variantName ? variantDrafts[0] : null;
+      variantDrafts.length === 1 && !variantDrafts[0].variantName
+        ? variantDrafts[0]
+        : null;
 
     const incomingCategories = [
       product.category || "",
@@ -335,7 +336,9 @@ export default function AddStoreProductScreen() {
     setProductName(product.product_name || "");
     setPrice(defaultVariant?.price || "");
     setSelectedCategories(
-      unknownCategories.length > 0 ? [...knownCategories, "Others"] : knownCategories,
+      unknownCategories.length > 0
+        ? [...knownCategories, "Others"]
+        : knownCategories,
     );
     setCustomCategory(unknownCategories[0] || "");
     setDescription(product.description || "");
@@ -452,7 +455,10 @@ export default function AddStoreProductScreen() {
 
       setImageUrl(buildSelectedImageValue(result.assets[0]));
     } catch {
-      Alert.alert("Image unavailable", "We couldn’t load that image right now.");
+      Alert.alert(
+        "Image unavailable",
+        "We couldn’t load that image right now.",
+      );
     } finally {
       setIsPickingImage(false);
     }
@@ -533,11 +539,17 @@ export default function AddStoreProductScreen() {
       price: price.trim() ? Number(price) : undefined,
       product_name: productName.trim(),
       tags: normalizedCategoryValues.slice(1),
-      ...(normalizedVariants.length > 0 ? { variants: normalizedVariants } : {}),
+      ...(normalizedVariants.length > 0
+        ? { variants: normalizedVariants }
+        : {}),
     };
 
     const result = isEditing
-      ? await updateProductWithBackend(session.authToken, editingProductId, payload)
+      ? await updateProductWithBackend(
+          session.authToken,
+          editingProductId,
+          payload,
+        )
       : await createProductWithBackend(session.authToken, {
           ...payload,
           store_id: Number(selectedStoreId),
@@ -552,7 +564,9 @@ export default function AddStoreProductScreen() {
       return;
     }
 
-    const resultProductId = String(result.product.product_id ?? result.product.id ?? "");
+    const resultProductId = String(
+      result.product.product_id ?? result.product.id ?? "",
+    );
     const snapshot: LastAddedProduct = {
       categories: selectedCategories,
       customCategory,
@@ -598,7 +612,9 @@ export default function AddStoreProductScreen() {
         message: result.message || "Added. Edit the next one.",
       });
       if (resultProductId) {
-        router.replace(`/store/products/add?store=${selectedStoreId}&product=${resultProductId}`);
+        router.replace(
+          `/store/products/add?store=${selectedStoreId}&product=${resultProductId}`,
+        );
         setSubmitMode(null);
         return;
       }
@@ -614,7 +630,7 @@ export default function AddStoreProductScreen() {
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         keyboardVerticalOffset={Platform.OS === "ios" ? 12 : 0}
-        style={styles.flex}
+        style={[styles.flex, { flex: 1 }]}
       >
         <ScrollView
           bounces={false}
@@ -622,323 +638,345 @@ export default function AddStoreProductScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-        <View style={styles.page}>
-          <View style={styles.header}>
-            <BackPillButton
-              fallbackHref={
-                selectedStoreId ? `/store/${selectedStoreId}` : "/profile"
-              }
-            />
-            <Text style={styles.headerTitle}>
-              {isEditing ? "Edit Product" : "Add Product"}
-            </Text>
-            <View style={styles.headerSpacer} />
-          </View>
-
-          {isEditing ? (
-            <View style={[styles.topNoticeCard, styles.infoNoticeCard]}>
-              <Text style={styles.topNoticeEyebrow}>Editing Product</Text>
-              <Text style={styles.topNoticeText}>
-                Update the product details, image, and variants, then save to
-                return to your store.
+          <View style={styles.page}>
+            <View style={styles.header}>
+              <BackPillButton
+                fallbackHref={
+                  selectedStoreId ? `/store/${selectedStoreId}` : "/profile"
+                }
+              />
+              <Text style={styles.headerTitle}>
+                {isEditing ? "Edit Product" : "Add Product"}
               </Text>
+              <View style={styles.headerSpacer} />
             </View>
-          ) : (
-            <View style={styles.topNoticeCard}>
-              <View style={styles.quickRepeatRow}>
-                <View style={styles.quickRepeatTextWrap}>
-                  <Text style={styles.topNoticeEyebrow}>Quick Repeat</Text>
-                  <Text style={styles.topNoticeText}>
-                    Reuse the last product and only edit what changed.
-                  </Text>
+
+            {isEditing ? (
+              <View style={[styles.topNoticeCard, styles.infoNoticeCard]}>
+                <Text style={styles.topNoticeEyebrow}>Editing Product</Text>
+                <Text style={styles.topNoticeText}>
+                  Update the product details, image, and variants, then save to
+                  return to your store.
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.topNoticeCard}>
+                <View style={styles.quickRepeatRow}>
+                  <View style={styles.quickRepeatTextWrap}>
+                    <Text style={styles.topNoticeEyebrow}>Quick Repeat</Text>
+                    <Text style={styles.topNoticeText}>
+                      Reuse the last product and only edit what changed.
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    disabled={!canDuplicate || isSubmitting || isLoadingProduct}
+                    onPress={handleDuplicateLastProduct}
+                    style={[
+                      styles.useLastButton,
+                      (!canDuplicate || isSubmitting) && styles.buttonDisabled,
+                    ]}
+                  >
+                    <Text style={styles.useLastButtonText}>
+                      Use Last Product
+                    </Text>
+                  </TouchableOpacity>
                 </View>
-                <TouchableOpacity
-                  activeOpacity={0.85}
-                  disabled={!canDuplicate || isSubmitting || isLoadingProduct}
-                  onPress={handleDuplicateLastProduct}
-                  style={[
-                    styles.useLastButton,
-                    (!canDuplicate || isSubmitting) && styles.buttonDisabled,
-                  ]}
-                >
-                  <Text style={styles.useLastButtonText}>Use Last Product</Text>
-                </TouchableOpacity>
+
+                <Text style={styles.quickRepeatFooter}>
+                  {lastAddedProduct
+                    ? `Last added: ${lastAddedProduct.productName}`
+                    : "Your last saved product shows here."}
+                </Text>
+              </View>
+            )}
+
+            <View style={styles.formCard}>
+              <View style={styles.formCardHeader}>
+                <Text style={styles.sectionEyebrow}>Details</Text>
+                <Text style={styles.sectionSubtitle}>
+                  {isEditing
+                    ? "Update the product and save."
+                    : "Name it, price it, save it."}
+                </Text>
               </View>
 
-              <Text style={styles.quickRepeatFooter}>
-                {lastAddedProduct
-                  ? `Last added: ${lastAddedProduct.productName}`
-                  : "Your last saved product shows here."}
-              </Text>
-            </View>
-          )}
+              <View style={styles.formBody}>
+                {notice ? (
+                  <View
+                    style={[
+                      styles.noticeCard,
+                      notice.type === "success"
+                        ? styles.noticeSuccess
+                        : styles.noticeError,
+                    ]}
+                  >
+                    <Text style={styles.noticeText}>{notice.message}</Text>
+                  </View>
+                ) : null}
 
-          <View style={styles.formCard}>
-            <View style={styles.formCardHeader}>
-              <Text style={styles.sectionEyebrow}>Details</Text>
-              <Text style={styles.sectionSubtitle}>
-                {isEditing
-                  ? "Update the product and save."
-                  : "Name it, price it, save it."}
-              </Text>
-            </View>
+                {isLoadingProduct ? (
+                  <View style={styles.noticeCard}>
+                    <Text style={styles.noticeText}>
+                      Loading product details...
+                    </Text>
+                  </View>
+                ) : null}
 
-            <View style={styles.formBody}>
-              {notice ? (
-                <View
-                  style={[
-                    styles.noticeCard,
-                    notice.type === "success"
-                      ? styles.noticeSuccess
-                      : styles.noticeError,
-                  ]}
-                >
-                  <Text style={styles.noticeText}>{notice.message}</Text>
-                </View>
-              ) : null}
+                {storeOptions.length > 1 ? (
+                  <View style={styles.fieldGroup}>
+                    <Text style={styles.fieldLabel}>Store</Text>
+                    <ScrollView
+                      horizontal
+                      contentContainerStyle={styles.storeChipRow}
+                      showsHorizontalScrollIndicator={false}
+                    >
+                      {storeOptions.map((store) => {
+                        const active = store.id === selectedStoreId;
 
-              {isLoadingProduct ? (
-                <View style={styles.noticeCard}>
-                  <Text style={styles.noticeText}>Loading product details...</Text>
-                </View>
-              ) : null}
+                        return (
+                          <TouchableOpacity
+                            key={store.id}
+                            activeOpacity={0.85}
+                            disabled={
+                              isSubmitting || isEditing || isLoadingProduct
+                            }
+                            onPress={() => setSelectedStoreId(store.id)}
+                            style={[
+                              styles.storeChip,
+                              active && styles.storeChipActive,
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.storeChipTitle,
+                                active && styles.storeChipTitleActive,
+                              ]}
+                            >
+                              {store.store_name}
+                            </Text>
+                            <Text style={styles.storeChipMeta}>
+                              {store.category}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </ScrollView>
+                  </View>
+                ) : null}
 
-              {storeOptions.length > 1 ? (
+                {selectedStore ? (
+                  <View style={styles.selectedStoreCard}>
+                    <Text style={styles.fieldLabel}>Store</Text>
+                    <Text style={styles.selectedStoreTitle}>
+                      {selectedStore.store_name}
+                    </Text>
+                    <Text style={styles.selectedStoreMeta}>
+                      {selectedStore.category || selectedStore.address}
+                    </Text>
+                  </View>
+                ) : null}
+
                 <View style={styles.fieldGroup}>
-                  <Text style={styles.fieldLabel}>Store</Text>
+                  <Text style={styles.fieldLabel}>Product Name</Text>
+                  <TextInput
+                    editable={!isSubmitting && !isLoadingProduct}
+                    onChangeText={setProductName}
+                    placeholder="Golden Morn Cereal"
+                    placeholderTextColor={theme.colors.mutedText}
+                    style={styles.input}
+                    value={productName}
+                  />
+                </View>
+
+                <View style={styles.fieldGroup}>
+                  <Text style={styles.fieldLabel}>Price</Text>
+                  <View style={styles.priceInputWrap}>
+                    <Text style={styles.currencyMark}>₦</Text>
+                    <TextInput
+                      editable={!isSubmitting && !isLoadingProduct}
+                      keyboardType="decimal-pad"
+                      onChangeText={setPrice}
+                      placeholder="2500"
+                      placeholderTextColor={theme.colors.mutedText}
+                      style={styles.priceInput}
+                      value={price}
+                    />
+                  </View>
+                  <Text style={styles.helperText}>
+                    Base price for simple products. Variants can override it.
+                  </Text>
+                </View>
+
+                <View style={styles.fieldGroup}>
+                  <Text style={styles.fieldLabel}>Categories</Text>
                   <ScrollView
                     horizontal
-                    contentContainerStyle={styles.storeChipRow}
+                    contentContainerStyle={styles.categoryRow}
                     showsHorizontalScrollIndicator={false}
                   >
-                    {storeOptions.map((store) => {
-                      const active = store.id === selectedStoreId;
+                    {CATEGORY_OPTIONS.map((option) => {
+                      const active = selectedCategories.includes(option);
 
                       return (
                         <TouchableOpacity
-                          key={store.id}
+                          key={option}
                           activeOpacity={0.85}
-                          disabled={isSubmitting || isEditing || isLoadingProduct}
-                          onPress={() => setSelectedStoreId(store.id)}
+                          disabled={isSubmitting || isLoadingProduct}
+                          onPress={() => handleToggleCategory(option)}
                           style={[
-                            styles.storeChip,
-                            active && styles.storeChipActive,
+                            styles.categoryChip,
+                            active && styles.categoryChipActive,
                           ]}
                         >
                           <Text
                             style={[
-                              styles.storeChipTitle,
-                              active && styles.storeChipTitleActive,
+                              styles.categoryChipText,
+                              active && styles.categoryChipTextActive,
                             ]}
                           >
-                            {store.store_name}
-                          </Text>
-                          <Text style={styles.storeChipMeta}>
-                            {store.category}
+                            {option}
                           </Text>
                         </TouchableOpacity>
                       );
                     })}
                   </ScrollView>
-                </View>
-              ) : null}
-
-              {selectedStore ? (
-                <View style={styles.selectedStoreCard}>
-                  <Text style={styles.fieldLabel}>Store</Text>
-                  <Text style={styles.selectedStoreTitle}>
-                    {selectedStore.store_name}
+                  <Text style={styles.helperText}>
+                    Choose up to 4 categories. Exact name matches still rank
+                    first in search, then category matches.
                   </Text>
-                  <Text style={styles.selectedStoreMeta}>
-                    {selectedStore.category || selectedStore.address}
-                  </Text>
-                </View>
-              ) : null}
-
-              <View style={styles.fieldGroup}>
-                <Text style={styles.fieldLabel}>Product Name</Text>
-                <TextInput
-                  editable={!isSubmitting && !isLoadingProduct}
-                  onChangeText={setProductName}
-                  placeholder="Golden Morn Cereal"
-                  placeholderTextColor={theme.colors.mutedText}
-                  style={styles.input}
-                  value={productName}
-                />
-              </View>
-
-              <View style={styles.fieldGroup}>
-                <Text style={styles.fieldLabel}>Price</Text>
-                <View style={styles.priceInputWrap}>
-                  <Text style={styles.currencyMark}>₦</Text>
-                  <TextInput
-                    editable={!isSubmitting && !isLoadingProduct}
-                    keyboardType="decimal-pad"
-                    onChangeText={setPrice}
-                    placeholder="2500"
-                    placeholderTextColor={theme.colors.mutedText}
-                    style={styles.priceInput}
-                    value={price}
-                  />
-                </View>
-                <Text style={styles.helperText}>
-                  Base price for simple products. Variants can override it.
-                </Text>
-              </View>
-
-              <View style={styles.fieldGroup}>
-                <Text style={styles.fieldLabel}>Categories</Text>
-                <ScrollView
-                  horizontal
-                  contentContainerStyle={styles.categoryRow}
-                  showsHorizontalScrollIndicator={false}
-                >
-                  {CATEGORY_OPTIONS.map((option) => {
-                    const active = selectedCategories.includes(option);
-
-                    return (
-                      <TouchableOpacity
-                        key={option}
-                        activeOpacity={0.85}
-                        disabled={isSubmitting || isLoadingProduct}
-                        onPress={() => handleToggleCategory(option)}
-                        style={[
-                          styles.categoryChip,
-                          active && styles.categoryChipActive,
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.categoryChipText,
-                            active && styles.categoryChipTextActive,
-                          ]}
-                        >
-                          {option}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-                <Text style={styles.helperText}>
-                  Choose up to 4 categories. Exact name matches still rank first in search, then category matches.
-                </Text>
-                {selectedCategories.includes("Others") ? (
-                  <TextInput
-                    editable={!isSubmitting && !isLoadingProduct}
-                    onChangeText={setCustomCategory}
-                    placeholder="Enter custom category"
-                    placeholderTextColor={theme.colors.mutedText}
-                    style={styles.input}
-                    value={customCategory}
-                  />
-                ) : null}
-              </View>
-
-              <View style={styles.fieldGroup}>
-                <Text style={styles.fieldLabel}>Description</Text>
-                <TextInput
-                  editable={!isSubmitting && !isLoadingProduct}
-                  multiline
-                  onChangeText={setDescription}
-                  placeholder="Short description customers will see on your store page"
-                  placeholderTextColor={theme.colors.mutedText}
-                  style={styles.textArea}
-                  textAlignVertical="top"
-                  value={description}
-                />
-              </View>
-
-              <View style={styles.imagePanel}>
-                <View style={styles.imageHeader}>
-                  <View>
-                    <Text style={styles.imageTitle}>Product image</Text>
-                    <Text style={styles.imageSubtitle}>
-                      Optional. Helps the product stand out.
-                    </Text>
-                  </View>
-                  {imageUrl ? (
-                    <TouchableOpacity
-                      activeOpacity={0.85}
-                      disabled={isSubmitting || isLoadingProduct}
-                      onPress={() => setImageUrl("")}
-                      style={styles.removeImageButton}
-                    >
-                      <Text style={styles.removeImageButtonText}>Remove</Text>
-                    </TouchableOpacity>
+                  {selectedCategories.includes("Others") ? (
+                    <TextInput
+                      editable={!isSubmitting && !isLoadingProduct}
+                      onChangeText={setCustomCategory}
+                      placeholder="Enter custom category"
+                      placeholderTextColor={theme.colors.mutedText}
+                      style={styles.input}
+                      value={customCategory}
+                    />
                   ) : null}
                 </View>
 
-                <View style={styles.imagePreview}>
-                  {imageUrl ? (
-                    <Image source={{ uri: imageUrl }} style={styles.previewImage} />
-                  ) : (
-                    <Text style={styles.imageEmptyText}>No image selected</Text>
-                  )}
+                <View style={styles.fieldGroup}>
+                  <Text style={styles.fieldLabel}>Description</Text>
+                  <TextInput
+                    editable={!isSubmitting && !isLoadingProduct}
+                    multiline
+                    onChangeText={setDescription}
+                    placeholder="Short description customers will see on your store page"
+                    placeholderTextColor={theme.colors.mutedText}
+                    style={styles.textArea}
+                    textAlignVertical="top"
+                    value={description}
+                  />
                 </View>
 
-                <View style={styles.imageActionRow}>
-                  <TouchableOpacity
-                    activeOpacity={0.85}
-                    disabled={isSubmitting || isLoadingProduct || isPickingImage}
-                    onPress={() => void handlePickProductImage("camera")}
-                    style={styles.primaryImageButton}
-                  >
-                    <Text style={styles.primaryImageButtonText}>
-                      {isPickingImage ? "Loading..." : "Take Photo"}
-                    </Text>
-                  </TouchableOpacity>
+                <View style={styles.imagePanel}>
+                  <View style={styles.imageHeader}>
+                    <View>
+                      <Text style={styles.imageTitle}>Product image</Text>
+                      <Text style={styles.imageSubtitle}>
+                        Optional. Helps the product stand out.
+                      </Text>
+                    </View>
+                    {imageUrl ? (
+                      <TouchableOpacity
+                        activeOpacity={0.85}
+                        disabled={isSubmitting || isLoadingProduct}
+                        onPress={() => setImageUrl("")}
+                        style={styles.removeImageButton}
+                      >
+                        <Text style={styles.removeImageButtonText}>Remove</Text>
+                      </TouchableOpacity>
+                    ) : null}
+                  </View>
 
-                  <TouchableOpacity
-                    activeOpacity={0.85}
-                    disabled={isSubmitting || isLoadingProduct || isPickingImage}
-                    onPress={() => void handlePickProductImage("library")}
-                    style={styles.secondaryImageButton}
-                  >
-                    <Text style={styles.secondaryImageButtonText}>
-                      Choose from Gallery
-                    </Text>
-                  </TouchableOpacity>
+                  <View style={styles.imagePreview}>
+                    {imageUrl ? (
+                      <Image
+                        source={{ uri: imageUrl }}
+                        style={styles.previewImage}
+                      />
+                    ) : (
+                      <Text style={styles.imageEmptyText}>
+                        No image selected
+                      </Text>
+                    )}
+                  </View>
+
+                  <View style={styles.imageActionRow}>
+                    <TouchableOpacity
+                      activeOpacity={0.85}
+                      disabled={
+                        isSubmitting || isLoadingProduct || isPickingImage
+                      }
+                      onPress={() => void handlePickProductImage("camera")}
+                      style={styles.primaryImageButton}
+                    >
+                      <Text style={styles.primaryImageButtonText}>
+                        {isPickingImage ? "Loading..." : "Take Photo"}
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      activeOpacity={0.85}
+                      disabled={
+                        isSubmitting || isLoadingProduct || isPickingImage
+                      }
+                      onPress={() => void handlePickProductImage("library")}
+                      style={styles.secondaryImageButton}
+                    >
+                      <Text style={styles.secondaryImageButtonText}>
+                        Choose from Gallery
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
-              </View>
 
-              <VariantRows
-                disabled={isSubmitting || isLoadingProduct}
-                onAdd={handleVariantAdd}
-                onChange={handleVariantChange}
-                onRemove={handleVariantRemove}
-                variants={variants}
-              />
-
-              <View style={styles.submitRow}>
-                <Button
-                  label={
-                    submitMode === "edit-next" || submitMode === "update"
-                      ? isEditing
-                        ? "Saving Changes…"
-                        : "Saving..."
-                      : isEditing
-                        ? "Save Changes"
-                        : "Add & Edit Next"
-                  }
-                  onPress={() => handleSubmit(isEditing ? "update" : "edit-next")}
+                <VariantRows
                   disabled={isSubmitting || isLoadingProduct}
-                  style={styles.primarySubmitButton}
+                  onAdd={handleVariantAdd}
+                  onChange={handleVariantChange}
+                  onRemove={handleVariantRemove}
+                  variants={variants}
                 />
 
-                {!isEditing ? (
+                <View style={styles.submitRow}>
                   <Button
-                    label={submitMode === "start-new" ? "Saving..." : "Add & Start New"}
-                    onPress={() => handleSubmit("start-new")}
+                    label={
+                      submitMode === "edit-next" || submitMode === "update"
+                        ? isEditing
+                          ? "Saving Changes…"
+                          : "Saving..."
+                        : isEditing
+                          ? "Save Changes"
+                          : "Add & Edit Next"
+                    }
+                    onPress={() =>
+                      handleSubmit(isEditing ? "update" : "edit-next")
+                    }
                     disabled={isSubmitting || isLoadingProduct}
-                    variant="secondary"
-                    style={styles.secondarySubmitButton}
+                    style={styles.primarySubmitButton}
                   />
-                ) : null}
+
+                  {!isEditing ? (
+                    <Button
+                      label={
+                        submitMode === "start-new"
+                          ? "Saving..."
+                          : "Add & Start New"
+                      }
+                      onPress={() => handleSubmit("start-new")}
+                      disabled={isSubmitting || isLoadingProduct}
+                      variant="secondary"
+                      style={styles.secondarySubmitButton}
+                    />
+                  ) : null}
+                </View>
               </View>
             </View>
           </View>
-        </View>
-      </ScrollView>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -950,6 +988,9 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: theme.colors.background,
+  },
+  flex: {
+    flex: 1,
   },
   scrollContent: {
     paddingHorizontal: 16,

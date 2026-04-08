@@ -1,0 +1,18 @@
+{
+  "auth": {
+    "signup": {
+      "emailExists": "This email is already registered. Try logging in instead.",
+      "success": "Account created successfully.",
+      "failed": "Couldn't create account right now. Please try again."
+    },
+    "login": {
+      "invalidCredentials": "Invalid email or password.",
+      "success": "Welcome back!",
+      "failed": "Login failed. Please try again."
+    },
+    "general": {
+      "networkError": "Network error. Please check your connection.",
+      "serverError": "Something went wrong. Please try again later."
+    }
+  }
+}

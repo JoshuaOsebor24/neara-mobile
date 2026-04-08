@@ -1,0 +1,419 @@
+import { LinearGradient } from "expo-linear-gradient";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  type ViewStyle,
+} from "react-native";
+import RNMapView, {
+  Marker,
+  PROVIDER_DEFAULT,
+  type Region,
+} from "react-native-maps";
+
+import { theme } from "@/constants/theme";
+import {
+  DEFAULT_MAP_COORDINATES,
+  type LocationPermissionState,
+  type UserCoordinates,
+} from "@/services/location";
+import type { BackendStore } from "@/services/store-api";
+
+function buildRegion(coordinates: UserCoordinates): Region {
+  const latitudeDelta = 0.008;
+  const longitudeDelta = 0.008;
+
+  return {
+    latitude: coordinates.latitude - latitudeDelta * 0.35,
+    latitudeDelta,
+    longitude: coordinates.longitude,
+    longitudeDelta,
+  };
+}
+
+const DEFAULT_REGION: Region = {
+  latitude: DEFAULT_MAP_COORDINATES.latitude,
+  latitudeDelta: 0.016,
+  longitude: DEFAULT_MAP_COORDINATES.longitude,
+  longitudeDelta: 0.016,
+};
+
+function buildStatusContent({
+  errorMessage,
+  isLoading,
+  permissionStatus,
+}: {
+  errorMessage: string;
+  isLoading: boolean;
+  permissionStatus: LocationPermissionState;
+}) {
+  if (isLoading) {
+    return {
+      actionLabel: undefined,
+      description: "Requesting permission and finding your current position.",
+      title: "Loading your location...",
+      tone: "info" as const,
+    };
+  }
+
+  if (permissionStatus === "denied") {
+    return {
+      actionLabel: "Retry location",
+      description:
+        "The map still works with the default region. Allow location access if you want automatic centering.",
+      title: "Location permission denied",
+      tone: "warning" as const,
+    };
+  }
+
+  if (errorMessage) {
+    return {
+      actionLabel: "Retry location",
+      description: errorMessage,
+      title: "Using default region",
+      tone: "info" as const,
+    };
+  }
+
+  return null;
+}
+
+export function NearaMapView({
+  coordinates,
+  disableUserLocationRecenter = false,
+  disableGestures = false,
+  errorMessage,
+  focusedCoordinates,
+  isLoading,
+  mapRecenterKey = 0,
+  onMapMoveStart,
+  onRequestLocation,
+  onSelectStore,
+  permissionStatus,
+  selectedStoreId,
+  stores,
+  style,
+}: {
+  coordinates: UserCoordinates | null;
+  disableUserLocationRecenter?: boolean;
+  errorMessage: string;
+  focusedCoordinates?: UserCoordinates | null;
+  isLoading: boolean;
+  mapRecenterKey?: number;
+  disableGestures?: boolean;
+  onMapMoveStart?: () => void;
+  onRequestLocation: () => void;
+  onSelectStore?: (storeId: string) => void;
+  permissionStatus: LocationPermissionState;
+  selectedStoreId?: string | null;
+  stores?: BackendStore[];
+  style?: ViewStyle;
+}) {
+  const mapRef = useRef<RNMapView | null>(null);
+  const [userInteracted, setUserInteracted] = useState(false);
+  const [displayRegion, setDisplayRegion] = useState<Region>(DEFAULT_REGION);
+  const region = useMemo(
+    () => (coordinates ? buildRegion(coordinates) : null),
+    [coordinates],
+  );
+  const focusedRegion = useMemo(() => {
+    if (!focusedCoordinates) {
+      return null;
+    }
+
+    return buildRegion(focusedCoordinates);
+  }, [focusedCoordinates]);
+  const status = useMemo(
+    () =>
+      buildStatusContent({
+        errorMessage,
+        isLoading,
+        permissionStatus,
+      }),
+    [errorMessage, isLoading, permissionStatus],
+  );
+
+  useEffect(() => {
+    if (focusedRegion) {
+      setUserInteracted(false);
+      setDisplayRegion(focusedRegion);
+      return;
+    }
+
+    if (region && !userInteracted && !disableUserLocationRecenter) {
+      setDisplayRegion(region);
+    }
+  }, [focusedRegion, region, userInteracted, disableUserLocationRecenter]);
+
+  useEffect(() => {
+    if (!region || mapRecenterKey === 0) {
+      return;
+    }
+
+    setUserInteracted(false);
+    setDisplayRegion(region);
+  }, [mapRecenterKey, region]);
+
+  return (
+    <View style={[styles.container, style]}>
+      <RNMapView
+        ref={mapRef}
+        initialRegion={focusedRegion ?? region ?? DEFAULT_REGION}
+        loadingEnabled
+        mapType="standard"
+        scrollEnabled={!disableGestures}
+        zoomEnabled={!disableGestures}
+        rotateEnabled={!disableGestures}
+        pitchEnabled={!disableGestures}
+        zoomTapEnabled={!disableGestures}
+        onPanDrag={
+          disableGestures
+            ? undefined
+            : () => {
+                setUserInteracted(true);
+                onMapMoveStart?.();
+              }
+        }
+        onRegionChangeComplete={
+          disableGestures
+            ? undefined
+            : (nextRegion) => {
+                setUserInteracted(true);
+                setDisplayRegion(nextRegion);
+              }
+        }
+        maxZoomLevel={19}
+        minZoomLevel={9}
+        provider={PROVIDER_DEFAULT}
+        region={displayRegion}
+        showsCompass={false}
+        showsIndoorLevelPicker={false}
+        showsMyLocationButton={false}
+        showsUserLocation
+        toolbarEnabled={false}
+        style={styles.map}
+      >
+        {(stores ?? []).map((store) => {
+          const latitude =
+            typeof store.latitude === "number"
+              ? store.latitude
+              : store.latitude !== null && store.latitude !== undefined
+                ? Number(store.latitude)
+                : null;
+          const longitude =
+            typeof store.longitude === "number"
+              ? store.longitude
+              : store.longitude !== null && store.longitude !== undefined
+                ? Number(store.longitude)
+                : null;
+
+          if (
+            store.id === null ||
+            store.id === undefined ||
+            !Number.isFinite(latitude) ||
+            !Number.isFinite(longitude)
+          ) {
+            return null;
+          }
+
+          const markerLatitude = Number(latitude);
+          const markerLongitude = Number(longitude);
+          const isSelected = String(store.id) === String(selectedStoreId || "");
+
+          return (
+            <Marker
+              key={String(store.id)}
+              coordinate={{
+                latitude: markerLatitude,
+                longitude: markerLongitude,
+              }}
+              onPress={() => onSelectStore?.(String(store.id))}
+              tracksViewChanges={false}
+            >
+              <View style={styles.storeMarkerWrap}>
+                <View
+                  style={[
+                    styles.storeMarkerHead,
+                    isSelected ? styles.storeMarkerHeadSelected : null,
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.storeMarkerCore,
+                      isSelected ? styles.storeMarkerCoreSelected : null,
+                    ]}
+                  />
+                </View>
+                <View
+                  style={[
+                    styles.storeMarkerTail,
+                    isSelected ? styles.storeMarkerTailSelected : null,
+                  ]}
+                />
+              </View>
+            </Marker>
+          );
+        })}
+      </RNMapView>
+
+      <LinearGradient
+        colors={["rgba(0,0,0,0.2)", "transparent", "rgba(0,0,0,0.28)"]}
+        pointerEvents="none"
+        style={styles.mapShade}
+      />
+
+      {status ? (
+        <View style={styles.statusWrap}>
+          <View
+            style={[
+              styles.statusCard,
+              status.tone === "warning" ? styles.statusCardWarning : null,
+            ]}
+          >
+            <Text style={styles.statusTitle}>{status.title}</Text>
+            <Text style={styles.statusDescription}>{status.description}</Text>
+            {isLoading ? (
+              <View style={styles.loadingRow}>
+                <ActivityIndicator color={theme.colors.accent} size="small" />
+                <Text style={styles.loadingText}>Updating map...</Text>
+              </View>
+            ) : status.actionLabel ? (
+              <Pressable
+                onPress={onRequestLocation}
+                style={styles.actionButton}
+              >
+                <Text style={styles.actionButtonText}>
+                  {status.actionLabel}
+                </Text>
+              </Pressable>
+            ) : null}
+          </View>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+export { NearaMapView as MapView };
+
+const styles = StyleSheet.create({
+  container: {
+    backgroundColor: "#0d1729",
+    height: "100%",
+    overflow: "hidden",
+    width: "100%",
+  },
+  map: {
+    ...StyleSheet.absoluteFillObject,
+    height: "100%",
+    width: "100%",
+  },
+  mapShade: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  statusWrap: {
+    left: 16,
+    position: "absolute",
+    right: 16,
+    top: 84,
+  },
+  statusCard: {
+    backgroundColor: "rgba(9, 15, 29, 0.9)",
+    borderColor: "rgba(255,255,255,0.08)",
+    borderRadius: 24,
+    borderWidth: 1,
+    gap: 12,
+    paddingHorizontal: 18,
+    paddingVertical: 18,
+  },
+  statusCardWarning: {
+    borderColor: "rgba(251,113,133,0.22)",
+  },
+  statusTitle: {
+    color: theme.colors.text,
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  statusDescription: {
+    color: "#c3d1e6",
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  loadingText: {
+    color: theme.colors.text,
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  loadingRow: {
+    alignItems: "center",
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    gap: 10,
+  },
+  actionButton: {
+    alignItems: "center",
+    alignSelf: "flex-start",
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderColor: "rgba(125, 211, 252, 0.18)",
+    borderRadius: 999,
+    borderWidth: 1,
+    justifyContent: "center",
+    minHeight: 42,
+    paddingHorizontal: 18,
+  },
+  actionButtonText: {
+    color: "#d8efff",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  storeMarkerWrap: {
+    alignItems: "center",
+    justifyContent: "flex-start",
+    paddingBottom: 12,
+    paddingHorizontal: 6,
+    paddingTop: 6,
+  },
+  storeMarkerHead: {
+    alignItems: "center",
+    backgroundColor: "rgba(14, 22, 39, 0.98)",
+    borderColor: "rgba(255,255,255,0.88)",
+    borderRadius: 18,
+    borderWidth: 2,
+    height: 34,
+    justifyContent: "center",
+    width: 34,
+    shadowColor: "#020817",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.24,
+    shadowRadius: 12,
+  },
+  storeMarkerHeadSelected: {
+    backgroundColor: "#1e3a8a",
+    borderColor: "#dbeafe",
+    transform: [{ scale: 1.08 }],
+  },
+  storeMarkerCore: {
+    backgroundColor: "#94a3b8",
+    borderRadius: 7,
+    height: 14,
+    width: 14,
+  },
+  storeMarkerCoreSelected: {
+    backgroundColor: "#f8fbff",
+  },
+  storeMarkerTail: {
+    borderLeftColor: "transparent",
+    borderLeftWidth: 8,
+    borderRightColor: "transparent",
+    borderRightWidth: 8,
+    borderTopColor: "rgba(14, 22, 39, 0.98)",
+    borderTopWidth: 14,
+    marginTop: -2,
+  },
+  storeMarkerTailSelected: {
+    borderTopColor: "#1e3a8a",
+  },
+});

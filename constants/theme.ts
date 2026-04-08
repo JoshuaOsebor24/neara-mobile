@@ -1,53 +1,99 @@
-/**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
- */
-
-import { Platform } from 'react-native';
-
-const tintColorLight = '#0a7ea4';
-const tintColorDark = '#fff';
-
-export const Colors = {
-  light: {
-    text: '#11181C',
-    background: '#fff',
-    tint: tintColorLight,
-    icon: '#687076',
-    tabIconDefault: '#687076',
-    tabIconSelected: tintColorLight,
+export const theme = {
+  colors: {
+    background: "#081120",
+    surface: "#101a2e",
+    surfaceElevated: "#16243b",
+    surfaceSoft: "#1b2b45",
+    surfaceOverlay: "rgba(15, 23, 42, 0.74)",
+    surfaceCard: "rgba(3, 10, 24, 0.88)",
+    border: "#24324b",
+    borderSoft: "rgba(148, 163, 184, 0.16)",
+    borderStrong: "rgba(255,255,255,0.10)",
+    text: "#f6fbff",
+    mutedText: "#8fa1ba",
+    subduedText: "#c3d1e6",
+    tabInactive: "#5f738f",
+    accent: "#7dd3fc",
+    accentStrong: "#38bdf8",
+    success: "#34d399",
+    danger: "#fb7185",
+    shadow: "#020817",
   },
-  dark: {
-    text: '#ECEDEE',
-    background: '#151718',
-    tint: tintColorDark,
-    icon: '#9BA1A6',
-    tabIconDefault: '#9BA1A6',
-    tabIconSelected: tintColorDark,
+  spacing: {
+    screenHorizontal: 20,
+    screenTop: 12,
+    screenBottom: 24,
+    xs: 8,
+    sm: 12,
+    md: 16,
+    lg: 20,
+    card: 18,
+    section: 24,
+    xl: 28,
   },
-};
-
-export const Fonts = Platform.select({
-  ios: {
-    /** iOS `UIFontDescriptorSystemDesignDefault` */
-    sans: 'system-ui',
-    /** iOS `UIFontDescriptorSystemDesignSerif` */
-    serif: 'ui-serif',
-    /** iOS `UIFontDescriptorSystemDesignRounded` */
-    rounded: 'ui-rounded',
-    /** iOS `UIFontDescriptorSystemDesignMonospaced` */
-    mono: 'ui-monospace',
+  radius: {
+    pill: 999,
+    button: 18,
+    card: 22,
+    cardLarge: 30,
+    cardXLarge: 34,
+    input: 18,
+    image: 22,
   },
-  default: {
-    sans: 'normal',
-    serif: 'serif',
-    rounded: 'normal',
-    mono: 'monospace',
+  typography: {
+    eyebrow: {
+      fontSize: 11,
+      fontWeight: "800",
+      letterSpacing: 3,
+    },
+    pageTitle: {
+      fontSize: 30,
+      fontWeight: "800",
+    },
+    sectionTitle: {
+      fontSize: 24,
+      fontWeight: "800",
+    },
+    body: {
+      fontSize: 15,
+      lineHeight: 22,
+    },
   },
-  web: {
-    sans: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-    serif: "Georgia, 'Times New Roman', serif",
-    rounded: "'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo, 'MS PGothic', sans-serif",
-    mono: "SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
+  controls: {
+    pillButtonHeight: 52,
+    inputHeight: 56,
+    actionButtonMinHeight: 52,
+    cardPadding: 20,
   },
-});
+  form: {
+    inputBackground: "rgba(2, 6, 23, 0.72)",
+    inputBorder: "rgba(255,255,255,0.10)",
+    inputPlaceholder: "#94a3b8",
+    inputRadius: 18,
+    labelColor: "#94a3b8",
+    labelSize: 13,
+  },
+  button: {
+    primaryBackground: "#7dd3fc",
+    primaryText: "#081120",
+    secondaryBackground: "rgba(255,255,255,0.06)",
+    secondaryBorder: "rgba(255,255,255,0.12)",
+    radius: 18,
+  },
+  shadows: {
+    card: {
+      shadowColor: "#020817",
+      shadowOffset: { width: 0, height: 18 },
+      shadowOpacity: 0.28,
+      shadowRadius: 30,
+      elevation: 10,
+    },
+    soft: {
+      shadowColor: "#020817",
+      shadowOffset: { width: 0, height: 10 },
+      shadowOpacity: 0.18,
+      shadowRadius: 18,
+      elevation: 4,
+    },
+  },
+} as const;
