@@ -3,9 +3,9 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  Animated,
   Image,
   KeyboardAvoidingView,
-  LayoutAnimation,
   PanResponder,
   Platform,
   ScrollView,
@@ -22,6 +22,7 @@ import {
 
 import { NearaMapView } from "@/components/map/MapView";
 import { useDrawer } from "@/components/navigation/drawer-provider";
+import { SavedStoreSkeleton } from "@/components/saved/saved-store-skeleton";
 import { PremiumBadge } from "@/components/ui/premium-badge";
 import { SearchInput } from "@/components/ui/search-input";
 import { StoreOwnerBadge } from "@/components/ui/store-owner-badge";
@@ -231,9 +232,10 @@ export default function HomeScreen() {
   );
   const collapsedPeekHeight = 104;
   const maxSheetOffset = Math.max(0, sheetHeight - collapsedPeekHeight);
-  const [sheetTranslateY, setSheetTranslateY] = useState(0);
+  const sheetTranslateY = useRef(new Animated.Value(0)).current;
   const dragStartOffsetRef = useRef(0);
   const sheetOffsetRef = useRef(0);
+  const sheetAnimationRef = useRef<Animated.CompositeAnimation | null>(null);
   const mapSheetInteractionRef = useRef({
     autoCollapsed: false,
     isMapMoving: false,
@@ -440,19 +442,45 @@ export default function HomeScreen() {
   const setSheetOffset = useCallback(
     (nextOffset: number) => {
       const clamped = Math.max(0, Math.min(nextOffset, maxSheetOffset));
+      sheetAnimationRef.current?.stop();
+      sheetAnimationRef.current = null;
       sheetOffsetRef.current = clamped;
       setIsSheetCollapsed(clamped >= maxSheetOffset * 0.5);
-      setSheetTranslateY(clamped);
+      sheetTranslateY.setValue(clamped);
     },
-    [maxSheetOffset],
+    [maxSheetOffset, sheetTranslateY],
   );
 
   const animateSheetOffset = useCallback(
     (nextOffset: number) => {
-      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-      setSheetOffset(nextOffset);
+      const clamped = Math.max(0, Math.min(nextOffset, maxSheetOffset));
+
+      sheetTranslateY.stopAnimation((currentValue) => {
+        sheetOffsetRef.current = currentValue;
+
+        if (clamped < maxSheetOffset * 0.5) {
+          setIsSheetCollapsed(false);
+        }
+
+        sheetAnimationRef.current?.stop();
+        sheetAnimationRef.current = Animated.timing(sheetTranslateY, {
+          toValue: clamped,
+          duration: 260,
+          useNativeDriver: true,
+        });
+
+        sheetAnimationRef.current.start(({ finished }) => {
+          if (!finished) {
+            return;
+          }
+
+          sheetOffsetRef.current = clamped;
+          setIsSheetCollapsed(clamped >= maxSheetOffset * 0.5);
+          sheetAnimationRef.current = null;
+        });
+      });
     },
-    [setSheetOffset],
+    [maxSheetOffset, sheetTranslateY],
   );
 
   useEffect(() => {
@@ -576,7 +604,7 @@ export default function HomeScreen() {
           const nextOffset = dragStartOffsetRef.current + gestureState.dy;
           const clamped = Math.max(0, Math.min(nextOffset, maxSheetOffset));
           sheetOffsetRef.current = clamped;
-          setSheetTranslateY(clamped);
+          sheetTranslateY.setValue(clamped);
         },
         onPanResponderRelease: (_, gestureState) => {
           snapSheet(gestureState.vy);
@@ -585,7 +613,7 @@ export default function HomeScreen() {
           snapSheet(gestureState.vy);
         },
       }),
-    [maxSheetOffset, snapSheet],
+    [maxSheetOffset, sheetTranslateY, snapSheet],
   );
 
   return (
@@ -744,7 +772,7 @@ export default function HomeScreen() {
                     params: { q: normalized },
                   });
                 }}
-                placeholder="Search stores, products, or locations"
+                placeholder="Search for food, groceries, electronics"
                 returnKeyType="search"
                 style={styles.searchOverlayInput}
                 value={overlaySearchQuery}
@@ -774,6 +802,8 @@ export default function HomeScreen() {
 
               <ScrollView
                 bounces={false}
+                keyboardShouldPersistTaps="handled"
+                keyboardDismissMode="on-drag"
                 contentContainerStyle={styles.searchOverlayRecentList}
                 showsVerticalScrollIndicator={false}
               >
@@ -899,10 +929,10 @@ export default function HomeScreen() {
                   <View style={styles.recentCard}>
                     <View style={styles.recentStoreInfo}>
                       <Text style={styles.recentStoreTitle}>
-                        No recent stores yet
+                        Start exploring stores near you
                       </Text>
                       <Text style={styles.recentStoreSubtitle}>
-                        Stores you open from backend results will appear here.
+                        Your recently interacted stores will appear here.
                       </Text>
                     </View>
                   </View>
@@ -912,7 +942,7 @@ export default function HomeScreen() {
           </View>
         ) : null}
 
-        <View
+        <Animated.View
           style={[
             styles.sheet,
             {
@@ -925,7 +955,7 @@ export default function HomeScreen() {
             <TouchableOpacity
               activeOpacity={0.9}
               onPress={() =>
-                setSheetOffset(isSheetCollapsed ? 0 : maxSheetOffset)
+                animateSheetOffset(isSheetCollapsed ? 0 : maxSheetOffset)
               }
               style={styles.handleButton}
             >
@@ -947,7 +977,7 @@ export default function HomeScreen() {
               <SearchInput
                 mode="pressable"
                 onPress={() => setIsSearchOverlayOpen(true)}
-                placeholder="Search stores, products, or locations"
+                placeholder="Search for food, groceries, electronics"
                 style={styles.searchBar}
               />
 
@@ -1031,10 +1061,10 @@ export default function HomeScreen() {
                     <View style={styles.recentCard}>
                       <View style={styles.recentStoreInfo}>
                         <Text style={styles.recentStoreTitle}>
-                          No recent stores yet
+                          Start exploring stores near you
                         </Text>
                         <Text style={styles.recentStoreSubtitle}>
-                          Stores you open from backend results will appear here.
+                          Your recently interacted stores will appear here.
                         </Text>
                       </View>
                     </View>
@@ -1047,12 +1077,11 @@ export default function HomeScreen() {
                   </View>
 
                   {isLoadingStores ? (
-                    <View style={styles.infoCard}>
-                      <Text style={styles.infoCardTitle}>Loading stores</Text>
-                      <Text style={styles.infoCardText}>
-                        Fetching nearby stores from the backend.
-                      </Text>
-                    </View>
+                    <>
+                      <SavedStoreSkeleton />
+                      <SavedStoreSkeleton />
+                      <SavedStoreSkeleton />
+                    </>
                   ) : storesError ? (
                     <View style={styles.infoCard}>
                       <Text style={styles.infoCardTitle}>
@@ -1086,11 +1115,11 @@ export default function HomeScreen() {
                           </View>
                         )}
                         <View style={styles.storeRowBody}>
-                        <View style={styles.storeRowTitleWrap}>
-                          <Text style={styles.storeRowTitle}>
-                            {store.name}
-                          </Text>
-                        </View>
+                          <View style={styles.storeRowTitleWrap}>
+                            <Text style={styles.storeRowTitle}>
+                              {store.name}
+                            </Text>
+                          </View>
                           <Text numberOfLines={1} style={styles.storeRowMeta}>
                             {store.distanceKm &&
                             Number.isFinite(store.distanceKm)
@@ -1109,7 +1138,7 @@ export default function HomeScreen() {
                   ) : (
                     <View style={styles.infoCard}>
                       <Text style={styles.infoCardTitle}>
-                        No stores found near you
+                        Search or browse to discover nearby stores
                       </Text>
                       <Text style={styles.infoCardText}>
                         Stores will show here when they are within 1 km of you.
@@ -1130,14 +1159,11 @@ export default function HomeScreen() {
                   </View>
 
                   {isLoadingStores ? (
-                    <View style={styles.infoCard}>
-                      <Text style={styles.infoCardTitle}>
-                        Loading store list
-                      </Text>
-                      <Text style={styles.infoCardText}>
-                        Fetching current stores.
-                      </Text>
-                    </View>
+                    <>
+                      <SavedStoreSkeleton />
+                      <SavedStoreSkeleton />
+                      <SavedStoreSkeleton />
+                    </>
                   ) : storesError ? (
                     <View style={styles.infoCard}>
                       <Text style={styles.infoCardTitle}>
@@ -1174,11 +1200,11 @@ export default function HomeScreen() {
                           </View>
                         )}
                         <View style={styles.storeRowBody}>
-                        <View style={styles.storeRowTitleWrap}>
-                          <Text style={styles.storeRowTitle}>
-                            {store.name}
-                          </Text>
-                        </View>
+                          <View style={styles.storeRowTitleWrap}>
+                            <Text style={styles.storeRowTitle}>
+                              {store.name}
+                            </Text>
+                          </View>
                           <Text numberOfLines={1} style={styles.storeRowMeta}>
                             {store.distanceKm &&
                             Number.isFinite(store.distanceKm)
@@ -1197,7 +1223,7 @@ export default function HomeScreen() {
                   ) : (
                     <View style={styles.infoCard}>
                       <Text style={styles.infoCardTitle}>
-                        No stores found near you
+                        Search or browse to discover nearby stores
                       </Text>
                       <Text style={styles.infoCardText}>
                         Stores will appear here when nearby results are
@@ -1211,7 +1237,7 @@ export default function HomeScreen() {
               </ScrollView>
             ) : null}
           </KeyboardAvoidingView>
-        </View>
+        </Animated.View>
       </View>
     </SafeAreaView>
   );
@@ -1233,17 +1259,17 @@ const styles = StyleSheet.create({
   },
   homeTopOverlay: {
     position: "absolute",
-    left: 20,
-    right: 20,
+    left: 18,
+    right: 18,
     zIndex: 60,
     flexDirection: "row",
-    alignItems: "flex-start",
+    alignItems: "center",
     justifyContent: "space-between",
   },
   homeMenuButton: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     backgroundColor: "rgba(31, 41, 55, 0.96)",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.10)",
@@ -1282,7 +1308,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     gap: 8,
-    alignItems: "flex-end",
+    alignItems: "center",
   },
   accountStatusName: {
     color: theme.colors.text,
@@ -1309,11 +1335,12 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     zIndex: 70,
     alignItems: "center",
+    justifyContent: "flex-start",
     paddingHorizontal: 18,
   },
   searchOverlayBackdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(2, 6, 23, 0.36)",
+    backgroundColor: "rgba(2, 6, 23, 0.28)",
   },
   searchOverlayCard: {
     width: "100%",
@@ -1322,9 +1349,9 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.10)",
-    backgroundColor: "rgba(11, 18, 32, 0.96)",
+    backgroundColor: "rgba(11, 18, 32, 0.94)",
     paddingHorizontal: 18,
-    paddingTop: 18,
+    paddingTop: 20,
     paddingBottom: 20,
     shadowColor: "#020617",
     shadowOffset: { width: 0, height: 18 },
@@ -1336,7 +1363,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 18,
+    marginBottom: 16,
   },
   searchOverlayTitle: {
     color: theme.colors.text,
@@ -1344,12 +1371,13 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   searchOverlayCloseButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.10)",
+    backgroundColor: "rgba(255,255,255,0.08)",
+    opacity: 0.92,
   },
   searchOverlayLocationCard: {
     borderRadius: 30,
@@ -1380,6 +1408,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    marginTop: 10,
     marginBottom: 16,
   },
   searchOverlaySectionTitle: {
@@ -1390,7 +1419,7 @@ const styles = StyleSheet.create({
   },
   searchOverlayRecentList: {
     gap: 12,
-    paddingBottom: 4,
+    paddingBottom: 36,
   },
   mapPreviewCard: {
     flexDirection: "row",
@@ -1479,7 +1508,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderBottomWidth: 0,
     borderColor: "rgba(255,255,255,0.08)",
-    backgroundColor: "rgba(10, 18, 32, 0.98)",
+    backgroundColor: "rgba(10, 18, 32, 0.94)",
     shadowColor: theme.colors.shadow,
     shadowOffset: { width: 0, height: -10 },
     shadowOpacity: 0.22,
@@ -1487,7 +1516,7 @@ const styles = StyleSheet.create({
     elevation: 20,
   },
   sheetDragZone: {
-    paddingTop: 10,
+    paddingTop: 6,
   },
   handleButton: {
     alignItems: "center",
@@ -1496,10 +1525,10 @@ const styles = StyleSheet.create({
     alignSelf: "center",
     width: 48,
     height: 6,
-    marginTop: 6,
-    marginBottom: 10,
+    marginTop: 4,
+    marginBottom: 8,
     borderRadius: 999,
-    backgroundColor: "rgba(255,255,255,0.22)",
+    backgroundColor: "rgba(255,255,255,0.18)",
   },
   searchHeader: {
     paddingHorizontal: 18,
@@ -1521,8 +1550,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: BORDER,
-    backgroundColor: "rgba(255,255,255,0.08)",
+    borderColor: "rgba(255,255,255,0.14)",
+    backgroundColor: "rgba(255,255,255,0.12)",
   },
   locationIconWrap: {
     width: 24,
@@ -1530,7 +1559,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(79,124,255,0.22)",
+    backgroundColor: "rgba(79,124,255,0.30)",
   },
   locationButtonText: {
     color: "#d8e6f6",
@@ -1546,7 +1575,7 @@ const styles = StyleSheet.create({
     paddingBottom: 120,
   },
   section: {
-    marginTop: 28,
+    marginTop: 24,
     gap: 14,
   },
   sectionHeader: {
@@ -1587,8 +1616,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     borderRadius: 22,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
@@ -1631,7 +1660,7 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   previewProductName: {
-    marginTop: 4,
+    marginTop: 3,
     color: "#E2E8F0",
     fontSize: 13,
     fontWeight: "700",
@@ -1647,7 +1676,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     gap: 12,
-    marginTop: 4,
+    marginTop: 2,
   },
   previewRightMeta: {
     alignItems: "flex-end",
@@ -1667,7 +1696,7 @@ const styles = StyleSheet.create({
   recentCard: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 16,
+    padding: 14,
     borderRadius: 26,
     borderWidth: 1,
     borderColor: BORDER,
@@ -1697,7 +1726,7 @@ const styles = StyleSheet.create({
   },
   recentVisualOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(2, 6, 23, 0.28)",
+    backgroundColor: "rgba(2, 6, 23, 0.22)",
   },
   recentAvatar: {
     position: "absolute",
@@ -1723,10 +1752,10 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     padding: 18,
-    backgroundColor: "rgba(2, 6, 23, 0.44)",
+    backgroundColor: "rgba(2, 6, 23, 0.56)",
   },
   recentStoreInfo: {
-    gap: 4,
+    gap: 2,
   },
   recentStoreTitle: {
     color: theme.colors.text,
@@ -1741,7 +1770,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    padding: 14,
+    padding: 12,
     borderRadius: 22,
     borderWidth: 1,
     borderColor: BORDER,
@@ -1772,7 +1801,7 @@ const styles = StyleSheet.create({
   storeRowBody: {
     flex: 1,
     minWidth: 0,
-    gap: 4,
+    gap: 2,
   },
   storeRowTitleWrap: {
     flexDirection: "row",
@@ -1793,7 +1822,7 @@ const styles = StyleSheet.create({
   storeRowAddress: {
     color: "#8fa2ba",
     fontSize: 12,
-    lineHeight: 18,
+    lineHeight: 16,
   },
   bottomSpacing: {
     height: 24,

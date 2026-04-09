@@ -1,7 +1,8 @@
 import { BackPillButton } from "@/components/ui/back-pill-button";
 import { ChatInputBar } from "@/components/ui/chat-input-bar";
+import Ionicons from "@expo/vector-icons/Ionicons";
+import { LinearGradient } from "expo-linear-gradient";
 import {
-  EmptyCard,
   ErrorCard,
   LoadingCard,
   SkeletonCard,
@@ -39,10 +40,19 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from "react-native";
 
 const { width } = Dimensions.get("window");
+
+type DraftBubble = {
+  created_at: string;
+  id: string;
+  pending?: boolean;
+  sender_id: string;
+  text: string;
+};
 
 function formatTime(dateString: string): string {
   const date = new Date(dateString);
@@ -52,11 +62,49 @@ function formatTime(dateString: string): string {
   });
 }
 
+function isSameDay(left: string, right: string) {
+  const leftDate = new Date(left);
+  const rightDate = new Date(right);
+
+  return (
+    leftDate.getFullYear() === rightDate.getFullYear() &&
+    leftDate.getMonth() === rightDate.getMonth() &&
+    leftDate.getDate() === rightDate.getDate()
+  );
+}
+
+function formatDayLabel(dateString: string) {
+  const date = new Date(dateString);
+  const now = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(now.getDate() - 1);
+
+  if (isSameDay(date.toISOString(), now.toISOString())) {
+    return "Today";
+  }
+
+  if (isSameDay(date.toISOString(), yesterday.toISOString())) {
+    return "Yesterday";
+  }
+
+  return date.toLocaleDateString([], {
+    month: "short",
+    day: "numeric",
+    year: date.getFullYear() === now.getFullYear() ? undefined : "numeric",
+  });
+}
+
+function buildStoreInitial(name: string) {
+  const trimmed = name.trim();
+  return trimmed ? trimmed.charAt(0).toUpperCase() : "S";
+}
+
 export default function ChatThreadScreen() {
   const params = useLocalSearchParams();
   const router = useRouter();
   const session = useMobileSession();
   const scrollViewRef = useRef<ScrollView>(null);
+  const lastAppliedDraftSeedRef = useRef("");
   const [conversation, setConversation] =
     useState<ChatConversationDetail | null>(null);
   const [storeName, setStoreName] = useState("");
@@ -65,6 +113,9 @@ export default function ChatThreadScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [quotaNotice, setQuotaNotice] = useState("");
+  const [optimisticMessages, setOptimisticMessages] = useState<DraftBubble[]>(
+    [],
+  );
 
   const storeId = params.storeId as string;
   const conversationId =
@@ -76,20 +127,33 @@ export default function ChatThreadScreen() {
   const variantPrompt =
     typeof params.variant === "string" ? params.variant : "";
   const pricePrompt = typeof params.price === "string" ? params.price : "";
+  const draftSeedKey = [
+    conversationId,
+    storeId,
+    prefillPrompt,
+    productPrompt,
+    variantPrompt,
+    pricePrompt,
+  ].join("|");
   const freeMessagesRemaining = getFreeMessagesRemaining(
     session.messagesSentCount,
     session.isPro,
   );
 
   useEffect(() => {
-    scrollViewRef.current?.scrollToEnd({ animated: false });
-  }, [conversation?.messages]);
+    const frame = requestAnimationFrame(() => {
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [conversation?.messages, optimisticMessages]);
 
   useEffect(() => {
-    if (conversationId || draft.trim()) {
+    if (conversationId || lastAppliedDraftSeedRef.current === draftSeedKey) {
       return;
     }
 
+    lastAppliedDraftSeedRef.current = draftSeedKey;
     setDraft(
       prefillPrompt ||
         buildChatRequestMessage("availability", {
@@ -100,7 +164,7 @@ export default function ChatThreadScreen() {
     );
   }, [
     conversationId,
-    draft,
+    draftSeedKey,
     prefillPrompt,
     pricePrompt,
     productPrompt,
@@ -228,6 +292,16 @@ export default function ChatThreadScreen() {
     const trimmedDraft = draft.trim();
     if (!trimmedDraft || isSending || !session.authToken) return;
 
+    const optimisticMessage: DraftBubble = {
+      created_at: new Date().toISOString(),
+      id: `pending:${Date.now()}`,
+      pending: true,
+      sender_id: session.id || "me",
+      text: trimmedDraft,
+    };
+
+    setOptimisticMessages((current) => [...current, optimisticMessage]);
+    setDraft("");
     setIsSending(true);
     setErrorMessage("");
 
@@ -299,6 +373,10 @@ export default function ChatThreadScreen() {
       }
 
       setErrorMessage(result.error);
+      setDraft(trimmedDraft);
+      setOptimisticMessages((current) =>
+        current.filter((message) => message.id !== optimisticMessage.id),
+      );
       setIsSending(false);
       return;
     }
@@ -349,8 +427,8 @@ export default function ChatThreadScreen() {
     }
 
     setConversation(result.conversation);
+    setOptimisticMessages([]);
     setStoreName(result.conversation.store_name);
-    setDraft("");
     setIsSending(false);
     showFlashFeedback("Message sent.");
     if (!conversationId) {
@@ -362,8 +440,19 @@ export default function ChatThreadScreen() {
   };
 
   const title = storeName || "Chat";
-  const subtitle = "Send a real message to this store";
+  const subtitle = conversation?.messages?.length
+    ? "Online"
+    : "Responds fast";
   const messages = conversation?.messages ?? [];
+  const hasDraftPreview = !conversationId && !messages.length && Boolean(draft.trim());
+  const renderedMessages = [
+    ...messages,
+    ...optimisticMessages.filter(
+      (optimisticMessage) =>
+        !messages.some((message) => message.text === optimisticMessage.text),
+    ),
+  ];
+  const threadTitle = storeName || "Store";
 
   return (
     <SafeAreaView style={styles.container}>
@@ -375,99 +464,239 @@ export default function ChatThreadScreen() {
         {/* Header */}
         <View style={styles.header}>
           <BackPillButton fallbackHref="/(tabs)/chats" />
-          <View style={styles.headerContent}>
-            <Text style={styles.headerTitle}>{title}</Text>
-            <Text style={styles.headerSubtitle}>{subtitle}</Text>
-          </View>
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={() => router.push(`/store/${storeId}`)}
+            style={styles.headerContentButton}
+          >
+            <View style={styles.headerAvatar}>
+              <Text style={styles.headerAvatarText}>
+                {buildStoreInitial(threadTitle)}
+              </Text>
+            </View>
+            <View style={styles.headerContent}>
+              <Text numberOfLines={1} style={styles.headerTitle}>
+                {title}
+              </Text>
+              <Text style={styles.headerSubtitle}>{subtitle}</Text>
+            </View>
+            <Ionicons color="#64748b" name="chevron-forward" size={16} />
+          </TouchableOpacity>
         </View>
 
         {/* Messages */}
-        <ScrollView
-          ref={scrollViewRef}
-          style={styles.messagesContainer}
-          contentContainerStyle={styles.messagesContent}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          {isLoading ? (
-            <View style={styles.stateWrap}>
-              <LoadingCard
-                message="Loading conversation"
-                detail="Fetching the latest messages."
-              />
-              <SkeletonCard height={72} />
-              <SkeletonCard height={64} />
-            </View>
-          ) : null}
-          {!isLoading && errorMessage ? (
-            <View style={styles.stateWrap}>
-              <ErrorCard title="Chat unavailable" detail={errorMessage} />
-            </View>
-          ) : null}
-          {!isLoading && !errorMessage && !session.isPro && quotaNotice ? (
-            <View style={styles.noticeCard}>
-              <Text style={styles.noticeTitle}>Free chat limit</Text>
-              <Text style={styles.noticeText}>{quotaNotice}</Text>
-            </View>
-          ) : null}
-          {!isLoading &&
-          !errorMessage &&
-          !session.isPro &&
-          !quotaNotice &&
-          freeMessagesRemaining === 2 ? (
-            <View style={styles.noticeCard}>
-              <Text style={styles.noticeTitle}>Free chat limit</Text>
-              <Text style={styles.noticeText}>
-                Free users have {NEARA_FREE_CHAT_LIMIT} total free messages.
-              </Text>
-            </View>
-          ) : null}
-          {!isLoading && !errorMessage && messages.length === 0 ? (
-            <View style={styles.stateWrap}>
-              <EmptyCard
-                title="Start a conversation"
-                detail="Send the first message to begin chatting with this store."
-              />
-            </View>
-          ) : null}
-          {messages.map((message: ChatMessage) => {
-            const isOwn = String(message.sender_id) === session.id;
-
-            return (
-              <View
-                key={message.id}
-                style={[
-                  styles.messageBubble,
-                  isOwn ? styles.ownMessage : styles.otherMessage,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.messageText,
-                    isOwn ? styles.ownMessageText : styles.otherMessageText,
-                  ]}
-                >
-                  {message.text}
+        <View style={styles.threadWrap}>
+          <LinearGradient
+            colors={[
+              "rgba(8, 15, 28, 0.96)",
+              "rgba(6, 12, 24, 1)",
+              "rgba(4, 10, 20, 1)",
+            ]}
+            pointerEvents="none"
+            style={StyleSheet.absoluteFillObject}
+          />
+          <ScrollView
+            ref={scrollViewRef}
+            style={styles.messagesContainer}
+            contentContainerStyle={[
+              styles.messagesContent,
+              !renderedMessages.length && styles.messagesContentEmpty,
+            ]}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            {productPrompt ? (
+              <View style={styles.contextCard}>
+                <Text style={styles.contextLabel}>About</Text>
+                <Text style={styles.contextValue}>
+                  {variantPrompt ? `${productPrompt} (${variantPrompt})` : productPrompt}
                 </Text>
-                <Text
-                  style={[
-                    styles.messageTime,
-                    isOwn ? styles.ownMessageTime : styles.otherMessageTime,
-                  ]}
-                >
-                  {isOwn ? "You" : title} • {formatTime(message.created_at)}
+                {pricePrompt ? (
+                  <Text style={styles.contextMeta}>Price: {pricePrompt}</Text>
+                ) : null}
+              </View>
+            ) : null}
+            {isLoading ? (
+              <View style={styles.stateWrap}>
+                <LoadingCard
+                  message="Loading conversation"
+                  detail="Fetching the latest messages."
+                />
+                <SkeletonCard height={72} />
+                <SkeletonCard height={64} />
+              </View>
+            ) : null}
+            {!isLoading && errorMessage ? (
+              <View style={styles.stateWrap}>
+                <ErrorCard title="Chat unavailable" detail={errorMessage} />
+              </View>
+            ) : null}
+            {!isLoading && !errorMessage && !session.isPro && quotaNotice ? (
+              <View style={styles.noticeCard}>
+                <Text style={styles.noticeTitle}>Free chat limit</Text>
+                <Text style={styles.noticeText}>{quotaNotice}</Text>
+              </View>
+            ) : null}
+            {!isLoading &&
+            !errorMessage &&
+            !session.isPro &&
+            !quotaNotice &&
+            freeMessagesRemaining === 2 ? (
+              <View style={styles.noticeCard}>
+                <Text style={styles.noticeTitle}>Free chat limit</Text>
+                <Text style={styles.noticeText}>
+                  Free users have {NEARA_FREE_CHAT_LIMIT} total free messages.
                 </Text>
               </View>
-            );
-          })}
-        </ScrollView>
+            ) : null}
+            {!isLoading && !errorMessage && !renderedMessages.length ? (
+              <View style={styles.emptyThreadSpacer}>
+                <Text style={styles.emptyThreadLabel}>
+                  Messages with {title} will appear here
+                </Text>
+              </View>
+            ) : null}
+            {renderedMessages.map((message: ChatMessage | DraftBubble, index) => {
+              const isOwn = String(message.sender_id) === session.id;
+              const previousMessage =
+                index > 0 ? renderedMessages[index - 1] : null;
+              const nextMessage =
+                index < renderedMessages.length - 1
+                  ? renderedMessages[index + 1]
+                  : null;
+              const startsNewDay =
+                !previousMessage ||
+                !isSameDay(previousMessage.created_at, message.created_at);
+              const isGroupedWithPrevious =
+                previousMessage &&
+                String(previousMessage.sender_id) === String(message.sender_id) &&
+                isSameDay(previousMessage.created_at, message.created_at);
+              const endsGroup =
+                !nextMessage ||
+                String(nextMessage.sender_id) !== String(message.sender_id) ||
+                !isSameDay(nextMessage.created_at, message.created_at);
+              const hasLaterIncomingMessage = renderedMessages
+                .slice(index + 1)
+                .some(
+                  (nextItem) =>
+                    String(nextItem.sender_id) !== String(message.sender_id),
+                );
+              const ownStatus =
+                "pending" in message && message.pending
+                  ? "sending"
+                  : hasLaterIncomingMessage
+                    ? "read"
+                    : index === renderedMessages.length - 1 && isOwn
+                      ? "delivered"
+                      : "sent";
+
+              return (
+                <View key={message.id}>
+                  {startsNewDay ? (
+                    <View style={styles.dateSeparatorWrap}>
+                      <View style={styles.dateSeparatorLine} />
+                      <Text style={styles.dateSeparatorText}>
+                        {formatDayLabel(message.created_at)}
+                      </Text>
+                      <View style={styles.dateSeparatorLine} />
+                    </View>
+                  ) : null}
+                  <View
+                    style={[
+                      styles.messageBubble,
+                      isOwn ? styles.ownMessage : styles.otherMessage,
+                      isGroupedWithPrevious
+                        ? styles.messageBubbleGrouped
+                        : null,
+                      "pending" in message &&
+                        message.pending &&
+                        styles.pendingMessage,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.messageText,
+                        isOwn ? styles.ownMessageText : styles.otherMessageText,
+                      ]}
+                    >
+                      {message.text}
+                    </Text>
+                    {endsGroup ? (
+                      <View style={styles.messageMetaRow}>
+                        {!isOwn ? (
+                          <Text style={styles.otherMessageTime}>
+                            {formatTime(message.created_at)}
+                          </Text>
+                        ) : (
+                          <>
+                            <Text style={styles.ownMessageTime}>
+                              {formatTime(message.created_at)}
+                            </Text>
+                            <View style={styles.messageStatusWrap}>
+                              {ownStatus === "sending" ? (
+                                <Ionicons
+                                  color="rgba(191,219,254,0.8)"
+                                  name="time-outline"
+                                  size={12}
+                                />
+                              ) : ownStatus === "read" ? (
+                                <Ionicons
+                                  color="#7dd3fc"
+                                  name="checkmark-done"
+                                  size={13}
+                                />
+                              ) : ownStatus === "delivered" ? (
+                                <Ionicons
+                                  color="rgba(191,219,254,0.84)"
+                                  name="checkmark-done"
+                                  size={13}
+                                />
+                              ) : (
+                                <Ionicons
+                                  color="rgba(191,219,254,0.84)"
+                                  name="checkmark"
+                                  size={12}
+                                />
+                              )}
+                            </View>
+                          </>
+                        )}
+                      </View>
+                    ) : null}
+                  </View>
+                </View>
+              );
+            })}
+            {!isLoading && !errorMessage && hasDraftPreview ? (
+              <View
+                style={[
+                  styles.messageBubble,
+                  styles.ownMessage,
+                  styles.draftPreviewBubble,
+                ]}
+              >
+                <Text style={[styles.messageText, styles.ownMessageText]}>
+                  {draft.trim()}
+                </Text>
+                <View style={styles.messageMetaRow}>
+                  <Text style={styles.ownMessageTime}>Draft</Text>
+                  <Ionicons
+                    color="rgba(191,219,254,0.72)"
+                    name="create-outline"
+                    size={12}
+                  />
+                </View>
+              </View>
+            ) : null}
+          </ScrollView>
+        </View>
 
         {/* Input */}
         <ChatInputBar
           isSending={isSending}
           onChangeText={setDraft}
           onSend={handleSend}
-          placeholder="Ask about this product..."
+          placeholder={`Message ${title}...`}
           value={draft}
         />
       </KeyboardAvoidingView>
@@ -493,38 +722,71 @@ const styles = StyleSheet.create({
     borderBottomColor: "rgba(255,255,255,0.06)",
     backgroundColor: "rgba(10, 18, 32, 0.96)",
   },
-  headerContent: {
+  headerContentButton: {
+    alignItems: "center",
     flex: 1,
+    flexDirection: "row",
+    gap: 12,
     marginLeft: 12,
   },
+  headerAvatar: {
+    alignItems: "center",
+    backgroundColor: "rgba(56,189,248,0.16)",
+    borderColor: "rgba(56,189,248,0.22)",
+    borderRadius: 22,
+    borderWidth: 1,
+    height: 44,
+    justifyContent: "center",
+    width: 44,
+  },
+  headerAvatarText: {
+    color: "#dbeafe",
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  headerContent: {
+    flex: 1,
+  },
   headerTitle: {
-    fontSize: 22,
+    fontSize: 21,
     fontWeight: "800",
     color: theme.colors.text,
-    marginBottom: 4,
+    marginBottom: 3,
   },
   headerSubtitle: {
-    fontSize: 14,
-    color: "#96a8bf",
+    fontSize: 13,
+    color: "#7dd3fc",
+    fontWeight: "600",
+  },
+  threadWrap: {
+    flex: 1,
   },
   messagesContainer: {
     flex: 1,
     paddingHorizontal: theme.spacing.screenHorizontal,
+    backgroundColor: "transparent",
   },
   messagesContent: {
     flexGrow: 1,
     paddingTop: 18,
     paddingBottom: 18,
   },
-  emptyState: {
-    color: theme.colors.mutedText,
-    fontSize: 14,
-    lineHeight: 22,
-    paddingVertical: 12,
-    textAlign: "center",
+  messagesContentEmpty: {
+    justifyContent: "flex-end",
   },
   stateWrap: {
     gap: 12,
+    paddingVertical: 12,
+  },
+  emptyThreadSpacer: {
+    flex: 1,
+    justifyContent: "flex-end",
+    paddingBottom: 8,
+  },
+  emptyThreadLabel: {
+    alignSelf: "center",
+    color: "#64748b",
+    fontSize: 13,
     paddingVertical: 12,
   },
   noticeCard: {
@@ -549,12 +811,59 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginTop: 6,
   },
-  messageBubble: {
-    maxWidth: width * 0.75,
-    paddingHorizontal: 16,
-    paddingVertical: 13,
-    borderRadius: 20,
+  contextCard: {
+    alignSelf: "flex-start",
+    backgroundColor: "rgba(15,23,42,0.84)",
+    borderColor: "rgba(255,255,255,0.08)",
+    borderRadius: 16,
+    borderWidth: 1,
+    marginBottom: 18,
+    maxWidth: width * 0.82,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  contextLabel: {
+    color: "#93c5fd",
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 1.2,
+    textTransform: "uppercase",
+  },
+  contextValue: {
+    color: theme.colors.text,
+    fontSize: 14,
+    fontWeight: "700",
+    lineHeight: 20,
+    marginTop: 4,
+  },
+  contextMeta: {
+    color: "#94a3b8",
+    fontSize: 12,
+    marginTop: 4,
+  },
+  dateSeparatorWrap: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 10,
     marginBottom: 14,
+    marginTop: 6,
+  },
+  dateSeparatorLine: {
+    backgroundColor: "rgba(148,163,184,0.14)",
+    flex: 1,
+    height: 1,
+  },
+  dateSeparatorText: {
+    color: "#64748b",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  messageBubble: {
+    maxWidth: width * 0.72,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 22,
+    marginBottom: 10,
     shadowColor: theme.colors.shadow,
     shadowOffset: {
       width: 0,
@@ -566,26 +875,45 @@ const styles = StyleSheet.create({
   },
   ownMessage: {
     alignSelf: "flex-end",
-    backgroundColor: "rgba(125, 211, 252, 0.14)",
+    backgroundColor: "rgba(59, 130, 246, 0.24)",
     borderWidth: 1,
-    borderColor: "rgba(125, 211, 252, 0.22)",
+    borderColor: "rgba(96, 165, 250, 0.3)",
+    borderBottomRightRadius: 8,
   },
   otherMessage: {
     alignSelf: "flex-start",
-    backgroundColor: "rgba(16, 26, 46, 0.9)",
+    backgroundColor: "rgba(11, 18, 32, 0.98)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
+    borderColor: "rgba(255,255,255,0.1)",
+    borderBottomLeftRadius: 8,
+  },
+  messageBubbleGrouped: {
+    marginBottom: 4,
+  },
+  pendingMessage: {
+    opacity: 0.8,
+  },
+  draftPreviewBubble: {
+    marginTop: 4,
+    marginBottom: 6,
   },
   messageText: {
     fontSize: 15,
     lineHeight: 20,
-    marginBottom: 8,
+    marginBottom: 4,
   },
   ownMessageText: {
     color: theme.colors.text,
   },
   otherMessageText: {
     color: theme.colors.text,
+  },
+  messageMetaRow: {
+    alignItems: "center",
+    alignSelf: "flex-end",
+    flexDirection: "row",
+    gap: 4,
+    marginTop: 2,
   },
   messageTime: {
     fontSize: 11,
@@ -596,5 +924,11 @@ const styles = StyleSheet.create({
   },
   otherMessageTime: {
     color: theme.colors.mutedText,
+  },
+  messageStatusWrap: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "center",
+    minWidth: 14,
   },
 });

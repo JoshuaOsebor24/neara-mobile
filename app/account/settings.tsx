@@ -1,4 +1,4 @@
-import { Button } from "@/components/ui/button";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
@@ -7,6 +7,7 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   TouchableOpacity,
@@ -39,6 +40,8 @@ export default function SettingsScreen() {
   const [settingsPhone, setSettingsPhone] = useState(session.phoneNumber);
   const [settingsNotice, setSettingsNotice] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [locationSuggestions, setLocationSuggestions] = useState(true);
+  const [savedSync, setSavedSync] = useState(true);
 
   useEffect(() => {
     if (!session.isAuthenticated) {
@@ -124,7 +127,7 @@ export default function SettingsScreen() {
                   <Text style={styles.groupLabel}>Account</Text>
                   <View style={styles.settingsGroup}>
                     <TouchableOpacity
-                      activeOpacity={0.85}
+                      activeOpacity={0.7}
                       onPress={() =>
                         setEditingField((current) =>
                           current === "name" ? null : "name",
@@ -133,9 +136,16 @@ export default function SettingsScreen() {
                       style={styles.settingRow}
                     >
                       <Text style={styles.settingLabel}>Display name</Text>
-                      <Text style={styles.settingValue}>
-                        {settingsName || "Add name"}
-                      </Text>
+                      <View style={styles.settingValueRow}>
+                        <Text style={styles.settingValue}>
+                          {settingsName || "Add name"}
+                        </Text>
+                        <Ionicons
+                          color="#64748b"
+                          name="chevron-forward"
+                          size={16}
+                        />
+                      </View>
                     </TouchableOpacity>
                     {editingField === "name" ? (
                       <View style={styles.inlineFieldWrap}>
@@ -151,7 +161,7 @@ export default function SettingsScreen() {
                     ) : null}
 
                     <TouchableOpacity
-                      activeOpacity={0.85}
+                      activeOpacity={0.7}
                       onPress={() =>
                         setEditingField((current) =>
                           current === "email" ? null : "email",
@@ -160,9 +170,16 @@ export default function SettingsScreen() {
                       style={styles.settingRow}
                     >
                       <Text style={styles.settingLabel}>Email</Text>
-                      <Text numberOfLines={1} style={styles.settingValue}>
-                        {settingsEmail || "Add email"}
-                      </Text>
+                      <View style={styles.settingValueRow}>
+                        <Text numberOfLines={1} style={styles.settingValue}>
+                          {settingsEmail || "Add email"}
+                        </Text>
+                        <Ionicons
+                          color="#64748b"
+                          name="chevron-forward"
+                          size={16}
+                        />
+                      </View>
                     </TouchableOpacity>
                     {editingField === "email" ? (
                       <View style={styles.inlineFieldWrap}>
@@ -180,7 +197,7 @@ export default function SettingsScreen() {
                     ) : null}
 
                     <TouchableOpacity
-                      activeOpacity={0.85}
+                      activeOpacity={0.7}
                       onPress={() =>
                         setEditingField((current) =>
                           current === "phone" ? null : "phone",
@@ -189,9 +206,30 @@ export default function SettingsScreen() {
                       style={styles.settingRow}
                     >
                       <Text style={styles.settingLabel}>Phone</Text>
-                      <Text numberOfLines={1} style={styles.settingValue}>
-                        {settingsPhone || "Add phone number"}
-                      </Text>
+                      <View style={styles.settingValueRow}>
+                        {settingsPhone ? (
+                          <Text numberOfLines={1} style={styles.settingValue}>
+                            {settingsPhone}
+                          </Text>
+                        ) : (
+                          <View style={styles.addPhoneRow}>
+                            <Ionicons
+                              color="#38bdf8"
+                              name="add-circle-outline"
+                              size={16}
+                              style={styles.addIcon}
+                            />
+                            <Text style={styles.addPhoneText}>
+                              Add phone number
+                            </Text>
+                          </View>
+                        )}
+                        <Ionicons
+                          color="#64748b"
+                          name="chevron-forward"
+                          size={16}
+                        />
+                      </View>
                     </TouchableOpacity>
                     {editingField === "phone" ? (
                       <View style={styles.inlineFieldWrap}>
@@ -216,22 +254,46 @@ export default function SettingsScreen() {
                       <Text style={styles.settingLabel}>
                         Location suggestions
                       </Text>
-                      <View style={styles.statusPill}>
-                        <Text style={styles.statusPillText}>On</Text>
-                      </View>
+                      <Switch
+                        trackColor={{
+                          false: "#374151",
+                          true: "rgba(56, 189, 248, 0.3)",
+                        }}
+                        thumbColor={locationSuggestions ? "#38bdf8" : "#9ca3af"}
+                        ios_backgroundColor="#374151"
+                        onValueChange={setLocationSuggestions}
+                        value={locationSuggestions}
+                      />
                     </View>
 
                     <View style={styles.preferenceRow}>
                       <Text style={styles.settingLabel}>Saved sync</Text>
-                      <View style={styles.statusPill}>
-                        <Text style={styles.statusPillText}>On</Text>
-                      </View>
+                      <Switch
+                        trackColor={{
+                          false: "#374151",
+                          true: "rgba(56, 189, 248, 0.3)",
+                        }}
+                        thumbColor={savedSync ? "#38bdf8" : "#9ca3af"}
+                        ios_backgroundColor="#374151"
+                        onValueChange={setSavedSync}
+                        value={savedSync}
+                      />
                     </View>
                   </View>
                 </View>
 
                 <View style={styles.logoutSection}>
-                  <TouchableOpacity activeOpacity={0.85} onPress={handleLogout}>
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    onPress={handleLogout}
+                    style={styles.logoutRow}
+                  >
+                    <Ionicons
+                      color="#fda4af"
+                      name="log-out-outline"
+                      size={16}
+                      style={styles.logoutIcon}
+                    />
                     <Text style={styles.logoutText}>Log out</Text>
                   </TouchableOpacity>
                 </View>
@@ -242,11 +304,24 @@ export default function SettingsScreen() {
                   </View>
                 ) : null}
 
-                <Button
-                  label={isSaving ? "Saving..." : "Save Changes"}
-                  onPress={() => void handleSaveSettings()}
+                <TouchableOpacity
+                  activeOpacity={0.8}
                   disabled={isSaving}
-                />
+                  onPress={() => void handleSaveSettings()}
+                  style={[
+                    styles.saveButton,
+                    isSaving && styles.saveButtonDisabled,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.saveButtonText,
+                      isSaving && styles.saveButtonTextDisabled,
+                    ]}
+                  >
+                    {isSaving ? "Saving..." : "Save Changes"}
+                  </Text>
+                </TouchableOpacity>
               </View>
             </ScreenCard>
           </View>
@@ -328,6 +403,25 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingVertical: 16,
   },
+  settingValueRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexShrink: 1,
+    gap: 8,
+  },
+  addPhoneRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 6,
+  },
+  addIcon: {
+    marginTop: 1,
+  },
+  addPhoneText: {
+    color: "#38bdf8",
+    fontSize: 14,
+    fontWeight: "500",
+  },
   settingLabel: {
     color: "#cbd5e1",
     fontSize: 14,
@@ -358,21 +452,19 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingVertical: 16,
   },
-  statusPill: {
-    backgroundColor: "rgba(16, 185, 129, 0.15)",
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  statusPillText: {
-    color: "#d1fae5",
-    fontSize: 12,
-    fontWeight: "600",
-  },
   logoutSection: {
     borderTopColor: "rgba(255,255,255,0.10)",
     borderTopWidth: 1,
-    paddingTop: 4,
+    marginTop: 20,
+    paddingTop: 16,
+  },
+  logoutRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8,
+  },
+  logoutIcon: {
+    marginTop: 1,
   },
   logoutText: {
     color: "#fda4af",
@@ -391,6 +483,28 @@ const styles = StyleSheet.create({
   noticeText: {
     color: "#d1fae5",
     fontSize: 14,
+  },
+  saveButton: {
+    alignItems: "center",
+    backgroundColor: "rgba(56, 189, 248, 0.12)",
+    borderColor: "rgba(56, 189, 248, 0.20)",
+    borderRadius: 16,
+    borderWidth: 1,
+    justifyContent: "center",
+    marginTop: 8,
+    minHeight: 48,
+    paddingHorizontal: 20,
+  },
+  saveButtonDisabled: {
+    opacity: 0.6,
+  },
+  saveButtonText: {
+    color: "#38bdf8",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  saveButtonTextDisabled: {
+    color: "#64748b",
   },
   primaryButton: {
     alignItems: "center",

@@ -17,6 +17,7 @@ export type SearchProductResult = {
   product_id?: number | string | null;
   product_name?: string | null;
   quantity?: number | string | null;
+  unit_count?: number | string | null;
   store_id?: number | string | null;
   store_name?: string | null;
   variant?: string | null;

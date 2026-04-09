@@ -118,6 +118,7 @@ const searchRoutes = require("./routes/search");
 const chatsRoutes = require("./routes/chats");
 const adminRoutes = require("./routes/admin");
 const paymentsRoutes = require("./routes/payments");
+const notificationsRoutes = require("./routes/notifications");
 
 app.use("/auth", authRoutes);
 app.get("/me", authMiddleware, (req, res) =>
@@ -131,6 +132,7 @@ app.use("/search", searchRoutes);
 app.use("/chats", chatsRoutes);
 app.use("/admin", adminRoutes);
 app.use("/payments", paymentsRoutes);
+app.use("/notifications", notificationsRoutes);
 
 /*
 --------------------------------

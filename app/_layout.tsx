@@ -21,6 +21,13 @@ import {
   useMobileSessionHydrated,
 } from "@/services/mobile-session";
 import {
+  clearPendingNotificationResponse,
+  initializeNotificationLifecycle,
+  resetPushTokenRegistrationState,
+  resolveNotificationTargetPath,
+  syncPushTokenForAuthenticatedSession,
+} from "@/services/notifications";
+import {
   loadRecentStoresForSession,
   loadSavedStoresForSession,
 } from "@/services/saved-stores";
@@ -71,6 +78,38 @@ export default function RootLayout() {
   }, []);
 
   useEffect(() => {
+    let isMounted = true;
+    let teardown: (() => void) | undefined;
+
+    const bootstrapNotifications = async () => {
+      teardown = await initializeNotificationLifecycle({
+        onNotificationReceived(notification) {
+          console.log("[notifications] received", {
+            identifier: notification.request.identifier,
+          });
+        },
+        onNotificationResponse(response) {
+          const targetPath = resolveNotificationTargetPath(response);
+
+          if (!targetPath || !isMounted) {
+            return;
+          }
+
+          clearPendingNotificationResponse();
+          router.push(targetPath as never);
+        },
+      });
+    };
+
+    void bootstrapNotifications();
+
+    return () => {
+      isMounted = false;
+      teardown?.();
+    };
+  }, [router]);
+
+  useEffect(() => {
     if (!isSessionHydrated || !isAuthBootstrapComplete) {
       return;
     }
@@ -114,7 +153,7 @@ export default function RootLayout() {
     ) {
       router.replace(
         buildPostLoginHref({
-          fallbackHref: "/",
+          fallbackHref: "/(tabs)/home",
           isStoreOwner: session.isStoreOwner,
           primaryStoreId: session.primaryStoreId,
           returnTo: pathname,
@@ -148,6 +187,28 @@ export default function RootLayout() {
     isSessionHydrated,
     session.authToken,
     session.email,
+    session.id,
+    session.isAuthenticated,
+  ]);
+
+  useEffect(() => {
+    if (!isSessionHydrated || !isAuthBootstrapComplete) {
+      return;
+    }
+
+    if (!session.isAuthenticated || !session.authToken || !session.id) {
+      resetPushTokenRegistrationState();
+      return;
+    }
+
+    void syncPushTokenForAuthenticatedSession({
+      authToken: session.authToken,
+      userId: session.id,
+    });
+  }, [
+    isAuthBootstrapComplete,
+    isSessionHydrated,
+    session.authToken,
     session.id,
     session.isAuthenticated,
   ]);

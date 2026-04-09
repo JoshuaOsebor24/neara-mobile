@@ -1,5 +1,10 @@
 import { BackPillButton } from "@/components/ui/back-pill-button";
 import { Button } from "@/components/ui/button";
+import {
+  MAIN_CATEGORY_OPTIONS,
+  normalizeCommaSeparatedValues,
+  TAG_OPTIONS,
+} from "@/constants/product-taxonomy";
 import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -47,30 +52,14 @@ type LastAddedProduct = {
   storeId: string;
   productName: string;
   price: string;
-  categories: string[];
-  customCategory: string;
+  mainCategory: string;
+  customMainCategory: string;
+  tags: string[];
+  customTags: string;
   description: string;
   imageUrl: string;
   variants: VariantDraft[];
 };
-
-const CATEGORY_OPTIONS = [
-  "Custom",
-  "drink",
-  "snack",
-  "juice",
-  "orange",
-  "soda",
-  "bread",
-  "rice",
-  "fruit",
-  "vegetable",
-  "electronics",
-  "phone accessory",
-  "toiletries",
-  "cleaning",
-  "beauty",
-];
 
 function createVariantId() {
   return `variant-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -90,17 +79,6 @@ function buildSelectedImageValue(asset: ImagePicker.ImagePickerAsset) {
   }
 
   return asset.uri;
-}
-
-function normalizeCustomCategoryValues(value: string) {
-  return Array.from(
-    new Set(
-      value
-        .split(",")
-        .map((item) => item.trim().toLowerCase())
-        .filter(Boolean),
-    ),
-  );
 }
 
 function VariantRows({
@@ -238,8 +216,10 @@ export default function AddStoreProductScreen() {
   const [selectedStoreId, setSelectedStoreId] = useState(preferredStoreId);
   const [productName, setProductName] = useState("");
   const [price, setPrice] = useState("");
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
-  const [customCategory, setCustomCategory] = useState("");
+  const [selectedMainCategory, setSelectedMainCategory] = useState("");
+  const [customMainCategory, setCustomMainCategory] = useState("");
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [customTags, setCustomTags] = useState("");
   const [description, setDescription] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [variants, setVariants] = useState<VariantDraft[]>([]);
@@ -329,29 +309,28 @@ export default function AddStoreProductScreen() {
         ? variantDrafts[0]
         : null;
 
-    const incomingCategories = [
-      product.category || "",
-      ...(Array.isArray(product.tags) ? product.tags : []),
-    ]
-      .map((item) => String(item || "").trim())
-      .filter(Boolean)
-      .slice(0, 4);
-    const knownCategories = incomingCategories.filter(
-      (item) => item !== "Custom" && CATEGORY_OPTIONS.includes(item),
-    );
-    const unknownCategories = incomingCategories.filter(
-      (item) => !CATEGORY_OPTIONS.includes(item),
-    );
+    const normalizedCategory = String(product.category || "").trim();
+    const incomingTags = (Array.isArray(product.tags) ? product.tags : [])
+      .map((item) => String(item || "").trim().toLowerCase())
+      .filter(Boolean);
+    const knownTags = incomingTags.filter((item) => TAG_OPTIONS.includes(item));
+    const unknownTags = incomingTags.filter((item) => !TAG_OPTIONS.includes(item));
 
     setSelectedStoreId(storeId);
     setProductName(product.product_name || "");
     setPrice(defaultVariant?.price || "");
-    setSelectedCategories(
-      unknownCategories.length > 0
-        ? ["Custom", ...knownCategories]
-        : knownCategories,
+    setSelectedMainCategory(
+      MAIN_CATEGORY_OPTIONS.includes(normalizedCategory)
+        ? normalizedCategory
+        : normalizedCategory
+          ? "Custom"
+          : "",
     );
-    setCustomCategory(unknownCategories.join(", "));
+    setCustomMainCategory(
+      MAIN_CATEGORY_OPTIONS.includes(normalizedCategory) ? "" : normalizedCategory,
+    );
+    setSelectedTags(knownTags);
+    setCustomTags(unknownTags.join(", "));
     setDescription(product.description || "");
     setImageUrl(product.image_url || "");
     setVariants(defaultVariant ? [] : variantDrafts);
@@ -393,26 +372,28 @@ export default function AddStoreProductScreen() {
     setSelectedStoreId(lastAddedProduct.storeId);
     setProductName(lastAddedProduct.productName);
     setPrice(lastAddedProduct.price);
-    setSelectedCategories(lastAddedProduct.categories);
-    setCustomCategory(lastAddedProduct.customCategory);
+    setSelectedMainCategory(lastAddedProduct.mainCategory);
+    setCustomMainCategory(lastAddedProduct.customMainCategory);
+    setSelectedTags(lastAddedProduct.tags);
+    setCustomTags(lastAddedProduct.customTags);
     setDescription(lastAddedProduct.description);
     setImageUrl(lastAddedProduct.imageUrl);
     setVariants(cloneVariants(lastAddedProduct.variants));
     setNotice(null);
   };
 
-  const handleToggleCategory = (option: string) => {
-    setSelectedCategories((current) => {
+  const handleToggleTag = (option: string) => {
+    setSelectedTags((current) => {
       const exists = current.includes(option);
 
       if (exists) {
         return current.filter((item) => item !== option);
       }
 
-      if (current.length >= 4) {
+      if (current.length >= 8) {
         setNotice({
           type: "error",
-          message: "Choose up to 4 categories for each product.",
+          message: "Choose up to 8 tags for each product.",
         });
         return current;
       }
@@ -500,19 +481,23 @@ export default function AddStoreProductScreen() {
       return;
     }
 
-    const normalizedCategoryValues = [
-      ...selectedCategories
-        .filter((item) => item !== "Custom")
-        .map((item) => item.trim().toLowerCase()),
-      ...(selectedCategories.includes("Custom")
-        ? normalizeCustomCategoryValues(customCategory)
-        : []),
-    ].slice(0, 4);
+    const normalizedMainCategory =
+      selectedMainCategory === "Custom"
+        ? customMainCategory.trim()
+        : selectedMainCategory.trim();
+    const normalizedTags = Array.from(
+      new Set([
+        ...selectedTags.map((item) => item.trim().toLowerCase()).filter(Boolean),
+        ...normalizeCommaSeparatedValues(customTags),
+      ]),
+    ).filter(
+      (tag) => tag !== normalizedMainCategory.trim().toLowerCase(),
+    );
 
-    if (normalizedCategoryValues.length === 0) {
+    if (!normalizedMainCategory) {
       setNotice({
         type: "error",
-        message: "Choose at least one category.",
+        message: "Choose a main category for this product.",
       });
       return;
     }
@@ -543,12 +528,12 @@ export default function AddStoreProductScreen() {
       );
 
     const payload = {
-      category: normalizedCategoryValues[0] || undefined,
+      category: normalizedMainCategory || undefined,
       description: description.trim() || undefined,
       image_url: imageUrl.trim() || undefined,
       price: price.trim() ? Number(price) : undefined,
       product_name: productName.trim(),
-      tags: normalizedCategoryValues.slice(1),
+      tags: normalizedTags,
       ...(normalizedVariants.length > 0
         ? { variants: normalizedVariants }
         : {}),
@@ -578,14 +563,16 @@ export default function AddStoreProductScreen() {
       result.product.product_id ?? result.product.id ?? "",
     );
     const snapshot: LastAddedProduct = {
-      categories: selectedCategories,
-      customCategory,
+      customMainCategory,
+      customTags,
       description,
       imageUrl,
+      mainCategory: selectedMainCategory,
       price,
       productId: resultProductId || undefined,
       productName,
       storeId: selectedStoreId,
+      tags: selectedTags,
       variants: cloneVariants(variants),
     };
 
@@ -606,8 +593,10 @@ export default function AddStoreProductScreen() {
       showFlashFeedback(result.message || "Product created.");
       setProductName("");
       setPrice("");
-      setSelectedCategories([]);
-      setCustomCategory("");
+      setSelectedMainCategory("");
+      setCustomMainCategory("");
+      setSelectedTags([]);
+      setCustomTags("");
       setDescription("");
       setImageUrl("");
       setVariants([]);
@@ -819,21 +808,21 @@ export default function AddStoreProductScreen() {
                 </View>
 
                 <View style={styles.fieldGroup}>
-                  <Text style={styles.fieldLabel}>Categories</Text>
+                  <Text style={styles.fieldLabel}>Main category</Text>
                   <ScrollView
                     horizontal
                     contentContainerStyle={styles.categoryRow}
                     showsHorizontalScrollIndicator={false}
                   >
-                    {CATEGORY_OPTIONS.map((option) => {
-                      const active = selectedCategories.includes(option);
+                    {MAIN_CATEGORY_OPTIONS.map((option) => {
+                      const active = selectedMainCategory === option;
 
                       return (
                         <TouchableOpacity
                           key={option}
                           activeOpacity={0.85}
                           disabled={isSubmitting || isLoadingProduct}
-                          onPress={() => handleToggleCategory(option)}
+                          onPress={() => setSelectedMainCategory(option)}
                           style={[
                             styles.categoryChip,
                             active && styles.categoryChipActive,
@@ -852,24 +841,66 @@ export default function AddStoreProductScreen() {
                     })}
                   </ScrollView>
                   <Text style={styles.helperText}>
-                    Choose up to 4 categories. Exact name matches still rank
-                    first in search, then category matches.
+                    Choose one main category for this product.
                   </Text>
-                  {selectedCategories.includes("Custom") ? (
+                  {selectedMainCategory === "Custom" ? (
                     <>
                       <TextInput
                         editable={!isSubmitting && !isLoadingProduct}
-                        onChangeText={setCustomCategory}
-                        placeholder="Enter custom categories, separated by commas"
+                        onChangeText={setCustomMainCategory}
+                        placeholder="Enter a custom main category"
                         placeholderTextColor={theme.colors.mutedText}
                         style={styles.input}
-                        value={customCategory}
+                        value={customMainCategory}
                       />
-                      <Text style={styles.helperText}>
-                        Separate multiple custom categories with commas.
-                      </Text>
                     </>
                   ) : null}
+                </View>
+
+                <View style={styles.fieldGroup}>
+                  <Text style={styles.fieldLabel}>Tags</Text>
+                  <ScrollView
+                    horizontal
+                    contentContainerStyle={styles.categoryRow}
+                    showsHorizontalScrollIndicator={false}
+                  >
+                    {TAG_OPTIONS.map((option) => {
+                      const active = selectedTags.includes(option);
+
+                      return (
+                        <TouchableOpacity
+                          key={option}
+                          activeOpacity={0.85}
+                          disabled={isSubmitting || isLoadingProduct}
+                          onPress={() => handleToggleTag(option)}
+                          style={[
+                            styles.categoryChip,
+                            active && styles.categoryChipActive,
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.categoryChipText,
+                              active && styles.categoryChipTextActive,
+                            ]}
+                          >
+                            {option}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                  <Text style={styles.helperText}>
+                    Add tags customers might search for.
+                  </Text>
+                  <TextInput
+                    editable={!isSubmitting && !isLoadingProduct}
+                    onChangeText={setCustomTags}
+                    placeholder="Add custom tags, separated by commas"
+                    placeholderTextColor={theme.colors.mutedText}
+                    style={styles.input}
+                    value={customTags}
+                  />
                 </View>
 
                 <View style={styles.fieldGroup}>

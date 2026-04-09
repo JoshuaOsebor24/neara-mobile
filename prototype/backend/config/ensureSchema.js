@@ -53,7 +53,8 @@ async function ensureSchema() {
         description TEXT,
         image_url TEXT,
         tags TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
     `);
 
@@ -63,6 +64,7 @@ async function ensureSchema() {
         product_id INT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
         variant_name TEXT,
         price NUMERIC(10,2) NOT NULL,
+        unit_count INT NOT NULL DEFAULT 1,
         stock_quantity INT NOT NULL DEFAULT 0,
         in_stock BOOLEAN NOT NULL DEFAULT true,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -137,6 +139,39 @@ async function ensureSchema() {
     `);
 
     await client.query(`
+      CREATE TABLE IF NOT EXISTS push_tokens (
+        id SERIAL PRIMARY KEY,
+        user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        token TEXT NOT NULL,
+        platform TEXT NOT NULL,
+        device_id TEXT,
+        status TEXT NOT NULL DEFAULT 'active',
+        last_registered_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        last_sent_at TIMESTAMPTZ,
+        last_error_at TIMESTAMPTZ,
+        last_error_reason TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS notification_deliveries (
+        id SERIAL PRIMARY KEY,
+        user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        push_token_id INT REFERENCES push_tokens(id) ON DELETE SET NULL,
+        event_type TEXT NOT NULL,
+        status TEXT NOT NULL,
+        title TEXT NOT NULL,
+        body TEXT NOT NULL,
+        payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+        provider_response JSONB NOT NULL DEFAULT '{}'::jsonb,
+        sent_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
+
+    await client.query(`
       ALTER TABLE users
         ADD COLUMN IF NOT EXISTS phone_number TEXT,
         ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT false,
@@ -171,11 +206,13 @@ async function ensureSchema() {
         ADD COLUMN IF NOT EXISTS description TEXT,
         ADD COLUMN IF NOT EXISTS image_url TEXT,
         ADD COLUMN IF NOT EXISTS tags TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
-        ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+        ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
     `);
 
     await client.query(`
       ALTER TABLE product_variants
+        ADD COLUMN IF NOT EXISTS unit_count INT NOT NULL DEFAULT 1,
         ADD COLUMN IF NOT EXISTS stock_quantity INT NOT NULL DEFAULT 0,
         ADD COLUMN IF NOT EXISTS in_stock BOOLEAN NOT NULL DEFAULT true,
         ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
@@ -221,6 +258,26 @@ async function ensureSchema() {
         ADD COLUMN IF NOT EXISTS metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
         ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+    `);
+
+    await client.query(`
+      ALTER TABLE push_tokens
+        ADD COLUMN IF NOT EXISTS device_id TEXT,
+        ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active',
+        ADD COLUMN IF NOT EXISTS last_registered_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        ADD COLUMN IF NOT EXISTS last_sent_at TIMESTAMPTZ,
+        ADD COLUMN IF NOT EXISTS last_error_at TIMESTAMPTZ,
+        ADD COLUMN IF NOT EXISTS last_error_reason TEXT,
+        ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+    `);
+
+    await client.query(`
+      ALTER TABLE notification_deliveries
+        ADD COLUMN IF NOT EXISTS payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+        ADD COLUMN IF NOT EXISTS provider_response JSONB NOT NULL DEFAULT '{}'::jsonb,
+        ADD COLUMN IF NOT EXISTS sent_at TIMESTAMPTZ,
+        ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
     `);
 
     await client.query(`
@@ -303,6 +360,12 @@ async function ensureSchema() {
     }
 
     await client.query(`
+      UPDATE products
+      SET updated_at = COALESCE(updated_at, created_at, NOW())
+      WHERE updated_at IS NULL;
+    `);
+
+    await client.query(`
       DELETE FROM saved_stores a
       USING saved_stores b
       WHERE a.id < b.id
@@ -362,6 +425,17 @@ async function ensureSchema() {
       ON subscriptions (user_id);
       CREATE INDEX IF NOT EXISTS subscriptions_status_period_idx
       ON subscriptions (status, current_period_end DESC);
+      CREATE UNIQUE INDEX IF NOT EXISTS push_tokens_token_unique_idx
+      ON push_tokens (token);
+      CREATE UNIQUE INDEX IF NOT EXISTS push_tokens_user_device_unique_idx
+      ON push_tokens (user_id, device_id)
+      WHERE device_id IS NOT NULL;
+      CREATE INDEX IF NOT EXISTS push_tokens_user_status_idx
+      ON push_tokens (user_id, status, last_registered_at DESC);
+      CREATE INDEX IF NOT EXISTS notification_deliveries_user_event_sent_idx
+      ON notification_deliveries (user_id, event_type, sent_at DESC);
+      CREATE INDEX IF NOT EXISTS notification_deliveries_status_created_idx
+      ON notification_deliveries (status, created_at DESC);
     `);
 
     await client.query("COMMIT");

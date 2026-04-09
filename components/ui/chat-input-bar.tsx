@@ -1,10 +1,10 @@
 import {
+  Pressable,
   StyleSheet,
-  Text,
   TextInput,
-  TouchableOpacity,
   View,
 } from "react-native";
+import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { theme } from "@/constants/theme";
 
@@ -23,11 +23,12 @@ export function ChatInputBar({
   placeholder: string;
   value: string;
 }) {
-  const sendDisabled = disabled || !value.trim() || isSending;
+  const hasText = Boolean(value.trim());
+  const sendDisabled = disabled || !hasText || isSending;
 
   return (
     <View style={styles.container}>
-      <View style={styles.wrapper}>
+      <View style={[styles.wrapper, hasText && styles.wrapperActive]}>
         <TextInput
           blurOnSubmit={false}
           maxLength={4000}
@@ -38,20 +39,22 @@ export function ChatInputBar({
           style={styles.input}
           value={value}
         />
-        <TouchableOpacity
+        <Pressable
           disabled={sendDisabled}
           onPress={onSend}
-          style={[styles.sendButton, sendDisabled && styles.sendButtonDisabled]}
+          style={({ pressed }) => [
+            styles.sendButton,
+            hasText && !sendDisabled && styles.sendButtonActive,
+            sendDisabled && styles.sendButtonDisabled,
+            pressed && !sendDisabled && styles.sendButtonPressed,
+          ]}
         >
-          <Text
-            style={[
-              styles.sendButtonText,
-              sendDisabled && styles.sendButtonTextDisabled,
-            ]}
-          >
-            {isSending ? "Sending..." : "Send"}
-          </Text>
-        </TouchableOpacity>
+          <Ionicons
+            color={sendDisabled ? theme.colors.mutedText : "#082f49"}
+            name={isSending ? "time-outline" : "send"}
+            size={18}
+          />
+        </Pressable>
       </View>
     </View>
   );
@@ -59,54 +62,59 @@ export function ChatInputBar({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: "rgba(10, 18, 32, 0.98)",
-    borderTopColor: "rgba(255,255,255,0.06)",
+    backgroundColor: "rgba(6, 12, 24, 0.98)",
+    borderTopColor: "rgba(255,255,255,0.05)",
     borderTopWidth: 1,
     paddingBottom: theme.spacing.screenBottom,
     paddingHorizontal: theme.spacing.screenHorizontal,
-    paddingTop: 12,
+    paddingTop: 10,
   },
   wrapper: {
     alignItems: "flex-end",
-    backgroundColor: theme.form.inputBackground,
-    borderColor: theme.form.inputBorder,
-    borderRadius: theme.radius.input,
+    backgroundColor: "rgba(15, 23, 42, 0.98)",
+    borderColor: "rgba(255,255,255,0.08)",
+    borderRadius: 28,
     borderWidth: 1,
     flexDirection: "row",
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  wrapperActive: {
+    borderColor: "rgba(56,189,248,0.24)",
+    backgroundColor: "rgba(15, 23, 42, 1)",
   },
   input: {
     color: theme.colors.text,
     flex: 1,
     fontSize: 15,
-    marginRight: 12,
+    lineHeight: 20,
+    marginRight: 10,
     maxHeight: 100,
-    minHeight: 20,
-    paddingBottom: 0,
-    paddingTop: 0,
+    minHeight: 24,
+    paddingBottom: 10,
+    paddingLeft: 8,
+    paddingRight: 0,
+    paddingTop: 10,
   },
   sendButton: {
     alignItems: "center",
-    backgroundColor: theme.colors.accent,
-    borderRadius: theme.radius.button,
+    backgroundColor: "rgba(56,189,248,0.24)",
+    borderRadius: 22,
     justifyContent: "center",
-    minWidth: 96,
-    paddingHorizontal: 18,
-    paddingVertical: 12,
+    height: 44,
+    width: 44,
     ...theme.shadows.soft,
   },
+  sendButtonActive: {
+    backgroundColor: theme.colors.accent,
+  },
   sendButtonDisabled: {
-    backgroundColor: theme.colors.border,
+    backgroundColor: "rgba(148,163,184,0.18)",
     elevation: 0,
     shadowOpacity: 0,
   },
-  sendButtonText: {
-    color: theme.colors.background,
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  sendButtonTextDisabled: {
-    color: theme.colors.mutedText,
+  sendButtonPressed: {
+    opacity: 0.92,
+    transform: [{ scale: 0.96 }],
   },
 });

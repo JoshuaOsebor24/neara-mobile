@@ -13,6 +13,7 @@ const OWNER_PROTECTED_ROUTE_KEYS = new Set([
   "store/chats/index",
   "store/chats/locked",
   "store/products/add",
+  "store/products/import",
 ]);
 
 const PRO_PROTECTED_ROUTE_KEYS = new Set([

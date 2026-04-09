@@ -1,4 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { ReactNode, useEffect, useMemo, useState } from "react";
@@ -6,14 +7,17 @@ import {
   Alert,
   Image,
   ImageBackground,
+  LayoutAnimation,
   Linking,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
+  UIManager,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -36,7 +40,7 @@ import {
   unsaveStore,
   useSavedStores,
 } from "@/services/saved-stores";
-import { fetchStoreFullData } from "@/services/store-api";
+import { fetchStoreFullData, updateStoreWithBackend } from "@/services/store-api";
 
 type StoreData = {
   id: string;
@@ -61,6 +65,7 @@ type ProductVariant = {
   price: number;
   inStock?: boolean;
   stockQuantity?: number;
+  unitCount?: number;
 };
 
 type ProductGroup = {
@@ -74,6 +79,13 @@ type ProductGroup = {
 };
 
 const STORE_PHOTO_LIMIT = 3;
+
+if (
+  Platform.OS === "android" &&
+  UIManager.setLayoutAnimationEnabledExperimental
+) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 function normalizeStorePhotos(
   photos: (string | null | undefined)[],
@@ -173,6 +185,15 @@ function buildPriceSummary(variants: ProductVariant[]) {
     : `${formatCurrency(minPrice)} - ${formatCurrency(maxPrice)}`;
 }
 
+function formatUnitCountLabel(unitCount?: number) {
+  const normalized =
+    typeof unitCount === "number" && Number.isFinite(unitCount) && unitCount > 0
+      ? unitCount
+      : 1;
+
+  return normalized > 1 ? `Pack of ${normalized}` : "Single";
+}
+
 function InfoRow({
   icon,
   label,
@@ -181,6 +202,8 @@ function InfoRow({
   isEditable = false,
   isEditing = false,
   onChangeText,
+  onPress,
+  pressable = false,
   children,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
@@ -190,6 +213,8 @@ function InfoRow({
   isEditable?: boolean;
   isEditing?: boolean;
   onChangeText?: (text: string) => void;
+  onPress?: () => void;
+  pressable?: boolean;
   children?: ReactNode;
 }) {
   if (isEditing && isEditable) {
@@ -214,16 +239,34 @@ function InfoRow({
     );
   }
 
-  return (
-    <View style={styles.infoRow}>
+  const rowContent = (
+    <>
       <View style={styles.infoIconWrap}>
-        <Ionicons color={theme.colors.text} name={icon} size={18} />
+        <Ionicons color={theme.colors.text} name={icon} size={20} />
       </View>
       <View style={styles.infoContent}>
         <Text style={styles.infoLabel}>{label}</Text>
         <Text style={styles.infoValue}>{value}</Text>
         {hint ? <Text style={styles.infoHint}>{hint}</Text> : null}
       </View>
+    </>
+  );
+
+  if (pressable && onPress) {
+    return (
+      <TouchableOpacity
+        activeOpacity={0.82}
+        onPress={onPress}
+        style={[styles.infoRow, styles.infoRowPressable]}
+      >
+        {rowContent}
+      </TouchableOpacity>
+    );
+  }
+
+  return (
+    <View style={styles.infoRow}>
+      {rowContent}
     </View>
   );
 }
@@ -250,6 +293,11 @@ function ProductCard({
   const [showVariants, setShowVariants] = useState(false);
   const priceSummary = buildPriceSummary(product.variants);
   const hasVariantChoices = product.variants.length > 1;
+  const primaryVariant = product.variants[0];
+  const singleVariantUnitLabel =
+    !hasVariantChoices && primaryVariant
+      ? formatUnitCountLabel(primaryVariant.unitCount)
+      : null;
 
   return (
     <View style={styles.productCard}>
@@ -279,7 +327,7 @@ function ProductCard({
               <Text style={styles.productSubtitle}>
                 {hasVariantChoices
                   ? `${product.variants.length} options`
-                  : product.description || "Single price"}
+                  : product.description || singleVariantUnitLabel || "Single price"}
               </Text>
             </View>
 
@@ -347,6 +395,9 @@ function ProductCard({
                     <Text style={styles.variantPriceText}>
                       {formatCurrency(variant.price)}
                     </Text>
+                    <Text style={styles.variantMetaText}>
+                      {formatUnitCountLabel(variant.unitCount)}
+                    </Text>
                     <TouchableOpacity
                       activeOpacity={0.85}
                       disabled={askDisabled}
@@ -356,7 +407,14 @@ function ProductCard({
                         askDisabled && styles.disabledActionButton,
                       ]}
                     >
-                      <Text style={styles.askButtonMeta}>Ask</Text>
+                      <View style={styles.askButtonContent}>
+                        <Ionicons
+                          color="#e0f2fe"
+                          name="chatbubble-ellipses-outline"
+                          size={15}
+                        />
+                        <Text style={styles.askButtonMeta}>Ask about this</Text>
+                      </View>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -374,7 +432,14 @@ function ProductCard({
             askDisabled && styles.disabledActionButton,
           ]}
         >
-          <Text style={styles.singleAskButtonText}>Ask</Text>
+          <View style={styles.askButtonContent}>
+            <Ionicons
+              color="#e0f2fe"
+              name="chatbubble-ellipses-outline"
+              size={16}
+            />
+            <Text style={styles.singleAskButtonText}>Chat store</Text>
+          </View>
         </TouchableOpacity>
       )}
     </View>
@@ -389,7 +454,7 @@ export default function StoreScreen() {
   }>();
   const session = useMobileSession();
   const [searchTerm, setSearchTerm] = useState("");
-  const [activeCategory, setActiveCategory] = useState("All");
+  const [activeFilters, setActiveFilters] = useState<string[]>([]);
   const [isSaveSubmitting, setIsSaveSubmitting] = useState(false);
   const [isStoreLoading, setIsStoreLoading] = useState(true);
   const [storeError, setStoreError] = useState("");
@@ -402,6 +467,7 @@ export default function StoreScreen() {
   const [remoteStore, setRemoteStore] = useState<StoreData | null>(null);
   const [remoteProducts, setRemoteProducts] = useState<ProductGroup[]>([]);
   const [isEditingInfo, setIsEditingInfo] = useState(false);
+  const [isSavingInfo, setIsSavingInfo] = useState(false);
   const [editAddress, setEditAddress] = useState("");
   const [editDelivery, setEditDelivery] = useState(false);
   const [editContact, setEditContact] = useState("");
@@ -493,6 +559,10 @@ export default function StoreScreen() {
                 typeof variant.stock_quantity === "number"
                   ? variant.stock_quantity
                   : Number(variant.stock_quantity || 0),
+              unitCount:
+                typeof variant.unit_count === "number"
+                  ? variant.unit_count
+                  : Number(variant.unit_count || 1),
             })) ?? [],
         }))
         .filter((product) => product.name.trim().length > 0);
@@ -515,6 +585,11 @@ export default function StoreScreen() {
       if (product.category) {
         unique.add(product.category);
       }
+      product.tags.forEach((tag) => {
+        if (tag) {
+          unique.add(tag);
+        }
+      });
     });
     return Array.from(unique);
   }, [remoteProducts]);
@@ -523,8 +598,14 @@ export default function StoreScreen() {
     const term = searchTerm.trim().toLowerCase();
 
     const nextProducts = remoteProducts.filter((product) => {
+      const productFilters = new Set(
+        [product.category, ...product.tags]
+          .map((value) => value.trim().toLowerCase())
+          .filter(Boolean),
+      );
       const matchesCategory =
-        activeCategory === "All" || product.category === activeCategory;
+        activeFilters.length === 0 ||
+        activeFilters.every((filter) => productFilters.has(filter.toLowerCase()));
       const matchesSearch =
         !term ||
         product.name.toLowerCase().includes(term) ||
@@ -558,7 +639,7 @@ export default function StoreScreen() {
     return [...nextProducts].sort(
       (left, right) => scoreProduct(left) - scoreProduct(right),
     );
-  }, [activeCategory, remoteProducts, searchTerm]);
+  }, [activeFilters, remoteProducts, searchTerm]);
 
   const ownerSessionStore = useMemo(
     () => buildOwnerSessionStore(session, String(storeId)),
@@ -733,6 +814,48 @@ export default function StoreScreen() {
     router.push(`/store/${storeId}?preview=customer`);
   };
 
+  const handleCategoryPress = (category: string) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setActiveFilters((current) => {
+      if (category === "All") {
+        return [];
+      }
+
+      if (current.includes(category)) {
+        return current.filter((item) => item !== category);
+      }
+
+      return [...current, category];
+    });
+  };
+
+  const handleCallStore = async () => {
+    const phoneNumber = resolvedStore.phoneNumber.trim();
+
+    if (!phoneNumber) {
+      Alert.alert("Phone unavailable", "This store has no phone number yet.");
+      return;
+    }
+
+    const phoneUrl = `tel:${phoneNumber.replace(/\s+/g, "")}`;
+
+    try {
+      const supported = await Linking.canOpenURL(phoneUrl);
+
+      if (!supported) {
+        Alert.alert(
+          "Calling unavailable",
+          "This device could not open the phone dialer.",
+        );
+        return;
+      }
+
+      await Linking.openURL(phoneUrl);
+    } catch {
+      Alert.alert("Calling unavailable", "Could not start a call right now.");
+    }
+  };
+
   const handleEditProduct = (product: ProductGroup) => {
     router.push(`/store/products/add?store=${storeId}&product=${product.id}`);
   };
@@ -761,6 +884,41 @@ export default function StoreScreen() {
     );
     setOwnerNotice(result.message || "Product deleted successfully.");
     setDeletingProductId(null);
+  };
+
+  const handleSaveStoreInfo = async () => {
+    if (!session.authToken || !storeId || isSavingInfo) {
+      return;
+    }
+
+    setIsSavingInfo(true);
+    setOwnerNotice("");
+
+    const result = await updateStoreWithBackend(session.authToken, String(storeId), {
+      address: editAddress.trim(),
+      delivery_available: editDelivery,
+      phone_number: editContact.trim(),
+    });
+
+    if (!result.ok || !result.store) {
+      setOwnerNotice(result.error || "Could not update store info.");
+      setIsSavingInfo(false);
+      return;
+    }
+
+    setRemoteStore((current) =>
+      current
+        ? {
+            ...current,
+            address: result.store?.address || editAddress.trim(),
+            deliveryAvailable: Boolean(result.store?.delivery_available),
+            phoneNumber: result.store?.phone_number || editContact.trim(),
+          }
+        : current,
+    );
+    setOwnerNotice(result.message || "Store info updated.");
+    setIsEditingInfo(false);
+    setIsSavingInfo(false);
   };
 
   useEffect(() => {
@@ -824,7 +982,7 @@ export default function StoreScreen() {
           <View style={styles.pageShell}>
             <View style={styles.topBar}>
               <BackPillButton fallbackHref="/(tabs)/home" />
-              <Text style={styles.topBarLabel}>Store</Text>
+              <Text style={styles.topBarLabel}>Neara</Text>
             </View>
             <LoadingCard
               message="Loading store"
@@ -848,7 +1006,7 @@ export default function StoreScreen() {
             <View style={styles.topBar}>
               <BackPillButton fallbackHref="/(tabs)/home" />
 
-              <Text style={styles.topBarLabel}>Store</Text>
+              <Text style={styles.topBarLabel}>Neara</Text>
             </View>
 
             <View style={styles.heroCard}>
@@ -862,6 +1020,17 @@ export default function StoreScreen() {
                 style={styles.heroBackground}
               >
                 <View style={styles.heroOverlay} />
+                <LinearGradient
+                  colors={[
+                    "rgba(2, 6, 23, 0.24)",
+                    "rgba(2, 6, 23, 0.5)",
+                    "rgba(2, 6, 23, 0.82)",
+                    "rgba(2, 6, 23, 0.94)",
+                  ]}
+                  locations={[0, 0.28, 0.72, 1]}
+                  pointerEvents="none"
+                  style={styles.heroGradientOverlay}
+                />
                 <View style={styles.heroContent}>
                   <View style={styles.heroHeaderBlock}>
                     <View style={styles.heroEyebrowRow}>
@@ -1036,16 +1205,21 @@ export default function StoreScreen() {
                         onPress={() => openChat()}
                         style={[
                           styles.gridActionButton,
-                          styles.gridActionButtonPrimary,
+                          styles.gridActionButtonTertiary,
                           (isOwnerViewingStore || isPreviewingOwnStore) &&
                             styles.disabledActionButton,
                         ]}
                       >
-                        <Text style={styles.gridActionButtonTextPrimary}>
-                          {resolvedStore.deliveryAvailable
-                            ? "Request in Chat"
-                            : "Pickup Only"}
-                        </Text>
+                        <View style={styles.gridActionContent}>
+                          <Ionicons
+                            color={theme.colors.text}
+                            name="chatbubble-outline"
+                            size={17}
+                          />
+                          <Text style={styles.gridActionButtonText}>
+                            Chat store
+                          </Text>
+                        </View>
                       </TouchableOpacity>
 
                       <TouchableOpacity
@@ -1066,10 +1240,10 @@ export default function StoreScreen() {
                         onPress={() => void openDirections()}
                         style={[
                           styles.gridActionButton,
-                          styles.gridActionButtonTertiary,
+                          styles.gridActionButtonPrimary,
                         ]}
                       >
-                        <Text style={styles.gridActionButtonText}>
+                        <Text style={styles.gridActionButtonTextPrimary}>
                           Get Directions
                         </Text>
                       </TouchableOpacity>
@@ -1185,13 +1359,16 @@ export default function StoreScreen() {
                 showsHorizontalScrollIndicator={false}
               >
                 {categories.map((category, index) => {
-                  const active = activeCategory === category;
+                  const active =
+                    category === "All"
+                      ? activeFilters.length === 0
+                      : activeFilters.includes(category);
 
                   return (
                     <TouchableOpacity
                       key={`category:${category || "all"}:${index}`}
                       activeOpacity={0.85}
-                      onPress={() => setActiveCategory(category)}
+                      onPress={() => handleCategoryPress(category)}
                       style={[
                         styles.categoryChip,
                         active && styles.categoryChipActive,
@@ -1244,6 +1421,17 @@ export default function StoreScreen() {
                           Add Product
                         </Text>
                       </TouchableOpacity>
+                      <TouchableOpacity
+                        activeOpacity={0.85}
+                        onPress={() =>
+                          router.push(`/store/products/import?store=${storeId}`)
+                        }
+                        style={styles.ownerManageButton}
+                      >
+                        <Text style={styles.ownerManageButtonText}>
+                          Import CSV
+                        </Text>
+                      </TouchableOpacity>
                     </>
                   ) : null}
                 </View>
@@ -1281,8 +1469,16 @@ export default function StoreScreen() {
                   ))
                 ) : (
                   <EmptyCard
-                    title="No products found"
-                    detail="Try a different search term or browse another category."
+                    title={
+                      remoteProducts.length === 0
+                        ? "No products yet"
+                        : "No products found"
+                    }
+                    detail={
+                      remoteProducts.length === 0
+                        ? "This store has not added any products yet. Start a chat to ask what is currently available."
+                        : "Try a different search term or remove a filter."
+                    }
                   />
                 )}
               </View>
@@ -1294,17 +1490,23 @@ export default function StoreScreen() {
                 {isOwnerViewingStore ? (
                   <TouchableOpacity
                     activeOpacity={0.85}
+                    disabled={isSavingInfo}
                     onPress={() => {
                       if (isEditingInfo) {
-                        setIsEditingInfo(false);
+                        void handleSaveStoreInfo();
                       } else {
+                        setOwnerNotice("");
                         setIsEditingInfo(true);
                       }
                     }}
                     style={styles.infoEditToggle}
                   >
                     <Text style={styles.infoEditToggleText}>
-                      {isEditingInfo ? "Done" : "Edit"}
+                      {isEditingInfo
+                        ? isSavingInfo
+                          ? "Saving..."
+                          : "Done"
+                        : "Edit"}
                     </Text>
                   </TouchableOpacity>
                 ) : null}
@@ -1393,9 +1595,16 @@ export default function StoreScreen() {
                     ? editContact
                     : resolvedStore.phoneNumber || "Not available"
                 }
+                hint={
+                  !isEditingInfo && resolvedStore.phoneNumber
+                    ? "Tap to call"
+                    : undefined
+                }
                 isEditable={isOwnerViewingStore}
                 isEditing={isEditingInfo}
                 onChangeText={setEditContact}
+                onPress={!isEditingInfo ? () => void handleCallStore() : undefined}
+                pressable={!isEditingInfo && Boolean(resolvedStore.phoneNumber)}
               />
             </View>
 
@@ -1403,6 +1612,19 @@ export default function StoreScreen() {
           </View>
         </ScrollView>
       )}
+
+      {!isOwnerViewingStore && !isPreviewingOwnStore ? (
+        <View pointerEvents="box-none" style={styles.stickyCtaWrap}>
+          <TouchableOpacity
+            activeOpacity={0.9}
+            onPress={() => openChat()}
+            style={styles.stickyCtaButton}
+          >
+            <Ionicons color="#f8fbff" name="chatbubble-ellipses" size={18} />
+            <Text style={styles.stickyCtaButtonText}>Chat store</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
 
       <Modal
         animationType="none"
@@ -1454,7 +1676,7 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     paddingTop: 6,
-    paddingBottom: 32,
+    paddingBottom: 120,
   },
   skeletonStack: {
     gap: 12,
@@ -1492,7 +1714,10 @@ const styles = StyleSheet.create({
   },
   heroOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(8, 17, 32, 0.76)",
+    backgroundColor: "rgba(8, 17, 32, 0.5)",
+  },
+  heroGradientOverlay: {
+    ...StyleSheet.absoluteFillObject,
   },
   heroContent: {
     padding: 22,
@@ -1524,6 +1749,9 @@ const styles = StyleSheet.create({
     fontSize: 30,
     fontWeight: "800",
     lineHeight: 34,
+    textShadowColor: "rgba(2, 6, 23, 0.7)",
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 10,
   },
   heroMetaRow: {
     flexDirection: "row",
@@ -1571,17 +1799,20 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   heroAddress: {
-    color: "#94a3b8",
+    color: "#cbd5e1",
     fontSize: 14,
     lineHeight: 21,
     maxWidth: 540,
+    textShadowColor: "rgba(2, 6, 23, 0.6)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 8,
   },
   actionCard: {
     gap: 12,
     borderRadius: 22,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-    backgroundColor: "rgba(10, 18, 32, 0.76)",
+    borderColor: "rgba(255,255,255,0.12)",
+    backgroundColor: "rgba(6, 12, 24, 0.84)",
     padding: 16,
   },
   actionGrid: {
@@ -1600,25 +1831,30 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   gridActionButtonPrimary: {
-    borderColor: "rgba(14, 165, 233, 0.45)",
-    backgroundColor: "rgba(8, 64, 108, 0.56)",
+    borderColor: "rgba(56, 189, 248, 0.58)",
+    backgroundColor: "rgba(3, 105, 161, 0.9)",
     shadowColor: "#0284c7",
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
+    shadowOpacity: 0.2,
+    shadowRadius: 14,
     shadowOffset: { width: 0, height: 8 },
-    elevation: 4,
+    elevation: 5,
   },
   gridActionButtonSecondary: {
-    borderColor: "rgba(255,255,255,0.09)",
-    backgroundColor: "rgba(255,255,255,0.05)",
+    borderColor: "rgba(255,255,255,0.11)",
+    backgroundColor: "rgba(255,255,255,0.04)",
   },
   gridActionButtonSaved: {
     borderColor: "rgba(52,211,153,0.28)",
     backgroundColor: "rgba(52,211,153,0.16)",
   },
   gridActionButtonTertiary: {
-    borderColor: "rgba(37, 99, 235, 0.34)",
-    backgroundColor: "rgba(30, 64, 175, 0.22)",
+    borderColor: "rgba(56, 189, 248, 0.28)",
+    backgroundColor: "rgba(14, 116, 144, 0.26)",
+    shadowColor: "#0ea5e9",
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
   },
   gridActionContent: {
     flexDirection: "row",
@@ -1734,13 +1970,14 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   categoryChipActive: {
-    backgroundColor: "#3b82f6",
-    borderColor: "#3b82f6",
+    backgroundColor: "#2563eb",
+    borderColor: "#60a5fa",
     shadowColor: "#3b82f6",
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
+    shadowOpacity: 0.36,
+    shadowRadius: 12,
     shadowOffset: { width: 0, height: 6 },
-    elevation: 5,
+    elevation: 6,
+    transform: [{ scale: 1.02 }],
   },
   categoryChipText: {
     color: "#e2e8f0",
@@ -1766,8 +2003,10 @@ const styles = StyleSheet.create({
   },
   sectionHeaderActions: {
     flexDirection: "row",
+    flexWrap: "wrap",
     alignItems: "center",
     gap: 10,
+    justifyContent: "flex-end",
   },
   sectionTitle: {
     color: theme.colors.text,
@@ -1798,10 +2037,18 @@ const styles = StyleSheet.create({
   productCard: {
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-    backgroundColor: "rgba(16, 26, 46, 0.92)",
+    borderColor: "rgba(255,255,255,0.1)",
+    backgroundColor: "rgba(16, 26, 46, 0.96)",
     padding: 20,
     gap: 16,
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: {
+      height: 6,
+      width: 0,
+    },
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
   },
   productTopRow: {
     flexDirection: "row",
@@ -1981,28 +2228,39 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
   },
+  variantMetaText: {
+    color: "#94a3b8",
+    fontSize: 12,
+    fontWeight: "600",
+  },
   askButton: {
     alignItems: "center",
     justifyContent: "center",
-    minWidth: 68,
+    minWidth: 132,
     minHeight: 44,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: "rgba(56, 189, 248, 0.2)",
-    backgroundColor: "rgba(56, 189, 248, 0.1)",
+    borderColor: "rgba(56, 189, 248, 0.28)",
+    backgroundColor: "rgba(56, 189, 248, 0.14)",
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
+  askButtonContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
   askButtonMeta: {
     color: "#e0f2fe",
-    fontSize: 14,
-    fontWeight: "500",
+    fontSize: 13,
+    fontWeight: "700",
   },
   singleAskButton: {
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: "rgba(56, 189, 248, 0.2)",
-    backgroundColor: "rgba(56, 189, 248, 0.1)",
+    borderColor: "rgba(56, 189, 248, 0.28)",
+    backgroundColor: "rgba(56, 189, 248, 0.14)",
     alignItems: "center",
     justifyContent: "center",
     minHeight: 48,
@@ -2010,7 +2268,7 @@ const styles = StyleSheet.create({
   singleAskButtonText: {
     color: "#e0f2fe",
     fontSize: 14,
-    fontWeight: "500",
+    fontWeight: "700",
   },
   addProductButton: {
     borderRadius: 999,
@@ -2095,10 +2353,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
+  infoRowPressable: {
+    shadowColor: "#38bdf8",
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
+  },
   infoIconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+    width: 44,
+    height: 44,
+    borderRadius: 14,
     backgroundColor: "rgba(2, 6, 23, 1)",
     alignItems: "center",
     justifyContent: "center",
@@ -2110,7 +2375,7 @@ const styles = StyleSheet.create({
   infoLabel: {
     color: "#94a3b8",
     fontSize: 12,
-    fontWeight: "500",
+    fontWeight: "700",
     textTransform: "uppercase",
     letterSpacing: 1,
   },
@@ -2186,5 +2451,32 @@ const styles = StyleSheet.create({
     color: "#475569",
     fontSize: 12,
     textAlign: "center",
+  },
+  stickyCtaWrap: {
+    position: "absolute",
+    left: 16,
+    right: 16,
+    bottom: 18,
+  },
+  stickyCtaButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    minHeight: 54,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "rgba(56, 189, 248, 0.52)",
+    backgroundColor: "rgba(3, 105, 161, 0.96)",
+    shadowColor: "#0284c7",
+    shadowOpacity: 0.24,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 7,
+  },
+  stickyCtaButtonText: {
+    color: "#f8fbff",
+    fontSize: 15,
+    fontWeight: "800",
   },
 });

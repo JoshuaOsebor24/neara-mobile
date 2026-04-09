@@ -1,5 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import * as ImagePicker from "expo-image-picker";
+import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -69,6 +70,32 @@ type Notice = {
 
 type OwnerSignupStep = 0 | 1 | 2;
 type AddressSearchState = "idle" | "loading" | "ready" | "empty" | "error";
+type RegisterField =
+  | "name"
+  | "email"
+  | "password"
+  | "confirmPassword"
+  | "ownerPhone"
+  | "storeName"
+  | "category"
+  | "storePhone"
+  | "country"
+  | "stateRegion"
+  | "address"
+  | "description";
+
+const COUNTRY_CITY_OPTIONS = {
+  Ghana: ["Accra / East Legon", "Kumasi / Adum", "Takoradi / Market Circle"],
+  Kenya: ["Nairobi / Westlands", "Mombasa / Nyali", "Kisumu / Milimani"],
+  Nigeria: ["Lagos / Lekki", "Abuja / Wuse", "Port Harcourt / GRA"],
+  "South Africa": [
+    "Cape Town / Sea Point",
+    "Durban / Umhlanga",
+    "Johannesburg / Sandton",
+  ],
+} as const;
+
+const COUNTRY_OPTIONS = Object.keys(COUNTRY_CITY_OPTIONS) as (keyof typeof COUNTRY_CITY_OPTIONS)[];
 
 const OWNER_STEP_META = [
   {
@@ -89,20 +116,17 @@ function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
+function normalizeCountry(value: string) {
+  const normalized = value.trim().toLowerCase();
+  return (
+    COUNTRY_OPTIONS.find(
+      (option) => option.toLowerCase() === normalized,
+    ) ?? value.trim()
+  );
+}
+
 function getRegisterFieldError(
-  field:
-    | "name"
-    | "email"
-    | "password"
-    | "confirmPassword"
-    | "ownerPhone"
-    | "storeName"
-    | "category"
-    | "storePhone"
-    | "country"
-    | "stateRegion"
-    | "address"
-    | "description",
+  field: RegisterField,
   value: string,
   passwordValue = "",
 ) {
@@ -273,7 +297,7 @@ export default function SignupScreen() {
   const [locationCoordinates, setLocationCoordinates] =
     useState<StoreCoordinates | null>(null);
   const [locationMessage, setLocationMessage] = useState(
-    "Add an address, use current location, or place the pin manually on the map.",
+    "Set your store location",
   );
   const [isLocationConfirmed, setIsLocationConfirmed] = useState(false);
   const [isUsingCurrentLocation, setIsUsingCurrentLocation] = useState(false);
@@ -290,6 +314,11 @@ export default function SignupScreen() {
   const [editingImageIndex, setEditingImageIndex] = useState<number | null>(
     null,
   );
+  const [hasAttemptedOwnerContinue, setHasAttemptedOwnerContinue] =
+    useState(false);
+  const [touchedFields, setTouchedFields] = useState<
+    Partial<Record<RegisterField, boolean>>
+  >({});
   const addressSearchRequestIdRef = useRef(0);
 
   const trimmedName = name.trim();
@@ -307,6 +336,18 @@ export default function SignupScreen() {
     () => buildStoreImageSlots(storeImages),
     [storeImages],
   );
+  const selectedCountry = normalizeCountry(country);
+  const stateRegionOptions = COUNTRY_CITY_OPTIONS[
+    selectedCountry as keyof typeof COUNTRY_CITY_OPTIONS
+  ] ?? [];
+  const hasRequiredStoreFields =
+    trimmedStoreName.length > 0 &&
+    trimmedCategory.length > 0 &&
+    trimmedStorePhone.length > 0 &&
+    trimmedCountry.length > 0 &&
+    trimmedStateRegion.length > 0 &&
+    trimmedDescription.length > 0 &&
+    !isSubmitting;
   const canSubmit = selectedStorePlan
     ? trimmedName.length > 0 &&
       trimmedEmail.length > 0 &&
@@ -350,12 +391,7 @@ export default function SignupScreen() {
     !errors.ownerPhone &&
     !isSubmitting;
   const canContinueStoreStep =
-    trimmedStoreName.length > 0 &&
-    trimmedCategory.length > 0 &&
-    trimmedStorePhone.length > 0 &&
-    trimmedCountry.length > 0 &&
-    trimmedStateRegion.length > 0 &&
-    trimmedDescription.length > 0 &&
+    hasRequiredStoreFields &&
     !errors.storeName &&
     !errors.category &&
     !errors.storePhone &&
@@ -368,15 +404,10 @@ export default function SignupScreen() {
     ? ownerStep === 0
       ? !canContinueOwnerStep
       : ownerStep === 1
-        ? !canContinueStoreStep
-        : !(
-            Boolean(locationCoordinates) &&
-            isLocationConfirmed &&
-            !isSubmitting
-          )
+        ? !hasRequiredStoreFields
+        : !(Boolean(locationCoordinates) && !isSubmitting)
     : !canSubmit;
 
-  const activeOwnerStep = OWNER_STEP_META[ownerStep];
   const addressLookupQuery = useMemo(
     () => buildAddressLookupQuery(address, stateRegion, country),
     [address, country, stateRegion],
@@ -388,15 +419,6 @@ export default function SignupScreen() {
       addressSuggestions.length > 0 ||
       addressSearchState === "empty" ||
       addressSearchState === "error");
-
-  useEffect(() => {
-    if (selectedStorePlan && params.paymentStatus === "success") {
-      setNotice({
-        text: "Payment confirmed. Continue your store registration.",
-        type: "success",
-      });
-    }
-  }, [params.paymentStatus, selectedStorePlan]);
 
   useEffect(() => {
     if (ownerStep !== 2) {
@@ -503,102 +525,95 @@ export default function SignupScreen() {
     };
   }, [address, addressLookupQuery, locationCoordinates, ownerStep]);
 
-  const setFieldValue = (
-    field:
-      | "name"
-      | "email"
-      | "password"
-      | "confirmPassword"
-      | "ownerPhone"
-      | "storeName"
-      | "category"
-      | "storePhone"
-      | "country"
-      | "stateRegion"
-      | "address"
-      | "description",
-    value: string,
-  ) => {
+  const setFieldValue = (field: RegisterField, value: string) => {
+    const nextValue =
+      field === "country"
+        ? normalizeCountry(value)
+        : field === "stateRegion"
+          ? value.replace(/\s{2,}/g, " ")
+          : value;
+
     if (field === "name") {
-      setName(value);
+      setName(nextValue);
     } else if (field === "email") {
-      setEmail(value);
+      setEmail(nextValue);
     } else if (field === "ownerPhone") {
-      setOwnerPhone(value);
+      setOwnerPhone(nextValue);
     } else if (field === "confirmPassword") {
-      setConfirmPassword(value);
+      setConfirmPassword(nextValue);
     } else if (field === "storeName") {
-      setStoreName(value);
+      setStoreName(nextValue);
     } else if (field === "category") {
-      setCategory(value);
+      setCategory(nextValue);
     } else if (field === "storePhone") {
-      setStorePhone(value);
+      setStorePhone(nextValue);
     } else if (field === "country") {
-      setCountry(value);
-    } else if (field === "stateRegion") {
-      setStateRegion(value);
-    } else if (field === "address") {
-      setAddress(value);
+      setCountry(nextValue);
+      setStateRegion("");
       setIsLocationConfirmed(false);
-      setLocationMessage("Address updated. Confirm the pin again.");
+      setLocationMessage("Set your store location");
+    } else if (field === "stateRegion") {
+      setStateRegion(nextValue);
+      setIsLocationConfirmed(false);
+      setLocationMessage("Set your store location");
+    } else if (field === "address") {
+      setAddress(nextValue);
+      setIsLocationConfirmed(false);
+      setLocationMessage("Set your store location");
       setAddressSearchErrorMessage("");
     } else if (field === "description") {
-      setDescription(value);
+      setDescription(nextValue);
     } else {
-      setPassword(value);
+      setPassword(nextValue);
     }
 
-    setErrors((current) => {
-      const next = { ...current };
-      const fieldError = getRegisterFieldError(
-        field,
-        value,
-        field === "password" ? value : password,
-      );
+    const shouldValidateField = touchedFields[field] || hasAttemptedOwnerContinue;
 
-      if (fieldError) {
-        next[field] = fieldError;
-      } else {
-        delete next[field];
-      }
-
-      if (field === "password" || field === "confirmPassword") {
-        const nextPassword = field === "password" ? value : password;
-        const nextConfirmPassword =
-          field === "confirmPassword" ? value : confirmPassword;
-        const confirmPasswordError = getRegisterFieldError(
-          "confirmPassword",
-          nextConfirmPassword,
-          nextPassword,
+    if (shouldValidateField) {
+      setErrors((current) => {
+        const next = { ...current };
+        const fieldError = getRegisterFieldError(
+          field,
+          nextValue,
+          field === "password" ? nextValue : password,
         );
 
-        if (confirmPasswordError) {
-          next.confirmPassword = confirmPasswordError;
+        if (fieldError) {
+          next[field] = fieldError;
         } else {
-          delete next.confirmPassword;
+          delete next[field];
         }
-      }
 
-      return next;
-    });
+        if (field === "password" || field === "confirmPassword") {
+          const nextPassword = field === "password" ? nextValue : password;
+          const nextConfirmPassword =
+            field === "confirmPassword" ? nextValue : confirmPassword;
+          const confirmPasswordError = getRegisterFieldError(
+            "confirmPassword",
+            nextConfirmPassword,
+            nextPassword,
+          );
+
+          if (confirmPasswordError) {
+            next.confirmPassword = confirmPasswordError;
+          } else {
+            delete next.confirmPassword;
+          }
+        }
+
+        if (field === "country" || field === "stateRegion") {
+          delete next.location;
+        }
+
+        return next;
+      });
+    }
+
     setNotice(null);
   };
 
-  const handleFieldBlur = (
-    field:
-      | "name"
-      | "email"
-      | "password"
-      | "confirmPassword"
-      | "ownerPhone"
-      | "storeName"
-      | "category"
-      | "storePhone"
-      | "country"
-      | "stateRegion"
-      | "address"
-      | "description",
-  ) => {
+  const handleFieldBlur = (field: RegisterField) => {
+    setTouchedFields((current) => ({ ...current, [field]: true }));
     const value =
       field === "name"
         ? name
@@ -976,9 +991,7 @@ export default function SignupScreen() {
 
     if (step === 2) {
       if (!locationCoordinates) {
-        nextErrors.location = "Set your store pin before continuing.";
-      } else if (!isLocationConfirmed) {
-        nextErrors.location = "Confirm your store location to continue.";
+        nextErrors.location = "Set your store location to continue.";
       }
     }
 
@@ -987,6 +1000,8 @@ export default function SignupScreen() {
   };
 
   const handleContinueOwnerSignup = () => {
+    setHasAttemptedOwnerContinue(true);
+
     if (ownerStep === 0) {
       if (!validateOwnerStep(0) || !canContinueOwnerStep) {
         setNotice(null);
@@ -1013,6 +1028,33 @@ export default function SignupScreen() {
       setNotice(null);
       return;
     }
+  };
+
+  const handleBackToPreviousStep = () => {
+    if (ownerStep > 0) {
+      Alert.alert(
+        ownerStep === 1 ? "Go back to account details?" : "Leave location setup?",
+        ownerStep === 1
+          ? "You can go back, but it may slow down finishing your store setup."
+          : "Your progress is saved, but moving back can interrupt this setup flow.",
+        [
+          { text: "Stay here", style: "cancel" },
+          {
+            text: "Go back",
+            style: "destructive",
+            onPress: () =>
+              setOwnerStep((current) =>
+                current > 0 ? ((current - 1) as OwnerSignupStep) : 0,
+              ),
+          },
+        ],
+      );
+      return;
+    }
+
+    setOwnerStep((current) =>
+      current > 0 ? ((current - 1) as OwnerSignupStep) : 0,
+    );
   };
 
   const handleUseCurrentLocation = async () => {
@@ -1046,8 +1088,8 @@ export default function SignupScreen() {
         longitude: coordinates.longitude,
       });
       setAddressSearchState("idle");
-      setIsLocationConfirmed(false);
-      setLocationMessage("Location found. Confirm the pin to continue.");
+      setIsLocationConfirmed(true);
+      setLocationMessage("Location selected ✓");
     } catch {
       setErrors((current) => ({
         ...current,
@@ -1064,8 +1106,8 @@ export default function SignupScreen() {
 
   const handleMapChange = (coordinates: StoreCoordinates) => {
     setLocationCoordinates(coordinates);
-    setIsLocationConfirmed(false);
-    setLocationMessage("Pin updated. Confirm this location.");
+    setIsLocationConfirmed(true);
+    setLocationMessage("Location selected ✓");
     setErrors((current) => {
       const next = { ...current };
       delete next.location;
@@ -1096,10 +1138,8 @@ export default function SignupScreen() {
       setAddress(match.formattedAddress);
       setLocationCoordinates(match.coordinates);
       setAddressSearchState("ready");
-      setIsLocationConfirmed(false);
-      setLocationMessage(
-        "Place selected. Adjust the pin if needed, then confirm.",
-      );
+      setIsLocationConfirmed(true);
+      setLocationMessage("Location selected ✓");
       setErrors((current) => {
         const next = { ...current };
         delete next.address;
@@ -1121,27 +1161,6 @@ export default function SignupScreen() {
       setAddressSearchState("error");
       setAddressSearchErrorMessage(message);
     }
-  };
-
-  const handleConfirmLocation = () => {
-    if (!locationCoordinates) {
-      setErrors((current) => ({
-        ...current,
-        location: "Set the store pin before confirming the location.",
-      }));
-      setLocationMessage(
-        "Place the pin on the map before confirming the location.",
-      );
-      return;
-    }
-
-    setIsLocationConfirmed(true);
-    setLocationMessage("Location confirmed.");
-    setErrors((current) => {
-      const next = { ...current };
-      delete next.location;
-      return next;
-    });
   };
 
   const buildSelectedImageValue = (asset: ImagePicker.ImagePickerAsset) => {
@@ -1223,6 +1242,30 @@ export default function SignupScreen() {
     }
   };
 
+  const handleAddStorePhoto = () => {
+    if (storeImages.length >= STORE_IMAGE_LIMIT) {
+      Alert.alert(
+        "Photo limit reached",
+        `You can add up to ${STORE_IMAGE_LIMIT} photos for your store.`,
+      );
+      return;
+    }
+
+    const slotIndex = storeImages.length;
+
+    Alert.alert("Add photos", "Choose how you want to add your store photos.", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Take photo",
+        onPress: () => void handlePickStoreImage(slotIndex, "camera"),
+      },
+      {
+        text: "Choose from gallery",
+        onPress: () => void handlePickStoreImage(slotIndex, "library"),
+      },
+    ]);
+  };
+
   const handleRemoveStoreImage = (slotIndex: number) => {
     setStoreImages((current) =>
       current.filter((_, index) => index !== slotIndex),
@@ -1262,11 +1305,13 @@ export default function SignupScreen() {
             <View style={styles.formCard}>
               <View style={styles.introBlock}>
                 <Text style={styles.introEyebrow}>
-                  {selectedStorePlan ? "Store signup" : "Get started"}
+                  {selectedStorePlan
+                    ? "Continue your store setup"
+                    : "Get started"}
                 </Text>
                 <Text style={styles.introText}>
                   {selectedStorePlan
-                    ? "Complete your Basic store plan on your existing account."
+                    ? "Payment confirmed. Continue setting up your store."
                     : "Create your account. Unlock Chat for ₦1,000 / month later from your profile."}
                 </Text>
                 {selectedStorePlan && session.primaryStoreName ? (
@@ -1276,21 +1321,16 @@ export default function SignupScreen() {
                 ) : null}
               </View>
 
-              {selectedStorePlan ? (
-                <View style={[styles.notice, styles.noticeSuccess]}>
-                  <Text style={styles.noticeText}>
-                    Selected plan: Basic Store
-                  </Text>
-                </View>
-              ) : null}
-
               <View style={styles.formStack}>
                 {selectedStorePlan ? (
                   <View style={styles.stepPanel}>
                     <Text style={styles.stepCounter}>
                       Step {ownerStep + 1} of {OWNER_STEP_META.length}
                     </Text>
-                    <View style={styles.stepRow}>
+                    {ownerStep === 1 ? (
+                      <Text style={styles.stepEncouragement}>Almost done 👏</Text>
+                    ) : null}
+                    <View style={styles.stepList}>
                       {OWNER_STEP_META.map((step, index) => {
                         const active = ownerStep === index;
                         const complete = ownerStep > index;
@@ -1299,40 +1339,29 @@ export default function SignupScreen() {
                           <View
                             key={step.title}
                             style={[
-                              styles.stepCard,
-                              active && styles.stepCardActive,
-                              complete && styles.stepCardComplete,
+                              styles.stepItem,
+                              active && styles.stepItemActive,
                             ]}
                           >
                             <Text
                               style={[
+                                styles.stepBullet,
+                                (active || complete) && styles.stepBulletActive,
+                              ]}
+                            >
+                              {active || complete ? "●" : "○"}
+                            </Text>
+                            <Text
+                              style={[
                                 styles.stepTitle,
                                 active && styles.stepTitleActive,
-                                complete && styles.stepTitleActive,
                               ]}
                             >
                               {step.title}
                             </Text>
-                            <Text
-                              style={[
-                                styles.stepDescription,
-                                active && styles.stepDescriptionActive,
-                              ]}
-                            >
-                              {step.description}
-                            </Text>
                           </View>
                         );
                       })}
-                    </View>
-
-                    <View style={styles.fieldGroup}>
-                      <Text style={styles.sectionCardTitle}>
-                        {activeOwnerStep.title}
-                      </Text>
-                      <Text style={styles.sectionCardSubtitle}>
-                        {activeOwnerStep.description}
-                      </Text>
                     </View>
                     {ownerStep === 0 ? (
                       <>
@@ -1354,7 +1383,7 @@ export default function SignupScreen() {
                               onChangeText={(value) =>
                                 setFieldValue("name", value)
                               }
-                              placeholder="Your full name"
+                              placeholder="Enter full name"
                               placeholderTextColor={theme.colors.mutedText}
                               selectionColor={theme.colors.accent}
                               style={styles.input}
@@ -1386,7 +1415,7 @@ export default function SignupScreen() {
                               onChangeText={(value) =>
                                 setFieldValue("email", value)
                               }
-                              placeholder="Your email"
+                              placeholder="Enter email"
                               placeholderTextColor={theme.colors.mutedText}
                               selectionColor={theme.colors.accent}
                               style={styles.input}
@@ -1395,98 +1424,6 @@ export default function SignupScreen() {
                           </View>
                           {errors.email ? (
                             <Text style={styles.errorText}>{errors.email}</Text>
-                          ) : null}
-                        </View>
-
-                        <View style={styles.fieldGroup}>
-                          <Text style={styles.fieldLabel}>
-                            Change to a stronger password (optional)
-                          </Text>
-                          <View
-                            style={[
-                              styles.inputShell,
-                              errors.password && styles.inputShellError,
-                            ]}
-                          >
-                            <Ionicons
-                              color="#64748b"
-                              name="lock-closed-outline"
-                              size={18}
-                            />
-                            <TextInput
-                              autoCapitalize="none"
-                              onBlur={() => handleFieldBlur("password")}
-                              onChangeText={(value) =>
-                                setFieldValue("password", value)
-                              }
-                              placeholder="Leave blank to keep your current password"
-                              placeholderTextColor={theme.colors.mutedText}
-                              secureTextEntry={!showPassword}
-                              selectionColor={theme.colors.accent}
-                              style={styles.input}
-                              value={password}
-                            />
-                            <TouchableOpacity
-                              activeOpacity={0.85}
-                              onPress={() =>
-                                setShowPassword((current) => !current)
-                              }
-                            >
-                              <Ionicons
-                                color="#94a3b8"
-                                name={
-                                  showPassword
-                                    ? "eye-off-outline"
-                                    : "eye-outline"
-                                }
-                                size={18}
-                              />
-                            </TouchableOpacity>
-                          </View>
-                          {errors.password ? (
-                            <Text style={styles.errorText}>
-                              {errors.password}
-                            </Text>
-                          ) : null}
-                        </View>
-                        <Text style={styles.helperText}>
-                          You are already signed in. Only enter a new password
-                          if you want to replace the current one.
-                        </Text>
-
-                        <View style={styles.fieldGroup}>
-                          <Text style={styles.fieldLabel}>
-                            Confirm new password
-                          </Text>
-                          <View
-                            style={[
-                              styles.inputShell,
-                              errors.confirmPassword && styles.inputShellError,
-                            ]}
-                          >
-                            <Ionicons
-                              color="#64748b"
-                              name="shield-checkmark-outline"
-                              size={18}
-                            />
-                            <TextInput
-                              autoCapitalize="none"
-                              onBlur={() => handleFieldBlur("confirmPassword")}
-                              onChangeText={(value) =>
-                                setFieldValue("confirmPassword", value)
-                              }
-                              placeholder="Repeat the new password"
-                              placeholderTextColor={theme.colors.mutedText}
-                              secureTextEntry={!showPassword}
-                              selectionColor={theme.colors.accent}
-                              style={styles.input}
-                              value={confirmPassword}
-                            />
-                          </View>
-                          {errors.confirmPassword ? (
-                            <Text style={styles.errorText}>
-                              {errors.confirmPassword}
-                            </Text>
                           ) : null}
                         </View>
 
@@ -1509,7 +1446,7 @@ export default function SignupScreen() {
                               onChangeText={(value) =>
                                 setFieldValue("ownerPhone", value)
                               }
-                              placeholder="+1 555 123 4567"
+                              placeholder="Enter phone number"
                               placeholderTextColor={theme.colors.mutedText}
                               selectionColor={theme.colors.accent}
                               style={styles.input}
@@ -1579,14 +1516,23 @@ export default function SignupScreen() {
                                     active && styles.chipActive,
                                   ]}
                                 >
-                                  <Text
-                                    style={[
-                                      styles.chipText,
-                                      active && styles.chipTextActive,
-                                    ]}
-                                  >
-                                    {option}
-                                  </Text>
+                                  <View style={styles.categoryChipContent}>
+                                    <Text
+                                      style={[
+                                        styles.chipText,
+                                        active && styles.chipTextActive,
+                                      ]}
+                                    >
+                                      {option}
+                                    </Text>
+                                    {active ? (
+                                      <Ionicons
+                                        color="#f8fafc"
+                                        name="checkmark-circle"
+                                        size={16}
+                                      />
+                                    ) : null}
+                                  </View>
                                 </TouchableOpacity>
                               );
                             })}
@@ -1633,6 +1579,43 @@ export default function SignupScreen() {
 
                         <View style={styles.fieldGroup}>
                           <Text style={styles.fieldLabel}>Country</Text>
+                          <ScrollView
+                            horizontal
+                            contentContainerStyle={styles.chipRow}
+                            showsHorizontalScrollIndicator={false}
+                          >
+                            {COUNTRY_OPTIONS.map((option) => {
+                              const active = selectedCountry === option;
+
+                              return (
+                                <TouchableOpacity
+                                  key={option}
+                                  activeOpacity={0.85}
+                                  onPress={() => {
+                                    setTouchedFields((current) => ({
+                                      ...current,
+                                      country: true,
+                                      stateRegion: true,
+                                    }));
+                                    setFieldValue("country", option);
+                                  }}
+                                  style={[
+                                    styles.chip,
+                                    active && styles.chipActive,
+                                  ]}
+                                >
+                                  <Text
+                                    style={[
+                                      styles.chipText,
+                                      active && styles.chipTextActive,
+                                    ]}
+                                  >
+                                    {option}
+                                  </Text>
+                                </TouchableOpacity>
+                              );
+                            })}
+                          </ScrollView>
                           <View
                             style={[
                               styles.inputShell,
@@ -1649,7 +1632,7 @@ export default function SignupScreen() {
                               onChangeText={(value) =>
                                 setFieldValue("country", value)
                               }
-                              placeholder="Nigeria"
+                              placeholder="Enter country"
                               placeholderTextColor={theme.colors.mutedText}
                               selectionColor={theme.colors.accent}
                               style={styles.input}
@@ -1665,6 +1648,49 @@ export default function SignupScreen() {
 
                         <View style={styles.fieldGroup}>
                           <Text style={styles.fieldLabel}>State / City</Text>
+                          {stateRegionOptions.length > 0 ? (
+                            <>
+                              <Text style={styles.helperText}>
+                                Choose a location that matches {selectedCountry}.
+                              </Text>
+                              <ScrollView
+                                horizontal
+                                contentContainerStyle={styles.chipRow}
+                                showsHorizontalScrollIndicator={false}
+                              >
+                                {stateRegionOptions.map((option) => {
+                                  const active = stateRegion === option;
+
+                                  return (
+                                    <TouchableOpacity
+                                      key={option}
+                                      activeOpacity={0.85}
+                                      onPress={() => {
+                                        setTouchedFields((current) => ({
+                                          ...current,
+                                          stateRegion: true,
+                                        }));
+                                        setFieldValue("stateRegion", option);
+                                      }}
+                                      style={[
+                                        styles.chip,
+                                        active && styles.chipActive,
+                                      ]}
+                                    >
+                                      <Text
+                                        style={[
+                                          styles.chipText,
+                                          active && styles.chipTextActive,
+                                        ]}
+                                      >
+                                        {option}
+                                      </Text>
+                                    </TouchableOpacity>
+                                  );
+                                })}
+                              </ScrollView>
+                            </>
+                          ) : null}
                           <View
                             style={[
                               styles.inputShell,
@@ -1681,7 +1707,9 @@ export default function SignupScreen() {
                               onChangeText={(value) =>
                                 setFieldValue("stateRegion", value)
                               }
-                              placeholder="California / San Francisco"
+                              placeholder={
+                                stateRegionOptions[0] || "Enter state / city"
+                              }
                               placeholderTextColor={theme.colors.mutedText}
                               selectionColor={theme.colors.accent}
                               style={styles.input}
@@ -1697,7 +1725,8 @@ export default function SignupScreen() {
 
                         <View style={styles.fieldGroup}>
                           <Text style={styles.fieldLabel}>
-                            Store Description
+                            Tell customers what you sell and why they should
+                            visit your store
                           </Text>
                           <View
                             style={[
@@ -1712,7 +1741,7 @@ export default function SignupScreen() {
                               onChangeText={(value) =>
                                 setFieldValue("description", value)
                               }
-                              placeholder="Describe what your store sells and what makes it useful."
+                              placeholder="e.g. Fresh groceries, quick delivery, affordable prices"
                               placeholderTextColor={theme.colors.mutedText}
                               selectionColor={theme.colors.accent}
                               style={styles.textArea}
@@ -1730,8 +1759,8 @@ export default function SignupScreen() {
                         <View style={styles.fieldGroup}>
                           <Text style={styles.fieldLabel}>Store Photos</Text>
                           <Text style={styles.helperText}>
-                            The first image becomes your store header
-                            background. Add up to 3 images.
+                            Add a few clear photos to build trust. The first
+                            image becomes your store header.
                           </Text>
                           <View style={styles.storeImageGrid}>
                             {imageSlots.map((image, index) => (
@@ -1778,40 +1807,8 @@ export default function SignupScreen() {
                                   </View>
                                 )}
 
-                                <View style={styles.storeImageActions}>
-                                  <TouchableOpacity
-                                    activeOpacity={0.85}
-                                    disabled={isPickingImage}
-                                    onPress={() =>
-                                      void handlePickStoreImage(
-                                        index,
-                                        "library",
-                                      )
-                                    }
-                                    style={styles.imageActionButton}
-                                  >
-                                    <Text style={styles.imageActionButtonText}>
-                                      {editingImageIndex === index &&
-                                      isPickingImage
-                                        ? "Loading..."
-                                        : image
-                                          ? "Replace"
-                                          : "Gallery"}
-                                    </Text>
-                                  </TouchableOpacity>
-                                  <TouchableOpacity
-                                    activeOpacity={0.85}
-                                    disabled={isPickingImage}
-                                    onPress={() =>
-                                      void handlePickStoreImage(index, "camera")
-                                    }
-                                    style={styles.imageActionButton}
-                                  >
-                                    <Text style={styles.imageActionButtonText}>
-                                      Camera
-                                    </Text>
-                                  </TouchableOpacity>
-                                  {image ? (
+                                {image ? (
+                                  <View style={styles.storeImageActions}>
                                     <TouchableOpacity
                                       activeOpacity={0.85}
                                       onPress={() =>
@@ -1827,11 +1824,29 @@ export default function SignupScreen() {
                                         Remove
                                       </Text>
                                     </TouchableOpacity>
-                                  ) : null}
-                                </View>
+                                  </View>
+                                ) : null}
                               </View>
                             ))}
                           </View>
+                          <TouchableOpacity
+                            activeOpacity={0.9}
+                            disabled={isPickingImage}
+                            onPress={handleAddStorePhoto}
+                            style={styles.addPhotosButton}
+                          >
+                            <Ionicons
+                              color="#f8fafc"
+                              name="images-outline"
+                              size={18}
+                            />
+                            <Text style={styles.addPhotosButtonText}>
+                              {isPickingImage &&
+                              editingImageIndex !== null
+                                ? "Adding photos..."
+                                : "Add photos"}
+                            </Text>
+                          </TouchableOpacity>
                         </View>
                       </>
                     ) : (
@@ -1842,10 +1857,6 @@ export default function SignupScreen() {
                             {locationMessage}
                           </Text>
                         </View>
-                        <Text style={styles.helperText}>
-                          Tap to move the pin. The pin position is the final
-                          saved store location.
-                        </Text>
 
                         <View style={styles.fieldGroup}>
                           <Text style={styles.fieldLabel}>
@@ -1941,9 +1952,7 @@ export default function SignupScreen() {
                             </Text>
                           ) : null}
                           <Text style={styles.helperText}>
-                            Search helps you find places quickly. Your final
-                            store location still comes from the map pin you
-                            confirm below.
+                            Search for your store or use the map below
                           </Text>
                         </View>
 
@@ -1951,47 +1960,51 @@ export default function SignupScreen() {
                           activeOpacity={0.85}
                           disabled={isUsingCurrentLocation}
                           onPress={() => void handleUseCurrentLocation()}
-                          style={styles.secondaryButton}
+                          style={styles.locationAssistButton}
                         >
-                          <Text style={styles.secondaryButtonText}>
+                          <Ionicons
+                            color="#f8fafc"
+                            name="locate"
+                            size={18}
+                          />
+                          <Text style={styles.locationAssistButtonText}>
                             {isUsingCurrentLocation
                               ? "Getting current location..."
-                              : "Use current location"}
+                              : "Use my current location"}
                           </Text>
                         </TouchableOpacity>
 
                         <View style={styles.fieldGroup}>
-                          <Text style={styles.fieldLabel}>Place your pin</Text>
-                          <StoreLocationPicker
-                            address={address}
-                            coordinates={locationCoordinates}
-                            onChange={handleMapChange}
-                            storeName={storeName}
-                          />
+                          <Text style={styles.fieldLabel}>
+                            Move the pin to your store location
+                          </Text>
+                          <Text style={styles.helperText}>
+                            This is where customers will find you
+                          </Text>
+                          <View style={styles.mapCard}>
+                            <StoreLocationPicker
+                              address={address}
+                              coordinates={locationCoordinates}
+                              onChange={handleMapChange}
+                              storeName={storeName}
+                            />
+                            <View pointerEvents="none" style={styles.mapOverlay}>
+                              <Text style={styles.mapOverlayText}>
+                                Drag map to position your store
+                              </Text>
+                            </View>
+                          </View>
+                          {isLocationConfirmed ? (
+                            <Text style={styles.locationSelectedText}>
+                              Location selected ✓
+                            </Text>
+                          ) : null}
                           {errors.location ? (
                             <Text style={styles.errorText}>
                               {errors.location}
                             </Text>
                           ) : null}
                         </View>
-
-                        <TouchableOpacity
-                          activeOpacity={0.85}
-                          disabled={!locationCoordinates}
-                          onPress={handleConfirmLocation}
-                          style={[
-                            styles.secondaryButton,
-                            !locationCoordinates && styles.submitButtonDisabled,
-                            isLocationConfirmed &&
-                              styles.locationConfirmedButton,
-                          ]}
-                        >
-                          <Text style={styles.secondaryButtonText}>
-                            {isLocationConfirmed
-                              ? "Location confirmed"
-                              : "Confirm location"}
-                          </Text>
-                        </TouchableOpacity>
                       </>
                     )}
                   </View>
@@ -2167,30 +2180,38 @@ export default function SignupScreen() {
                     primaryActionDisabled && styles.submitButtonDisabled,
                   ]}
                 >
-                  <Text
-                    style={[
-                      styles.submitButtonText,
-                      primaryActionDisabled && styles.submitButtonTextDisabled,
-                    ]}
+                  <LinearGradient
+                    colors={
+                      primaryActionDisabled
+                        ? ["rgba(255,255,255,0.16)", "rgba(255,255,255,0.12)"]
+                        : ["#f8fafc", "#7dd3fc", "#38bdf8"]
+                    }
+                    end={{ x: 1, y: 0.5 }}
+                    start={{ x: 0, y: 0.5 }}
+                    style={styles.submitButtonGradient}
                   >
-                    {isSubmitting
-                      ? "Creating account..."
-                      : selectedStorePlan
-                        ? ownerStep < 2
-                          ? "Continue"
-                          : "Finish store setup"
-                        : "Create account"}
-                  </Text>
+                    <Text
+                      style={[
+                        styles.submitButtonText,
+                        primaryActionDisabled &&
+                          styles.submitButtonTextDisabled,
+                      ]}
+                    >
+                      {isSubmitting
+                        ? "Creating account..."
+                        : selectedStorePlan
+                          ? ownerStep < 2
+                            ? "Continue setup →"
+                            : "Confirm & finish setup"
+                          : "Create account"}
+                    </Text>
+                  </LinearGradient>
                 </TouchableOpacity>
 
                 {selectedStorePlan && ownerStep > 0 ? (
                   <TouchableOpacity
                     activeOpacity={0.85}
-                    onPress={() =>
-                      setOwnerStep((current) =>
-                        current > 0 ? ((current - 1) as OwnerSignupStep) : 0,
-                      )
-                    }
+                    onPress={handleBackToPreviousStep}
                     style={styles.secondaryButton}
                   >
                     <Text style={styles.secondaryButtonText}>
@@ -2349,7 +2370,7 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   stepPanel: {
-    gap: 16,
+    gap: 14,
   },
   stepCounter: {
     color: "#94a3b8",
@@ -2358,41 +2379,39 @@ const styles = StyleSheet.create({
     letterSpacing: 1.6,
     textTransform: "uppercase",
   },
-  stepRow: {
+  stepEncouragement: {
+    color: "#c4f1ff",
+    fontSize: 13,
+    fontWeight: "700",
+    marginTop: -4,
+  },
+  stepList: {
+    gap: 10,
+    paddingVertical: 4,
+  },
+  stepItem: {
+    alignItems: "center",
+    flexDirection: "row",
     gap: 10,
   },
-  stepCard: {
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-    backgroundColor: "rgba(255,255,255,0.03)",
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+  stepItemActive: {
+    transform: [{ scale: 1.01 }],
   },
-  stepCardActive: {
-    borderColor: "rgba(125,211,252,0.35)",
-    backgroundColor: "rgba(56,189,248,0.12)",
+  stepBullet: {
+    color: "#64748b",
+    fontSize: 14,
+    lineHeight: 18,
   },
-  stepCardComplete: {
-    borderColor: "rgba(52,211,153,0.3)",
-    backgroundColor: "rgba(16,185,129,0.10)",
+  stepBulletActive: {
+    color: "#f8fafc",
   },
   stepTitle: {
-    color: theme.colors.text,
+    color: "#94a3b8",
     fontSize: 13,
     fontWeight: "700",
   },
   stepTitleActive: {
-    color: "#e0f2fe",
-  },
-  stepDescription: {
-    marginTop: 3,
-    color: theme.colors.mutedText,
-    fontSize: 12,
-    lineHeight: 18,
-  },
-  stepDescriptionActive: {
-    color: "#cbd5e1",
+    color: "#f8fafc",
   },
   fieldGroup: {
     gap: 8,
@@ -2448,8 +2467,20 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   chipActive: {
-    borderColor: "rgba(125,211,252,0.38)",
-    backgroundColor: "rgba(56,189,248,0.16)",
+    borderColor: "rgba(125,211,252,0.7)",
+    backgroundColor: "rgba(56,189,248,0.24)",
+    shadowColor: "rgba(56,189,248,0.45)",
+    shadowOpacity: 0.3,
+    shadowRadius: 14,
+    shadowOffset: {
+      width: 0,
+      height: 8,
+    },
+  },
+  categoryChipContent: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8,
   },
   chipText: {
     color: "#cbd5e1",
@@ -2553,6 +2584,52 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     marginTop: 6,
   },
+  locationAssistButton: {
+    minHeight: 50,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "rgba(125,211,252,0.32)",
+    backgroundColor: "rgba(56,189,248,0.14)",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+  },
+  locationAssistButtonText: {
+    color: "#f8fafc",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  mapCard: {
+    borderRadius: 22,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(2,6,23,0.42)",
+    position: "relative",
+  },
+  mapOverlay: {
+    position: "absolute",
+    top: 12,
+    left: 12,
+    right: 12,
+    alignItems: "center",
+  },
+  mapOverlayText: {
+    color: "#f8fafc",
+    fontSize: 12,
+    fontWeight: "700",
+    backgroundColor: "rgba(2,6,23,0.72)",
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    overflow: "hidden",
+  },
+  locationSelectedText: {
+    color: "#86efac",
+    fontSize: 13,
+    fontWeight: "700",
+  },
   storeImageGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -2604,6 +2681,23 @@ const styles = StyleSheet.create({
     gap: 8,
     padding: 12,
   },
+  addPhotosButton: {
+    marginTop: 4,
+    minHeight: 48,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "rgba(125,211,252,0.32)",
+    backgroundColor: "rgba(56,189,248,0.14)",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+  },
+  addPhotosButtonText: {
+    color: "#f8fafc",
+    fontSize: 14,
+    fontWeight: "800",
+  },
   imageActionButton: {
     flex: 1,
     alignItems: "center",
@@ -2637,18 +2731,31 @@ const styles = StyleSheet.create({
   },
   submitButton: {
     borderRadius: 18,
-    backgroundColor: "#fff",
+    overflow: "hidden",
+    shadowColor: "rgba(255,255,255,0.55)",
+    shadowOpacity: 0.22,
+    shadowRadius: 18,
+    shadowOffset: {
+      width: 0,
+      height: 10,
+    },
     paddingVertical: 15,
     alignItems: "center",
     justifyContent: "center",
   },
+  submitButtonGradient: {
+    minHeight: 54,
+    width: "100%",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   submitButtonDisabled: {
-    backgroundColor: "rgba(255,255,255,0.18)",
+    shadowOpacity: 0,
   },
   submitButtonText: {
     color: "#020617",
     fontSize: 15,
-    fontWeight: "700",
+    fontWeight: "800",
   },
   submitButtonTextDisabled: {
     color: "#cbd5e1",
@@ -2656,24 +2763,20 @@ const styles = StyleSheet.create({
   secondaryButton: {
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: BORDER,
-    backgroundColor: "rgba(255,255,255,0.04)",
+    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(255,255,255,0.025)",
     paddingVertical: 14,
     alignItems: "center",
     justifyContent: "center",
   },
   secondaryButtonText: {
-    color: theme.colors.text,
+    color: "#cbd5e1",
     fontSize: 14,
-    fontWeight: "700",
+    fontWeight: "600",
   },
   disabledTextArea: {
     color: "#d7e4f2",
     opacity: 0.88,
-  },
-  locationConfirmedButton: {
-    borderColor: "rgba(52,211,153,0.22)",
-    backgroundColor: "rgba(52,211,153,0.12)",
   },
   footerText: {
     color: "#94a3b8",

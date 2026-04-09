@@ -44,6 +44,7 @@ type StoreFullResponse = {
       in_stock?: boolean;
       price?: number | string | null;
       stock_quantity?: number | string | null;
+      unit_count?: number | string | null;
       variant_id?: number | string;
       variant_name?: string | null;
     }[];

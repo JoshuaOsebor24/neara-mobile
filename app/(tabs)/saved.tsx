@@ -1,19 +1,26 @@
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useMemo, useState } from "react";
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import {
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { SavedStoreCard } from "@/components/saved/saved-store-card";
 import { BackPillButton } from "@/components/ui/back-pill-button";
-import { BrandPill } from "@/components/ui/brand-pill";
 import { ScreenCard } from "@/components/ui/screen-card";
+import { LoadingCard, SkeletonCard } from "@/components/ux-state";
 import { theme } from "@/constants/theme";
 import { useMobileSession } from "@/services/mobile-session";
 import {
   loadSavedStoresForSession,
-  useSavedStores,
   unsaveStore,
+  useSavedStores,
 } from "@/services/saved-stores";
 
 type Notice = {
@@ -27,7 +34,9 @@ export default function SavedTab() {
   const savedStores = useSavedStores();
   const [notice, setNotice] = useState<Notice>(null);
   const [removingStoreId, setRemovingStoreId] = useState<number | null>(null);
-  const [optimisticRemovedIds, setOptimisticRemovedIds] = useState<number[]>([]);
+  const [optimisticRemovedIds, setOptimisticRemovedIds] = useState<number[]>(
+    [],
+  );
   const [isLoading, setIsLoading] = useState(false);
 
   const isAuthenticated = session.isAuthenticated;
@@ -56,7 +65,10 @@ export default function SavedTab() {
       } catch (error) {
         if (!cancelled) {
           setNotice({
-            text: error instanceof Error ? error.message : "Could not load saved stores.",
+            text:
+              error instanceof Error
+                ? error.message
+                : "Could not load saved stores.",
             type: "error",
           });
         }
@@ -75,7 +87,10 @@ export default function SavedTab() {
   }, [isAuthenticated, savedStores.length, session.authToken]);
 
   const visibleSavedStores = useMemo(
-    () => savedStores.filter((store) => !optimisticRemovedIds.includes(store.store_id)),
+    () =>
+      savedStores.filter(
+        (store) => !optimisticRemovedIds.includes(store.store_id),
+      ),
     [optimisticRemovedIds, savedStores],
   );
 
@@ -109,15 +124,15 @@ export default function SavedTab() {
           </View>
 
           <ScreenCard style={styles.mainCard}>
-            <BrandPill label="NEARA" />
-
             <Text style={styles.pageTitle}>Saved</Text>
 
             {notice ? (
               <View
                 style={[
                   styles.noticeCard,
-                  notice.type === "error" ? styles.noticeError : styles.noticeSuccess,
+                  notice.type === "error"
+                    ? styles.noticeError
+                    : styles.noticeSuccess,
                 ]}
               >
                 <Text style={styles.noticeText}>{notice.text}</Text>
@@ -125,24 +140,40 @@ export default function SavedTab() {
             ) : null}
 
             {isLoading && visibleSavedStores.length === 0 ? (
-              <View style={styles.loadingStateWrap}>
-                <Text style={styles.loadingStateText}>Loading...</Text>
+              <View style={styles.stateWrap}>
+                <LoadingCard
+                  message="Loading saved stores"
+                  detail="Checking your favorites."
+                />
+                <SkeletonCard height={92} />
+                <SkeletonCard height={92} />
+                <SkeletonCard height={92} />
               </View>
             ) : null}
 
             {showEmptyState ? (
               <View style={styles.emptyStateWrap}>
+                <Ionicons
+                  color="rgba(56, 189, 248, 0.6)"
+                  name="bookmark-outline"
+                  size={48}
+                  style={styles.emptyStateIcon}
+                />
                 <Text style={styles.emptyStateTitle}>No saved stores yet</Text>
+                <Text style={styles.emptyStateContext}>
+                  Stores you save will appear here
+                </Text>
                 <TouchableOpacity
                   activeOpacity={0.85}
                   onPress={() => router.push("/(tabs)/home")}
+                  style={styles.exploreButton}
                 >
-                  <Text style={styles.emptyStateSubtitle}>Start exploring</Text>
+                  <Text style={styles.exploreButtonText}>Explore stores</Text>
                 </TouchableOpacity>
               </View>
             ) : null}
 
-            {!isLoading && visibleSavedStores.length > 0 ? (
+            {visibleSavedStores.length > 0 ? (
               <View style={styles.savedList}>
                 {visibleSavedStores.map((store) => (
                   <SavedStoreCard
@@ -160,7 +191,10 @@ export default function SavedTab() {
 
                       setRemovingStoreId(store.store_id);
                       setNotice(null);
-                      setOptimisticRemovedIds((current) => [...current, store.store_id]);
+                      setOptimisticRemovedIds((current) => [
+                        ...current,
+                        store.store_id,
+                      ]);
 
                       try {
                         await unsaveStore(session.authToken, store.store_id);
@@ -265,28 +299,45 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flex: 1,
     justifyContent: "center",
-    minHeight: 340,
+    minHeight: 280,
     paddingBottom: 26,
   },
-  loadingStateWrap: {
-    marginTop: 24,
-  },
-  loadingStateText: {
-    color: "#cbd5e1",
-    fontSize: 14,
+  emptyStateIcon: {
+    marginBottom: 20,
   },
   emptyStateTitle: {
     color: "#e5edf8",
     fontSize: 23,
     fontWeight: "500",
-    marginBottom: 14,
+    marginBottom: 8,
     textAlign: "center",
   },
-  emptyStateSubtitle: {
+  emptyStateContext: {
     color: "#8f9db4",
-    fontSize: 20,
-    fontWeight: "400",
+    fontSize: 16,
+    lineHeight: 22,
+    marginBottom: 24,
     textAlign: "center",
+  },
+  exploreButton: {
+    alignItems: "center",
+    backgroundColor: "rgba(56, 189, 248, 0.12)",
+    borderColor: "rgba(56, 189, 248, 0.20)",
+    borderRadius: 999,
+    borderWidth: 1,
+    justifyContent: "center",
+    minHeight: 44,
+    minWidth: 140,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+  },
+  exploreButtonText: {
+    color: "#38bdf8",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  stateWrap: {
+    gap: 12,
   },
   savedList: {
     gap: 14,

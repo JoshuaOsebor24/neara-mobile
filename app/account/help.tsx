@@ -1,6 +1,13 @@
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import {
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { BackPillButton } from "@/components/ui/back-pill-button";
@@ -8,10 +15,10 @@ import { ScreenCard } from "@/components/ui/screen-card";
 import { theme } from "@/constants/theme";
 
 const quickHelpItems = [
-  "How to chat with a store",
-  "How to save a store",
-  "How to start a store",
-  "How to upgrade to Pro",
+  { text: "How to chat with a store", icon: "chatbubble-outline" },
+  { text: "How to save a store", icon: "bookmark-outline" },
+  { text: "How to start a store", icon: "storefront-outline" },
+  { text: "How to upgrade to Pro", icon: "flash-outline" },
 ];
 
 export default function HelpScreen() {
@@ -33,7 +40,6 @@ export default function HelpScreen() {
           </View>
 
           <ScreenCard style={styles.panel}>
-            <Text style={styles.eyebrow}>Help</Text>
             <Text style={styles.title}>Help</Text>
 
             <View style={styles.sectionStack}>
@@ -41,16 +47,40 @@ export default function HelpScreen() {
                 <Text style={styles.sectionTitle}>Quick help</Text>
                 <View style={styles.quickHelpList}>
                   {quickHelpItems.map((item) => (
-                    <View key={item} style={styles.quickHelpItem}>
-                      <Text style={styles.quickHelpItemText}>{item}</Text>
-                    </View>
+                    <TouchableOpacity
+                      key={item.text}
+                      activeOpacity={0.7}
+                      onPress={() => {
+                        // TODO: Navigate to specific help content
+                      }}
+                      style={styles.quickHelpItem}
+                    >
+                      <View style={styles.quickHelpItemLeft}>
+                        <Ionicons
+                          color="#38bdf8"
+                          name={item.icon}
+                          size={18}
+                          style={styles.quickHelpItemIcon}
+                        />
+                        <Text style={styles.quickHelpItemText}>
+                          {item.text}
+                        </Text>
+                      </View>
+                      <Ionicons
+                        color="#64748b"
+                        name="chevron-forward"
+                        size={16}
+                      />
+                    </TouchableOpacity>
                   ))}
                 </View>
               </View>
 
               <View style={styles.sectionCard}>
                 <Text style={styles.sectionTitle}>Need help?</Text>
-                <Text style={styles.sectionSubtitle}>Get support in minutes</Text>
+                <Text style={styles.sectionSubtitle}>
+                  We usually respond within minutes
+                </Text>
 
                 <TouchableOpacity
                   activeOpacity={0.85}
@@ -137,12 +167,24 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   quickHelpItem: {
+    alignItems: "center",
     backgroundColor: "rgba(2, 6, 23, 0.4)",
     borderColor: "rgba(255,255,255,0.08)",
     borderRadius: 18,
     borderWidth: 1,
+    flexDirection: "row",
+    justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingVertical: 14,
+  },
+  quickHelpItemLeft: {
+    alignItems: "center",
+    flexDirection: "row",
+    flex: 1,
+    gap: 12,
+  },
+  quickHelpItemIcon: {
+    marginTop: 1,
   },
   quickHelpItemText: {
     color: "#f1f5f9",
@@ -151,15 +193,17 @@ const styles = StyleSheet.create({
   },
   supportButton: {
     alignItems: "center",
-    backgroundColor: "#ffffff",
+    backgroundColor: "rgba(56, 189, 248, 0.12)",
+    borderColor: "rgba(56, 189, 248, 0.20)",
     borderRadius: 16,
+    borderWidth: 1,
     justifyContent: "center",
     marginTop: 16,
     minHeight: 48,
     paddingHorizontal: 20,
   },
   supportButtonText: {
-    color: "#020617",
+    color: "#38bdf8",
     fontSize: 14,
     fontWeight: "700",
   },

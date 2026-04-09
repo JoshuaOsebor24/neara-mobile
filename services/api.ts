@@ -2,7 +2,7 @@ import Constants from "expo-constants";
 import { Platform } from "react-native";
 
 const REQUEST_TIMEOUT_MS = 8000;
-const DEFAULT_API_PORT = "5050";
+const DEFAULT_API_PORTS = ["5050", "5051"] as const;
 
 type JsonValue =
   | null
@@ -85,17 +85,20 @@ function normalizeBaseUrl(value?: string | null) {
   return normalized || null;
 }
 
+function buildHostCandidates(host: string | null, ports: readonly string[]) {
+  if (!host) {
+    return [];
+  }
+
+  return ports.map((port) => `http://${host}:${port}`);
+}
+
 export function getMobileApiBaseCandidates() {
   const apiEnv = String(process.env.EXPO_PUBLIC_API_ENV || "").trim().toLowerCase();
   const explicitBase = normalizeBaseUrl(process.env.EXPO_PUBLIC_API_URL);
   const productionBase = normalizeBaseUrl(process.env.EXPO_PUBLIC_API_URL_PRODUCTION);
   const developmentBase = normalizeBaseUrl(process.env.EXPO_PUBLIC_API_URL_DEVELOPMENT);
   const expoHost = extractExpoHostCandidate();
-  const expoLanBase = expoHost ? `http://${expoHost}:${DEFAULT_API_PORT}` : null;
-  const fallbackBase =
-    Platform.OS === "android"
-      ? `http://10.0.2.2:${DEFAULT_API_PORT}`
-      : `http://localhost:${DEFAULT_API_PORT}`;
   const preferredEnvBase =
     apiEnv === "production" ? productionBase || explicitBase : developmentBase || explicitBase;
 
@@ -106,9 +109,12 @@ export function getMobileApiBaseCandidates() {
         explicitBase,
         productionBase,
         developmentBase,
-        expoLanBase,
-        fallbackBase,
-        `http://localhost:${DEFAULT_API_PORT}`,
+        ...buildHostCandidates(expoHost, DEFAULT_API_PORTS),
+        ...buildHostCandidates(
+          Platform.OS === "android" ? "10.0.2.2" : "localhost",
+          DEFAULT_API_PORTS,
+        ),
+        ...buildHostCandidates("localhost", DEFAULT_API_PORTS),
       ].filter(Boolean),
     ),
   ) as string[];

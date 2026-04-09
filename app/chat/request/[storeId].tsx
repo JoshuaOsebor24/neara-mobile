@@ -1,17 +1,16 @@
 import { theme } from "@/constants/theme";
 import { buildChatRequestMessage, type ChatRequestChoice } from "@/services/chat-request";
 import { BackPillButton } from "@/components/ui/back-pill-button";
-import { BrandPill } from "@/components/ui/brand-pill";
 import { ScreenCard } from "@/components/ui/screen-card";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React from "react";
 import {
+  Pressable,
   SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from "react-native";
 
@@ -69,26 +68,26 @@ function getToneStyles(tone: RequestTone) {
 
   if (tone === "amber") {
     return {
-      cardBorder: "rgba(251, 191, 36, 0.2)",
-      cardWash: "rgba(61, 42, 8, 0.24)",
-      chipBackground: "rgba(67, 55, 24, 0.64)",
-      chipBorder: "rgba(245, 158, 11, 0.16)",
-      chipText: "#fef3c7",
-      eyebrow: "#fde68a",
-      iconBackground: "rgba(67, 55, 24, 0.5)",
-      iconBorder: "rgba(245, 158, 11, 0.16)",
+      cardBorder: "rgba(245, 158, 11, 0.16)",
+      cardWash: "rgba(56, 42, 14, 0.2)",
+      chipBackground: "rgba(67, 55, 24, 0.42)",
+      chipBorder: "rgba(245, 158, 11, 0.12)",
+      chipText: "#f8e7bf",
+      eyebrow: "#f4d48b",
+      iconBackground: "rgba(67, 55, 24, 0.34)",
+      iconBorder: "rgba(245, 158, 11, 0.12)",
     };
   }
 
   return {
-    cardBorder: "rgba(56, 189, 248, 0.22)",
-    cardWash: "rgba(9, 44, 84, 0.22)",
-    chipBackground: "rgba(9, 44, 84, 0.62)",
-    chipBorder: "rgba(56, 189, 248, 0.16)",
-    chipText: "#dbeafe",
-    eyebrow: "#c6e7ff",
-    iconBackground: "rgba(9, 44, 84, 0.48)",
-    iconBorder: "rgba(56, 189, 248, 0.16)",
+    cardBorder: "rgba(56, 189, 248, 0.16)",
+    cardWash: "rgba(10, 36, 62, 0.18)",
+    chipBackground: "rgba(9, 44, 84, 0.42)",
+    chipBorder: "rgba(56, 189, 248, 0.12)",
+    chipText: "#d8e7f7",
+    eyebrow: "#c0d9ee",
+    iconBackground: "rgba(9, 44, 84, 0.34)",
+    iconBorder: "rgba(56, 189, 248, 0.12)",
   };
 }
 
@@ -108,15 +107,15 @@ function RequestChoiceCard({
   const toneStyles = getToneStyles(tone);
 
   return (
-    <TouchableOpacity
-      activeOpacity={0.9}
+    <Pressable
       onPress={onPress}
-      style={[
+      style={({ pressed }) => [
         styles.choiceCard,
         {
           borderColor: toneStyles.cardBorder,
           backgroundColor: toneStyles.cardWash,
         },
+        pressed && styles.choiceCardPressed,
       ]}
     >
       <View style={styles.choiceRow}>
@@ -129,7 +128,7 @@ function RequestChoiceCard({
             },
           ]}
         >
-          <Ionicons color={theme.colors.text} name={icon} size={22} />
+          <Ionicons color={theme.colors.text} name={icon} size={20} />
         </View>
 
         <View style={styles.choiceContent}>
@@ -152,10 +151,10 @@ function RequestChoiceCard({
         </View>
 
         <View style={styles.choiceArrowButton}>
-          <Ionicons color={theme.colors.text} name="arrow-forward" size={22} />
+          <Ionicons color="rgba(248,250,252,0.74)" name="arrow-forward" size={18} />
         </View>
       </View>
-    </TouchableOpacity>
+    </Pressable>
   );
 }
 
@@ -189,6 +188,26 @@ export default function ChatRequestScreen() {
     });
   };
 
+  const handleCustomMessage = () => {
+    router.push({
+      pathname: "/chat/[storeId]",
+      params: {
+        price,
+        product,
+        storeId,
+        variant,
+      },
+    });
+  };
+
+  const heroTitle = product
+    ? "How do you want to message this store about this product?"
+    : "How do you want to start the conversation with this store?";
+
+  const heroSubtitle = product
+    ? `Choose a quick way to contact ${storeName} about ${variant ? `${product} (${variant})` : product}.`
+    : `Choose the fastest way to start a conversation with ${storeName}.`;
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView
@@ -198,16 +217,19 @@ export default function ChatRequestScreen() {
         <View style={styles.pageShell}>
           <View style={styles.topBar}>
             <BackPillButton fallbackHref={`/store/${storeId}`} />
-            <BrandPill label={storeName} style={styles.storePill} />
+            <View style={styles.storeIdentity}>
+              <Text style={styles.storeLabel}>Chatting with</Text>
+              <Text style={styles.storeName} numberOfLines={2}>
+                {storeName}
+              </Text>
+            </View>
           </View>
 
           <ScreenCard style={styles.heroCard}>
             <View style={styles.heroGlow} />
             <Text style={styles.heroEyebrow}>Neara Request</Text>
-            <Text style={styles.heroTitle}>What do you want to do?</Text>
-            <Text style={styles.heroSubtitle}>
-              Pick the fastest way to start the conversation.
-            </Text>
+            <Text style={styles.heroTitle}>{heroTitle}</Text>
+            <Text style={styles.heroSubtitle}>{heroSubtitle}</Text>
           </ScreenCard>
 
           <View style={styles.choiceList}>
@@ -219,6 +241,40 @@ export default function ChatRequestScreen() {
                 onPress={() => handleChoose(card.choice)}
               />
             ))}
+
+            <Pressable
+              onPress={handleCustomMessage}
+              style={({ pressed }) => [
+                styles.customMessageCard,
+                pressed && styles.choiceCardPressed,
+              ]}
+            >
+              <View style={styles.choiceRow}>
+                <View style={styles.customMessageIconWrap}>
+                  <Ionicons
+                    color={theme.colors.text}
+                    name="create-outline"
+                    size={20}
+                  />
+                </View>
+
+                <View style={styles.choiceContent}>
+                  <Text style={styles.customMessageEyebrow}>Write your own</Text>
+                  <Text style={styles.customMessageTitle}>Type your own message</Text>
+                  <Text style={styles.customMessageDescription}>
+                    Open the chat and send a custom message in your own words.
+                  </Text>
+                </View>
+
+                <View style={styles.choiceArrowButton}>
+                  <Ionicons
+                    color="rgba(248,250,252,0.74)"
+                    name="arrow-forward"
+                    size={18}
+                  />
+                </View>
+              </View>
+            </Pressable>
           </View>
         </View>
       </ScrollView>
@@ -239,14 +295,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.screenHorizontal,
   },
   topBar: {
-    alignItems: "center",
+    alignItems: "flex-start",
     flexDirection: "row",
     gap: 14,
     marginBottom: 24,
   },
-  storePill: {
+  storeIdentity: {
     flexShrink: 1,
-    maxWidth: 180,
+    flex: 1,
+    paddingTop: 4,
+  },
+  storeLabel: {
+    color: "#8aa4c6",
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 1.6,
+    marginBottom: 6,
+    textTransform: "uppercase",
+  },
+  storeName: {
+    color: theme.colors.text,
+    fontSize: 20,
+    fontWeight: "800",
+    lineHeight: 26,
   },
   heroCard: {
     marginBottom: 20,
@@ -273,18 +344,18 @@ const styles = StyleSheet.create({
   },
   heroTitle: {
     color: theme.colors.text,
-    fontSize: 54,
+    fontSize: 40,
     fontWeight: "800",
-    letterSpacing: -1.4,
-    lineHeight: 58,
-    maxWidth: 280,
+    letterSpacing: -1,
+    lineHeight: 46,
+    maxWidth: 320,
   },
   heroSubtitle: {
     color: "#c3d1e6",
-    fontSize: 17,
-    lineHeight: 26,
-    marginTop: 18,
-    maxWidth: 290,
+    fontSize: 16,
+    lineHeight: 24,
+    marginTop: 16,
+    maxWidth: 310,
   },
   choiceList: {
     gap: 16,
@@ -295,6 +366,10 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     paddingHorizontal: 20,
     paddingVertical: 20,
+  },
+  choiceCardPressed: {
+    opacity: 0.92,
+    transform: [{ scale: 0.985 }],
   },
   choiceRow: {
     alignItems: "flex-start",
@@ -334,24 +409,67 @@ const styles = StyleSheet.create({
     maxWidth: 210,
   },
   choiceMessageChip: {
-    borderRadius: 22,
+    alignSelf: "flex-start",
+    borderRadius: 20,
     borderWidth: 1,
-    marginTop: 18,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    marginTop: 16,
+    opacity: 0.88,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
   },
   choiceMessageText: {
     fontSize: 14,
-    lineHeight: 21,
+    lineHeight: 20,
   },
   choiceArrowButton: {
     alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.05)",
-    borderColor: "rgba(255,255,255,0.1)",
+    backgroundColor: "rgba(255,255,255,0.035)",
+    borderColor: "rgba(255,255,255,0.08)",
     borderRadius: theme.radius.pill,
     borderWidth: 1,
-    height: 52,
+    height: 44,
     justifyContent: "center",
-    width: 52,
+    marginTop: 6,
+    width: 44,
+  },
+  customMessageCard: {
+    backgroundColor: "rgba(16, 26, 46, 0.58)",
+    borderColor: "rgba(148, 163, 184, 0.16)",
+    borderRadius: 32,
+    borderWidth: 1,
+    overflow: "hidden",
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+  },
+  customMessageIconWrap: {
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderColor: "rgba(255,255,255,0.08)",
+    borderRadius: 20,
+    borderWidth: 1,
+    height: 72,
+    justifyContent: "center",
+    width: 72,
+  },
+  customMessageEyebrow: {
+    color: "#cbd5e1",
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 3,
+    marginBottom: 10,
+    textTransform: "uppercase",
+  },
+  customMessageTitle: {
+    color: theme.colors.text,
+    fontSize: 25,
+    fontWeight: "800",
+    lineHeight: 30,
+  },
+  customMessageDescription: {
+    color: "#b6c4da",
+    fontSize: 16,
+    lineHeight: 23,
+    marginTop: 10,
+    maxWidth: 220,
   },
 });

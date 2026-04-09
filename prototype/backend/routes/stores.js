@@ -391,6 +391,7 @@ router.get("/:id/full", async (req, res, next) => {
                 'variant_id', pv.id,
                 'variant_name', pv.variant_name,
                 'price', COALESCE(pv.price, 0),
+                'unit_count', COALESCE(pv.unit_count, 1),
                 'stock_quantity', COALESCE(pv.stock_quantity, 0),
                 'in_stock', COALESCE(pv.in_stock, false)
               )
@@ -454,6 +455,7 @@ router.get("/:id/full", async (req, res, next) => {
       variants: product.variants.map((variant) => ({
         ...variant,
         price: normalizeNumbers(variant.price),
+        unit_count: normalizeNumbers(variant.unit_count),
         stock_quantity: normalizeNumbers(variant.stock_quantity),
       })),
     }));

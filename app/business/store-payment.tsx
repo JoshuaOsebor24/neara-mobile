@@ -20,7 +20,9 @@ import {
 import { navigateBackOrFallback } from "@/services/navigation";
 
 const STORE_PLAN_META = {
-  description: "Start selling with a simple store presence across Neara.",
+  description:
+    "Start selling with a store customers can discover, browse, and message on Neara.",
+  dailyEquivalent: "About ₦33/day",
   price: "₦1,000 / month",
   title: "Basic Store",
 };
@@ -29,7 +31,6 @@ export default function StorePaymentScreen() {
   const router = useRouter();
   const session = useMobileSession();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [notice, setNotice] = useState("");
   const plan = useMemo(() => STORE_PLAN_META, []);
 
   const handleContinue = async () => {
@@ -38,13 +39,11 @@ export default function StorePaymentScreen() {
     }
 
     setIsSubmitting(true);
-    setNotice("");
 
     updateMobileSession({
       storePlan: "basic",
     });
 
-    setNotice("Payment confirmed. Continuing to registration...");
     router.replace("/signup?storePlan=basic&paymentStatus=success");
   };
 
@@ -70,46 +69,64 @@ export default function StorePaymentScreen() {
 
           <View style={styles.panel}>
             <Text style={styles.eyebrow}>Neara Store Mode</Text>
-            <Text style={styles.title}>Complete Your Payment</Text>
+            <Text style={styles.title}>Start Your Store</Text>
             <Text style={styles.subtitle}>
-              Continue with the same store setup flow after payment is
-              confirmed.
+              Secure your store plan now and start getting discovered today.
             </Text>
 
-            <View style={styles.planCard}>
-              <Text style={styles.planTitle}>{plan.title}</Text>
+            <View style={styles.mainCard}>
               <Text style={styles.planPrice}>{plan.price}</Text>
+              <Text style={styles.planDailyEquivalent}>
+                {plan.dailyEquivalent}
+              </Text>
               <Text style={styles.planDescription}>{plan.description}</Text>
-            </View>
 
-            <View style={styles.noticeCard}>
-              <Text style={styles.noticeTitle}>Payment step</Text>
-              <Text style={styles.noticeText}>
-                Real payment can be wired into this step later. For now, this
-                keeps the correct flow and success transition from pricing to
-                registration.
-              </Text>
-            </View>
-
-            {notice ? (
-              <View style={styles.successPill}>
-                <Text style={styles.successPillText}>{notice}</Text>
+              <View style={styles.benefitsSection}>
+                <Text style={styles.benefitsTitle}>What happens next</Text>
+                <View style={styles.noticeBullets}>
+                  <Text style={styles.noticeBullet}>
+                    • Continue setup after payment
+                  </Text>
+                  <Text style={styles.noticeBullet}>
+                    • Add your first products
+                  </Text>
+                  <Text style={styles.noticeBullet}>
+                    • Start appearing in search
+                  </Text>
+                </View>
               </View>
-            ) : null}
 
-            <TouchableOpacity
-              activeOpacity={0.85}
-              disabled={isSubmitting}
-              onPress={() => void handleContinue()}
-              style={[
-                styles.primaryButton,
-                isSubmitting && styles.primaryButtonDisabled,
-              ]}
-            >
-              <Text style={styles.primaryButtonText}>
-                {isSubmitting ? "Confirming..." : "Confirm payment"}
+              <Text style={styles.ctaPrompt}>
+                Start getting customers today
               </Text>
-            </TouchableOpacity>
+
+              <LinearGradient
+                colors={["#f8fafc", "#e2e8f0"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={[
+                  styles.primaryButton,
+                  isSubmitting && styles.primaryButtonDisabled,
+                ]}
+              >
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  disabled={isSubmitting}
+                  onPress={() => void handleContinue()}
+                  style={styles.primaryButtonTouchable}
+                >
+                  <Text style={styles.primaryButtonText}>
+                    {isSubmitting ? "Processing..." : "Pay ₦1,000"}
+                  </Text>
+                </TouchableOpacity>
+              </LinearGradient>
+            </View>
+
+            <View style={styles.trustRow}>
+              <Text style={styles.trustText}>Secure payment</Text>
+              <Text style={styles.trustDivider}>•</Text>
+              <Text style={styles.trustText}>Cancel anytime</Text>
+            </View>
 
             <TouchableOpacity
               activeOpacity={0.85}
@@ -121,7 +138,7 @@ export default function StorePaymentScreen() {
 
             {session.isAuthenticated ? (
               <Text style={styles.sameAccountText}>
-                This continues on the same Neara account for{" "}
+                This secure checkout continues on the same Neara account for{" "}
                 {session.email || "your login"}.
               </Text>
             ) : null}
@@ -199,49 +216,94 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     marginTop: 10,
   },
-  planCard: {
+  mainCard: {
     backgroundColor: "rgba(255,255,255,0.05)",
     borderColor: BORDER,
     borderRadius: 24,
     borderWidth: 1,
     marginTop: 22,
-    padding: 18,
-  },
-  planTitle: {
-    color: theme.colors.text,
-    fontSize: 20,
-    fontWeight: "700",
+    padding: 24,
   },
   planPrice: {
     color: "#f8fafc",
-    fontSize: 24,
+    fontSize: 32,
     fontWeight: "700",
-    marginTop: 10,
+    textAlign: "center",
+  },
+  planDailyEquivalent: {
+    color: "#b0e7fe",
+    fontSize: 14,
+    fontWeight: "700",
+    marginTop: 8,
+    textAlign: "center",
   },
   planDescription: {
     color: "#cbd5e1",
-    fontSize: 14,
-    lineHeight: 21,
-    marginTop: 10,
+    fontSize: 16,
+    lineHeight: 24,
+    marginTop: 16,
+    textAlign: "center",
   },
-  noticeCard: {
-    backgroundColor: "rgba(56,189,248,0.08)",
-    borderColor: "rgba(125, 211, 252, 0.16)",
-    borderRadius: 24,
-    borderWidth: 1,
-    marginTop: 18,
-    padding: 18,
+  benefitsSection: {
+    marginTop: 24,
   },
-  noticeTitle: {
+  benefitsTitle: {
     color: theme.colors.text,
     fontSize: 16,
     fontWeight: "700",
+    marginBottom: 12,
+    textAlign: "center",
   },
-  noticeText: {
+  noticeBullets: {
+    gap: 8,
+  },
+  noticeBullet: {
     color: "#d7e4f2",
-    fontSize: 13,
+    fontSize: 14,
     lineHeight: 20,
-    marginTop: 8,
+    textAlign: "center",
+  },
+  ctaPrompt: {
+    color: "#94a3b8",
+    fontSize: 14,
+    fontWeight: "600",
+    marginTop: 24,
+    textAlign: "center",
+  },
+  primaryButton: {
+    borderRadius: 24,
+    marginTop: 16,
+    minHeight: 64,
+    paddingHorizontal: 32,
+  },
+  primaryButtonTouchable: {
+    alignItems: "center",
+    flex: 1,
+    justifyContent: "center",
+  },
+  primaryButtonDisabled: {
+    opacity: 0.7,
+  },
+  primaryButtonText: {
+    color: "#020617",
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  trustRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 8,
+    marginTop: 16,
+  },
+  trustText: {
+    color: "#94a3b8",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  trustDivider: {
+    color: "#475569",
+    fontSize: 12,
   },
   successPill: {
     backgroundColor: "rgba(34,197,94,0.12)",
@@ -256,22 +318,6 @@ const styles = StyleSheet.create({
     color: "#dcfce7",
     fontSize: 13,
     fontWeight: "600",
-  },
-  primaryButton: {
-    alignItems: "center",
-    backgroundColor: "#f8fafc",
-    borderRadius: 20,
-    justifyContent: "center",
-    marginTop: 22,
-    minHeight: 56,
-  },
-  primaryButtonDisabled: {
-    opacity: 0.7,
-  },
-  primaryButtonText: {
-    color: "#020617",
-    fontSize: 15,
-    fontWeight: "800",
   },
   secondaryButton: {
     alignItems: "center",

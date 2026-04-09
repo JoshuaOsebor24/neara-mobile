@@ -1,18 +1,26 @@
 import { useFocusEffect, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useState } from "react";
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import {
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { BackPillButton } from "@/components/ui/back-pill-button";
-import { BrandPill } from "@/components/ui/brand-pill";
 import { PremiumBadge } from "@/components/ui/premium-badge";
 import { ScreenCard } from "@/components/ui/screen-card";
 import { StoreOwnerBadge } from "@/components/ui/store-owner-badge";
+import { theme } from "@/constants/theme";
 import { refreshMobileSessionFromBackend } from "@/services/auth-api";
 import { useMobileSession } from "@/services/mobile-session";
-import { theme } from "@/constants/theme";
-import { NEARA_FREE_PLAN_LABEL, NEARA_PRO_PLAN_LABEL } from "@/services/role-access";
+import {
+  NEARA_FREE_PLAN_LABEL,
+  NEARA_PRO_PLAN_LABEL,
+} from "@/services/role-access";
 
 export default function ProfileTab() {
   const router = useRouter();
@@ -45,7 +53,9 @@ export default function ProfileTab() {
     }, [refreshProfileData]),
   );
 
-  const planLabel = session.isPro ? NEARA_PRO_PLAN_LABEL : NEARA_FREE_PLAN_LABEL;
+  const planLabel = session.isPro
+    ? NEARA_PRO_PLAN_LABEL
+    : NEARA_FREE_PLAN_LABEL;
   const displayName = session.name.trim() || session.email || "Neara user";
 
   if (!session.isAuthenticated) {
@@ -74,7 +84,6 @@ export default function ProfileTab() {
           </View>
 
           <ScreenCard style={styles.panel}>
-            <BrandPill label="Neara" />
             <Text style={styles.title}>Profile</Text>
 
             {isRefreshing ? (
@@ -105,11 +114,15 @@ export default function ProfileTab() {
             <View style={styles.infoGrid}>
               <View style={styles.infoCard}>
                 <Text style={styles.infoLabel}>Email</Text>
-                <Text style={styles.infoValue}>{session.email || "Not available"}</Text>
+                <Text style={styles.infoValue}>
+                  {session.email || "Not available"}
+                </Text>
               </View>
               <View style={styles.infoCard}>
                 <Text style={styles.infoLabel}>Phone</Text>
-                <Text style={styles.infoValue}>{session.phoneNumber || "Not available"}</Text>
+                <Text style={styles.infoValue}>
+                  {session.phoneNumber || "Not available"}
+                </Text>
               </View>
             </View>
 
@@ -142,7 +155,9 @@ export default function ProfileTab() {
 
             <TouchableOpacity
               activeOpacity={0.85}
-              onPress={() => router.push(session.isPro ? "/pro-benefits" : "/upgrade")}
+              onPress={() =>
+                router.push(session.isPro ? "/pro-benefits" : "/upgrade")
+              }
               style={styles.upgradeCard}
             >
               {!session.isPro ? (
@@ -150,7 +165,9 @@ export default function ProfileTab() {
               ) : null}
               <View style={styles.upgradeRow}>
                 <View style={styles.upgradeTextWrap}>
-                  <Text style={styles.upgradeTitle}>{session.isPro ? "Pro benefits" : "Go Pro"}</Text>
+                  <Text style={styles.upgradeTitle}>
+                    {session.isPro ? "Pro benefits" : "Go Pro"}
+                  </Text>
                   <Text style={styles.upgradeSubtitle}>
                     {session.isPro
                       ? "All your premium features in one place."
@@ -226,11 +243,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   identityCard: {
-    backgroundColor: "rgba(255,255,255,0.05)",
-    borderColor: "rgba(255,255,255,0.10)",
+    backgroundColor: "rgba(255,255,255,0.03)",
+    borderColor: "rgba(255,255,255,0.08)",
     borderRadius: 16,
     borderWidth: 1,
-    marginTop: 20,
+    marginTop: 16,
     padding: 16,
   },
   identityTitleRow: {
@@ -241,8 +258,8 @@ const styles = StyleSheet.create({
   identityName: {
     color: theme.colors.text,
     flexShrink: 1,
-    fontSize: 20,
-    fontWeight: "700",
+    fontSize: 22,
+    fontWeight: "800",
   },
   identitySubtitle: {
     color: "#cbd5e1",
@@ -257,18 +274,18 @@ const styles = StyleSheet.create({
   },
   infoGrid: {
     gap: 14,
-    marginTop: 24,
+    marginTop: 20,
   },
   infoCard: {
-    backgroundColor: "rgba(255,255,255,0.05)",
-    borderColor: "rgba(255,255,255,0.10)",
+    backgroundColor: "rgba(255,255,255,0.03)",
+    borderColor: "rgba(255,255,255,0.08)",
     borderRadius: 16,
     borderWidth: 1,
     padding: 16,
   },
   infoCardLarge: {
-    backgroundColor: "rgba(255,255,255,0.05)",
-    borderColor: "rgba(255,255,255,0.10)",
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderColor: "rgba(255,255,255,0.12)",
     borderRadius: 16,
     borderWidth: 1,
     marginTop: 16,
@@ -277,33 +294,33 @@ const styles = StyleSheet.create({
   infoLabel: {
     color: "#94a3b8",
     fontSize: 12,
-    letterSpacing: 1.8,
+    letterSpacing: 1.2,
     textTransform: "uppercase",
   },
   infoValue: {
     color: theme.colors.text,
     fontSize: 14,
     fontWeight: "500",
-    marginTop: 8,
+    marginTop: 6,
   },
   infoTitle: {
     color: theme.colors.text,
     fontSize: 18,
     fontWeight: "600",
-    marginTop: 8,
+    marginTop: 6,
   },
   infoSubtext: {
     color: "#cbd5e1",
     fontSize: 14,
     lineHeight: 20,
-    marginTop: 4,
+    marginTop: 2,
   },
   upgradeCard: {
-    backgroundColor: "rgba(56, 189, 248, 0.10)",
-    borderColor: "rgba(56, 189, 248, 0.20)",
+    backgroundColor: "rgba(56, 189, 248, 0.14)",
+    borderColor: "rgba(56, 189, 248, 0.24)",
     borderRadius: 16,
     borderWidth: 1,
-    marginTop: 24,
+    marginTop: 20,
     padding: 20,
   },
   upgradeEyebrow: {

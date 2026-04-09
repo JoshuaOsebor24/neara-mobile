@@ -397,6 +397,7 @@ export default function SearchTab() {
               contentContainerStyle={styles.resultsList}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
             />
           )}
         </View>
@@ -413,7 +414,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 14,
     paddingHorizontal: 20,
-    paddingTop: 18,
+    paddingTop: 12,
     paddingBottom: 18,
   },
   backButton: {
@@ -426,7 +427,7 @@ const styles = StyleSheet.create({
   },
   searchShell: {
     flex: 1,
-    height: 72,
+    height: 64,
     borderRadius: 18,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
@@ -443,14 +444,14 @@ const styles = StyleSheet.create({
   },
   recentSearchesCard: {
     marginHorizontal: 20,
-    marginBottom: 22,
+    marginBottom: 16,
     borderRadius: 26,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
     backgroundColor: "rgba(10, 18, 32, 0.92)",
     paddingHorizontal: 20,
-    paddingVertical: 18,
-    gap: 16,
+    paddingVertical: 14,
+    gap: 12,
   },
   recentSearchesHeader: {
     flexDirection: "row",
@@ -515,12 +516,12 @@ const styles = StyleSheet.create({
   },
   resultCardWrap: {},
   resultCard: {
-    marginBottom: 12,
+    marginBottom: 10,
     borderRadius: 20,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
     backgroundColor: "rgba(16,26,46,0.94)",
-    padding: 18,
+    padding: 16,
   },
   resultCardActive: {
     borderColor: "rgba(96,165,250,0.42)",
@@ -535,6 +536,7 @@ const styles = StyleSheet.create({
     height: 54,
     borderRadius: 14,
     backgroundColor: "#1e293b",
+    resizeMode: "cover",
   },
   resultImageFallback: {
     width: 54,
@@ -615,12 +617,12 @@ const styles = StyleSheet.create({
     paddingTop: 2,
   },
   resultAction: {
-    color: "#64748b",
-    fontSize: 11,
-    fontWeight: "600",
+    color: "#94a3b8",
+    fontSize: 12,
+    fontWeight: "700",
     textTransform: "uppercase",
     textAlign: "right",
-    lineHeight: 12,
+    lineHeight: 14,
   },
   stateCard: {
     borderRadius: 22,

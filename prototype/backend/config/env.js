@@ -70,6 +70,12 @@ module.exports = {
     cancelUrl: readEnv("PAYMENT_CANCEL_URL", "https://example.com/payments/cancel"),
     webhookSecret: readEnv("PAYMENT_WEBHOOK_SECRET"),
   },
+  notifications: {
+    expoAccessToken: readEnv("EXPO_ACCESS_TOKEN"),
+    productReminderCooldownHours: readInt("NOTIFICATION_PRODUCTS_REMINDER_COOLDOWN_HOURS", 72),
+    productReminderStaleDays: readInt("NOTIFICATION_PRODUCTS_STALE_DAYS", 7),
+    reminderBatchSize: readInt("NOTIFICATION_REMINDER_BATCH_SIZE", 50),
+  },
   runtime: {
     isProduction,
     nodeEnv,

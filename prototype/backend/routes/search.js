@@ -143,6 +143,7 @@ function buildSearchResults(rows, { hasCoords, userLat, userLng }) {
     description: item.description,
     variant: item.variant_name,
     variant_name: item.variant_name,
+    unit_count: item.unit_count ?? 1,
     price: item.price ?? null,
     quantity: item.stock_quantity ?? null,
     in_stock: item.in_stock ?? null,
@@ -261,6 +262,7 @@ router.get("/", async (req, res) => {
           products.image_url,
           preview_variant.variant_id,
           preview_variant.variant_name,
+          preview_variant.unit_count,
           preview_variant.price,
           NULL::integer AS stock_quantity,
           NULL::boolean AS in_stock,
@@ -272,6 +274,7 @@ router.get("/", async (req, res) => {
           SELECT
             product_variants.id AS variant_id,
             product_variants.variant_name,
+            product_variants.unit_count,
             product_variants.price
           FROM product_variants
           WHERE product_variants.product_id = products.id
@@ -281,6 +284,11 @@ router.get("/", async (req, res) => {
         WHERE
           COALESCE(products.product_name, '') ILIKE $1
           OR COALESCE(products.category, '') ILIKE $1
+          OR EXISTS (
+            SELECT 1
+            FROM UNNEST(COALESCE(products.tags, ARRAY[]::TEXT[])) AS product_tag
+            WHERE product_tag ILIKE $1
+          )
           OR COALESCE(stores.store_name, '') ILIKE $1
           OR COALESCE(stores.category, '') ILIKE $1
         ORDER BY stores.store_name ASC, products.product_name ASC
@@ -302,6 +310,7 @@ router.get("/", async (req, res) => {
           products.image_url,
           product_variants.id AS variant_id,
           product_variants.variant_name,
+          product_variants.unit_count,
           product_variants.price,
           NULL::integer AS stock_quantity,
           NULL::boolean AS in_stock,
@@ -313,6 +322,11 @@ router.get("/", async (req, res) => {
         WHERE
           COALESCE(product_variants.variant_name, '') ILIKE $1
           OR COALESCE(products.product_name, '') ILIKE $1
+          OR EXISTS (
+            SELECT 1
+            FROM UNNEST(COALESCE(products.tags, ARRAY[]::TEXT[])) AS product_tag
+            WHERE product_tag ILIKE $1
+          )
           OR COALESCE(stores.store_name, '') ILIKE $1
         ORDER BY stores.store_name ASC, products.product_name ASC
         LIMIT $2
@@ -418,6 +432,7 @@ router.get("/", async (req, res) => {
         products.image_url,
         display_variant.variant_id,
         display_variant.variant_name,
+        display_variant.unit_count,
         display_variant.price,
         display_variant.stock_quantity,
         display_variant.in_stock,
@@ -429,6 +444,7 @@ router.get("/", async (req, res) => {
         SELECT
           product_variants.id AS variant_id,
           product_variants.variant_name,
+          product_variants.unit_count,
           product_variants.price,
           product_variants.stock_quantity,
           product_variants.in_stock
@@ -444,6 +460,11 @@ router.get("/", async (req, res) => {
         COALESCE(products.product_name, '') ILIKE $1
         OR COALESCE(products.description, '') ILIKE $1
         OR COALESCE(products.category, '') ILIKE $1
+        OR EXISTS (
+          SELECT 1
+          FROM UNNEST(COALESCE(products.tags, ARRAY[]::TEXT[])) AS product_tag
+          WHERE product_tag ILIKE $1
+        )
         OR COALESCE(stores.store_name, '') ILIKE $1
         OR COALESCE(stores.category, '') ILIKE $1
       ORDER BY stores.store_name ASC, products.product_name ASC
@@ -465,6 +486,7 @@ router.get("/", async (req, res) => {
         products.image_url,
         product_variants.id AS variant_id,
         product_variants.variant_name,
+        product_variants.unit_count,
         product_variants.price,
         product_variants.stock_quantity,
         product_variants.in_stock,
@@ -476,6 +498,11 @@ router.get("/", async (req, res) => {
       WHERE
         COALESCE(product_variants.variant_name, '') ILIKE $1
         OR COALESCE(products.product_name, '') ILIKE $1
+        OR EXISTS (
+          SELECT 1
+          FROM UNNEST(COALESCE(products.tags, ARRAY[]::TEXT[])) AS product_tag
+          WHERE product_tag ILIKE $1
+        )
         OR COALESCE(stores.store_name, '') ILIKE $1
       ORDER BY stores.store_name ASC, products.product_name ASC
       LIMIT $2

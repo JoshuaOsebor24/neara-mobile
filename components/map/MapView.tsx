@@ -116,7 +116,11 @@ export function NearaMapView({
 }) {
   const mapRef = useRef<RNMapView | null>(null);
   const [userInteracted, setUserInteracted] = useState(false);
-  const [displayRegion, setDisplayRegion] = useState<Region>(DEFAULT_REGION);
+  const hasMountedRef = useRef(false);
+  const hasSettledInitialRegionRef = useRef(false);
+  const programmaticMoveRef = useRef(false);
+  const mapInteractionActiveRef = useRef(false);
+  const mapMoveEndTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const region = useMemo(
     () => (coordinates ? buildRegion(coordinates) : null),
     [coordinates],
@@ -140,12 +144,18 @@ export function NearaMapView({
 
   useEffect(() => {
     if (focusedRegion && !userInteracted) {
-      setDisplayRegion(focusedRegion);
+      if (hasMountedRef.current) {
+        programmaticMoveRef.current = true;
+        mapRef.current?.animateToRegion(focusedRegion, 320);
+      }
       return;
     }
 
     if (region && !userInteracted && !disableUserLocationRecenter) {
-      setDisplayRegion(region);
+      if (hasMountedRef.current) {
+        programmaticMoveRef.current = true;
+        mapRef.current?.animateToRegion(region, 320);
+      }
     }
   }, [focusedRegion, region, userInteracted, disableUserLocationRecenter]);
 
@@ -155,8 +165,76 @@ export function NearaMapView({
     }
 
     setUserInteracted(false);
-    setDisplayRegion(region);
+    programmaticMoveRef.current = true;
+    mapRef.current?.animateToRegion(region, 420);
   }, [mapRecenterKey, region]);
+
+  useEffect(() => {
+    hasMountedRef.current = true;
+
+    return () => {
+      hasMountedRef.current = false;
+      if (mapMoveEndTimeoutRef.current) {
+        clearTimeout(mapMoveEndTimeoutRef.current);
+        mapMoveEndTimeoutRef.current = null;
+      }
+    };
+  }, []);
+
+  const signalMapMoveStart = (source: "drag" | "region") => {
+    if (!hasSettledInitialRegionRef.current && source === "region") {
+      return;
+    }
+
+    if (source === "drag") {
+      hasSettledInitialRegionRef.current = true;
+    }
+
+    if (programmaticMoveRef.current) {
+      return;
+    }
+
+    if (mapMoveEndTimeoutRef.current) {
+      clearTimeout(mapMoveEndTimeoutRef.current);
+      mapMoveEndTimeoutRef.current = null;
+    }
+
+    if (mapInteractionActiveRef.current) {
+      return;
+    }
+
+    mapInteractionActiveRef.current = true;
+    setUserInteracted(true);
+    onMapMoveStart?.();
+  };
+
+  const signalMapMoveEnd = () => {
+    if (!hasSettledInitialRegionRef.current) {
+      hasSettledInitialRegionRef.current = true;
+      programmaticMoveRef.current = false;
+      return;
+    }
+
+    if (programmaticMoveRef.current) {
+      programmaticMoveRef.current = false;
+      return;
+    }
+
+    if (mapMoveEndTimeoutRef.current) {
+      clearTimeout(mapMoveEndTimeoutRef.current);
+    }
+
+    mapMoveEndTimeoutRef.current = setTimeout(() => {
+      mapMoveEndTimeoutRef.current = null;
+
+      if (!mapInteractionActiveRef.current) {
+        return;
+      }
+
+      mapInteractionActiveRef.current = false;
+      onMapMoveEnd?.();
+    }, 140);
+  };
 
   return (
     <View style={[styles.container, style]}>
@@ -170,27 +248,30 @@ export function NearaMapView({
         rotateEnabled={!disableGestures}
         pitchEnabled={!disableGestures}
         zoomTapEnabled={!disableGestures}
+        onRegionChange={
+          disableGestures
+            ? undefined
+            : () => {
+                signalMapMoveStart("region");
+              }
+        }
         onPanDrag={
           disableGestures
             ? undefined
             : () => {
-                setUserInteracted(true);
-                onMapMoveStart?.();
+                signalMapMoveStart("drag");
               }
         }
         onRegionChangeComplete={
           disableGestures
             ? undefined
-            : (nextRegion) => {
-                setUserInteracted(true);
-                setDisplayRegion(nextRegion);
-                onMapMoveEnd?.();
+            : () => {
+                signalMapMoveEnd();
               }
         }
         maxZoomLevel={19}
         minZoomLevel={9}
         provider={PROVIDER_DEFAULT}
-        region={displayRegion}
         showsCompass={false}
         showsIndoorLevelPicker={false}
         showsMyLocationButton={false}

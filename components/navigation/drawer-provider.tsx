@@ -1,5 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { type Href, usePathname, useRouter } from "expo-router";
+import { usePathname, useRouter, type Href } from "expo-router";
 import {
   createContext,
   useCallback,
@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import {
+  Animated,
   Modal,
   Pressable,
   StyleSheet,
@@ -17,12 +18,15 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 
-import { theme } from "@/constants/theme";
-import { useMobileSession } from "@/services/mobile-session";
 import { PremiumBadge } from "@/components/ui/premium-badge";
 import { StoreOwnerBadge } from "@/components/ui/store-owner-badge";
+import { theme } from "@/constants/theme";
+import { useMobileSession } from "@/services/mobile-session";
 
 type DrawerContextValue = {
   closeDrawer: () => void;
@@ -55,14 +59,26 @@ export function DrawerProvider({ children }: { children: ReactNode }) {
   const session = useMobileSession();
   const isAuthenticated = session.isAuthenticated && Boolean(session.authToken);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isDrawerMounted, setIsDrawerMounted] = useState(false);
   const [previousPathname, setPreviousPathname] = useState(pathname);
+  const drawerTranslateX = useState(new Animated.Value(-360))[0];
 
   const closeDrawer = useCallback(() => {
     if (!isDrawerOpen) {
       return;
     }
+
     setIsDrawerOpen(false);
-  }, [isDrawerOpen]);
+    Animated.timing(drawerTranslateX, {
+      toValue: -360,
+      duration: 240,
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      if (finished) {
+        setIsDrawerMounted(false);
+      }
+    });
+  }, [drawerTranslateX, isDrawerOpen]);
 
   const openDrawer = useCallback(() => {
     if (!isAuthenticated) {
@@ -72,8 +88,16 @@ export function DrawerProvider({ children }: { children: ReactNode }) {
     if (isDrawerOpen) {
       return;
     }
+
+    setIsDrawerMounted(true);
     setIsDrawerOpen(true);
-  }, [isAuthenticated, isDrawerOpen]);
+    drawerTranslateX.setValue(-360);
+    Animated.timing(drawerTranslateX, {
+      toValue: 0,
+      duration: 260,
+      useNativeDriver: true,
+    }).start();
+  }, [drawerTranslateX, isAuthenticated, isDrawerOpen]);
 
   const toggleDrawer = useCallback(() => {
     if (isDrawerOpen) {
@@ -125,7 +149,9 @@ export function DrawerProvider({ children }: { children: ReactNode }) {
       ...(session.isStoreOwner
         ? [
             {
-              href: session.primaryStoreId ? `/store/${session.primaryStoreId}` : "/store-mode",
+              href: session.primaryStoreId
+                ? `/store/${session.primaryStoreId}`
+                : "/store-mode",
               icon: "storefront-outline" as const,
               label: "My Store",
             },
@@ -136,7 +162,11 @@ export function DrawerProvider({ children }: { children: ReactNode }) {
             },
           ]
         : []),
-      { href: "/saved-stores", icon: "bookmark-outline", label: "Saved Stores" },
+      {
+        href: "/saved-stores",
+        icon: "bookmark-outline",
+        label: "Saved Stores",
+      },
       { href: "/help", icon: "help-circle-outline", label: "Help" },
       {
         href: "/settings",
@@ -146,104 +176,142 @@ export function DrawerProvider({ children }: { children: ReactNode }) {
     ];
 
     return items;
-  }, [isAuthenticated, session.isPro, session.isStoreOwner, session.primaryStoreId]);
+  }, [
+    isAuthenticated,
+    session.isPro,
+    session.isStoreOwner,
+    session.primaryStoreId,
+  ]);
   return (
     <DrawerContext.Provider value={value}>
       {children}
-      {!isAuthenticated ? null : (
-      <Modal
-        animationType="none"
-        onRequestClose={closeDrawer}
-        statusBarTranslucent
-        transparent
-        visible={isDrawerOpen}
-      >
-        <View style={styles.modalRoot}>
-          <View style={styles.overlay}>
-            <Pressable
-              onPress={closeDrawer}
-              style={StyleSheet.absoluteFillObject}
-            />
-          </View>
+      {!isAuthenticated || !isDrawerMounted ? null : (
+        <Modal
+          animationType="none"
+          onRequestClose={closeDrawer}
+          statusBarTranslucent
+          transparent
+          visible
+        >
+          <View style={styles.modalRoot}>
+            <View style={styles.overlay}>
+              <Pressable
+                onPress={closeDrawer}
+                style={StyleSheet.absoluteFillObject}
+              />
+            </View>
 
-          <View style={styles.drawerWrap}>
-            <SafeAreaView edges={["bottom"]} style={[styles.drawer, { paddingTop: Math.max(insets.top, 20) }]}>
-              <View style={styles.drawerHeader}>
-                <View style={styles.brandPill}>
-                  <Text style={styles.brandPillText}>Neara</Text>
+            <Animated.View
+              style={[
+                styles.drawerWrap,
+                { transform: [{ translateX: drawerTranslateX }] },
+              ]}
+            >
+              <SafeAreaView
+                edges={["bottom"]}
+                style={[
+                  styles.drawer,
+                  { paddingTop: Math.max(insets.top, 20) },
+                ]}
+              >
+                <View style={styles.drawerHeader}>
+                  <View style={styles.brandPill}>
+                    <Text style={styles.brandPillText}>Neara</Text>
+                  </View>
                 </View>
-              </View>
 
-              <View style={styles.identityBlock}>
-                <View style={styles.identityRow}>
-                  <Text style={styles.identityName}>{identityName}</Text>
+                <View style={styles.identityBlock}>
+                  <View style={styles.identityRow}>
+                    <Text style={styles.identityName}>{identityName}</Text>
+                  </View>
+                  <View style={styles.identityBadgeRow}>
+                    {session.isPro ? <PremiumBadge /> : null}
+                    {session.isStoreOwner ? <StoreOwnerBadge /> : null}
+                  </View>
+                  <Text style={styles.identityMeta}>{identityMeta}</Text>
                 </View>
-                <View style={styles.identityBadgeRow}>
-                  {session.isPro ? <PremiumBadge /> : null}
-                  {session.isStoreOwner ? <StoreOwnerBadge /> : null}
+
+                <View style={styles.navList}>
+                  {drawerItems.map((item, index) => {
+                    const active = isItemActive(pathname, item.href);
+                    const isPrimary = index === 0; // Profile
+                    const isSecondary = index >= 1 && index <= 2; // Chats, Saved Stores
+                    const isTertiary = index >= 3; // Help, Settings
+
+                    return (
+                      <TouchableOpacity
+                        key={item.href}
+                        activeOpacity={0.7}
+                        onPress={() => {
+                          closeDrawer();
+                          router.push(item.href as Href);
+                        }}
+                        style={[
+                          styles.navItem,
+                          active && styles.navItemActive,
+                          isPrimary && styles.navItemPrimary,
+                          isSecondary && styles.navItemSecondary,
+                          isTertiary && styles.navItemTertiary,
+                        ]}
+                      >
+                        <View style={styles.navIconWrap}>
+                          <Ionicons
+                            color={active ? "#f8fafc" : "#e2e8f0"}
+                            name={item.icon}
+                            size={18}
+                          />
+                        </View>
+                        <Text
+                          style={[
+                            styles.navLabel,
+                            active && styles.navLabelActive,
+                          ]}
+                        >
+                          {item.label}
+                        </Text>
+                        {item.showBadge ? (
+                          <View style={styles.unreadDot} />
+                        ) : null}
+                        <Ionicons
+                          color={active ? "#94a3b8" : "#64748b"}
+                          name="chevron-forward"
+                          size={16}
+                        />
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
-                <Text style={styles.identityMeta}>{identityMeta}</Text>
-              </View>
 
-              <View style={styles.navList}>
-                {drawerItems.map((item) => {
-                  const active = isItemActive(pathname, item.href);
-
-                  return (
+                {!session.isStoreOwner ? (
+                  <View style={styles.bottomActionWrap}>
                     <TouchableOpacity
-                      key={item.href}
-                      activeOpacity={0.85}
+                      activeOpacity={0.7}
                       onPress={() => {
                         closeDrawer();
-                        router.push(item.href as Href);
+                        router.push("/store-mode");
                       }}
-                      style={[styles.navItem, active && styles.navItemActive]}
+                      style={styles.bottomActionButton}
                     >
                       <View style={styles.navIconWrap}>
                         <Ionicons
-                          color={active ? "#f8fafc" : "#e2e8f0"}
-                          name={item.icon}
+                          color="#dbeafe"
+                          name="swap-horizontal-outline"
                           size={18}
                         />
                       </View>
-                      <Text style={[styles.navLabel, active && styles.navLabelActive]}>
-                        {item.label}
-                      </Text>
-                      {item.showBadge ? (
-                        <View style={styles.unreadDot} />
-                      ) : null}
+                      <Text style={styles.navLabel}>Switch to Store Mode</Text>
                       <Ionicons
-                        color={active ? "#94a3b8" : "#64748b"}
+                        color="#64748b"
                         name="chevron-forward"
                         size={16}
                       />
                     </TouchableOpacity>
-                  );
-                })}
-              </View>
-
-              {!session.isStoreOwner ? (
-                <View style={styles.bottomActionWrap}>
-                  <TouchableOpacity
-                    activeOpacity={0.85}
-                    onPress={() => {
-                      closeDrawer();
-                      router.push("/store-mode");
-                    }}
-                    style={styles.bottomActionButton}
-                  >
-                    <View style={styles.navIconWrap}>
-                      <Ionicons color="#dbeafe" name="swap-horizontal-outline" size={18} />
-                    </View>
-                    <Text style={styles.navLabel}>Switch to Store Mode</Text>
-                    <Ionicons color="#64748b" name="chevron-forward" size={16} />
-                  </TouchableOpacity>
-                </View>
-              ) : null}
-            </SafeAreaView>
+                  </View>
+                ) : null}
+              </SafeAreaView>
+            </Animated.View>
           </View>
-        </View>
-      </Modal>
+        </Modal>
       )}
     </DrawerContext.Provider>
   );
@@ -318,13 +386,13 @@ const styles = StyleSheet.create({
   },
   identityName: {
     color: theme.colors.text,
-    fontSize: 20,
-    fontWeight: "600",
+    fontSize: 22,
+    fontWeight: "700",
     letterSpacing: -0.3,
   },
   identityMeta: {
     marginTop: 4,
-    color: "#94a3b8",
+    color: "#64748b",
     fontSize: 14,
   },
   identityBadgeRow: {
@@ -336,6 +404,10 @@ const styles = StyleSheet.create({
   navList: {
     marginTop: 8,
     flex: 1,
+    backgroundColor: "rgba(255,255,255,0.02)",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   navItem: {
     flexDirection: "row",
@@ -347,6 +419,15 @@ const styles = StyleSheet.create({
   },
   navItemActive: {
     backgroundColor: "transparent",
+  },
+  navItemPrimary: {
+    marginTop: 0,
+  },
+  navItemSecondary: {
+    marginTop: 8,
+  },
+  navItemTertiary: {
+    marginTop: 4,
   },
   navIconWrap: {
     width: 32,
@@ -382,8 +463,8 @@ const styles = StyleSheet.create({
   },
   bottomActionButton: {
     alignItems: "center",
-    backgroundColor: "rgba(59,130,246,0.10)",
-    borderColor: "rgba(59,130,246,0.18)",
+    backgroundColor: "rgba(59,130,246,0.16)",
+    borderColor: "rgba(59,130,246,0.28)",
     borderRadius: 18,
     borderWidth: 1,
     flexDirection: "row",

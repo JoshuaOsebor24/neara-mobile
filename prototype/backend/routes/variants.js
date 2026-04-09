@@ -14,7 +14,7 @@ const router = express.Router();
 router.post("/", authMiddleware, async (req, res) => {
   try {
     const userId = req.user.id;
-    const { product_id, variant_name, price, stock_quantity } = req.body;
+    const { product_id, variant_name, price, stock_quantity, unit_count } = req.body;
 
     if (!product_id || !variant_name || price === undefined) {
       return res.status(400).json({
@@ -48,18 +48,26 @@ router.post("/", authMiddleware, async (req, res) => {
     }
 
     const finalStockQuantity = stock_quantity !== undefined ? Number(stock_quantity) : 0;
+    const finalUnitCount = unit_count !== undefined ? Number.parseInt(String(unit_count), 10) : 1;
+
+    if (!Number.isInteger(finalUnitCount) || finalUnitCount <= 0) {
+      return res.status(400).json({
+        message: "unit_count must be a valid positive number",
+      });
+    }
     const finalInStock = finalStockQuantity > 0;
 
     const newVariant = await pool.query(
       `
-      INSERT INTO product_variants (product_id, variant_name, price, stock_quantity, in_stock)
-      VALUES ($1, $2, $3, $4, $5)
+      INSERT INTO product_variants (product_id, variant_name, price, unit_count, stock_quantity, in_stock)
+      VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING *
       `,
       [
         product_id,
         variant_name,
         price,
+        finalUnitCount,
         finalStockQuantity,
         finalInStock,
       ]
@@ -83,7 +91,7 @@ router.put("/:id", authMiddleware, async (req, res) => {
   try {
     const userId = req.user.id;
     const { id } = req.params;
-    const { variant_name, price, stock_quantity } = req.body;
+    const { variant_name, price, stock_quantity, unit_count } = req.body;
 
     const variantResult = await pool.query(
       `
@@ -115,6 +123,16 @@ router.put("/:id", authMiddleware, async (req, res) => {
       stock_quantity !== undefined
         ? Number(stock_quantity)
         : variant.stock_quantity;
+    const finalUnitCount =
+      unit_count !== undefined
+        ? Number.parseInt(String(unit_count), 10)
+        : variant.unit_count ?? 1;
+
+    if (!Number.isInteger(finalUnitCount) || finalUnitCount <= 0) {
+      return res.status(400).json({
+        message: "unit_count must be a valid positive number",
+      });
+    }
 
     const finalInStock = finalStockQuantity > 0;
 
@@ -124,8 +142,9 @@ router.put("/:id", authMiddleware, async (req, res) => {
       SET variant_name = $1,
           price = $2,
           stock_quantity = $3,
-          in_stock = $4
-      WHERE id = $5
+          in_stock = $4,
+          unit_count = $5
+      WHERE id = $6
       RETURNING *
       `,
       [
@@ -133,6 +152,7 @@ router.put("/:id", authMiddleware, async (req, res) => {
         price !== undefined ? price : variant.price,
         finalStockQuantity,
         finalInStock,
+        finalUnitCount,
         id,
       ]
     );

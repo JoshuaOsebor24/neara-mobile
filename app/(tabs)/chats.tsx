@@ -18,10 +18,7 @@ import {
   type ChatConversationSummary,
 } from "@/services/chat-api";
 import { useMobileSession } from "@/services/mobile-session";
-import {
-  getFreeMessagesRemaining,
-  NEARA_FREE_CHAT_LIMIT,
-} from "@/services/role-access";
+import { getFreeMessagesRemaining } from "@/services/role-access";
 
 export default function ChatsTab() {
   const router = useRouter();
@@ -111,24 +108,39 @@ export default function ChatsTab() {
             </View>
 
             <Pressable
-              onPress={() => router.push("/(tabs)/profile")}
-              style={styles.profileButton}
+              onPress={() => router.push("/(tabs)/search")}
+              style={styles.newChatButton}
             >
-              <Text style={styles.profileButtonText}>Profile</Text>
+              <Text style={styles.newChatButtonText}>New Chat</Text>
             </Pressable>
           </View>
+
+          <View style={styles.divider} />
 
           <ScreenCard style={styles.panel}>
             <View style={styles.panelHeader}>
               <View>
                 <Text style={styles.panelTitle}>Conversations</Text>
-                <Text style={styles.panelSubtitle}>
-                  {session.isPro
-                    ? "Pro messaging active"
-                    : freeMessagesRemaining > 0
-                      ? `Free messaging with a ${NEARA_FREE_CHAT_LIMIT}-message limit`
-                      : "Free message quota exhausted"}
-                </Text>
+                {session.isPro ? (
+                  <View style={styles.limitBadge}>
+                    <Text style={styles.limitBadgeText}>
+                      Pro messaging active
+                    </Text>
+                  </View>
+                ) : freeMessagesRemaining > 0 ? (
+                  <View style={styles.limitBadge}>
+                    <Text style={styles.limitBadgeText}>
+                      Free messaging • {freeMessagesRemaining} message
+                      {freeMessagesRemaining === 1 ? "" : "s"} left
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={styles.limitBadgeExhausted}>
+                    <Text style={[styles.limitBadgeText, { color: "#ef4444" }]}>
+                      Free message quota exhausted
+                    </Text>
+                  </View>
+                )}
               </View>
             </View>
 
@@ -151,7 +163,7 @@ export default function ChatsTab() {
             {!isLoading && !errorMessage && conversations.length === 0 ? (
               <EmptyCard
                 title="No conversations yet"
-                detail="Start a chat from any store page."
+                detail="Browse stores and tap the chat button to start messaging."
               />
             ) : null}
 
@@ -165,10 +177,18 @@ export default function ChatsTab() {
                         `/chat/${conversation.store_id}?conversationId=${conversation.id}`,
                       )
                     }
-                    style={styles.card}
+                    style={({ pressed }) => [
+                      styles.card,
+                      pressed && styles.cardPressed,
+                    ]}
                   >
                     <View style={styles.cardHeader}>
                       <View style={styles.cardHeaderLeft}>
+                        <View style={styles.avatar}>
+                          <Text style={styles.avatarText}>
+                            {conversation.store_name.charAt(0).toUpperCase()}
+                          </Text>
+                        </View>
                         <Text numberOfLines={1} style={styles.storeName}>
                           {conversation.store_name}
                         </Text>
@@ -248,10 +268,10 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: "700",
   },
-  profileButton: {
+  newChatButton: {
     alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.05)",
-    borderColor: "rgba(255,255,255,0.10)",
+    backgroundColor: "rgba(56, 189, 248, 0.12)",
+    borderColor: "rgba(56, 189, 248, 0.20)",
     borderRadius: 999,
     borderWidth: 1,
     justifyContent: "center",
@@ -259,10 +279,16 @@ const styles = StyleSheet.create({
     minWidth: 104,
     paddingHorizontal: 16,
   },
-  profileButtonText: {
-    color: theme.colors.text,
+  newChatButtonText: {
+    color: "#38bdf8",
     fontSize: 14,
     fontWeight: "700",
+  },
+  divider: {
+    backgroundColor: "rgba(255,255,255,0.08)",
+    height: 1,
+    marginBottom: 16,
+    marginHorizontal: 16,
   },
   panel: {
     padding: 16,
@@ -280,11 +306,36 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginTop: 4,
   },
+  limitBadge: {
+    alignSelf: "flex-start",
+    backgroundColor: "rgba(56, 189, 248, 0.12)",
+    borderColor: "rgba(56, 189, 248, 0.20)",
+    borderRadius: 999,
+    borderWidth: 1,
+    marginTop: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  limitBadgeExhausted: {
+    alignSelf: "flex-start",
+    backgroundColor: "rgba(239, 68, 68, 0.12)",
+    borderColor: "rgba(239, 68, 68, 0.20)",
+    borderRadius: 999,
+    borderWidth: 1,
+    marginTop: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  limitBadgeText: {
+    color: "#38bdf8",
+    fontSize: 12,
+    fontWeight: "600",
+  },
   stateWrap: {
     gap: 12,
   },
   list: {
-    gap: 12,
+    gap: 8,
   },
   card: {
     backgroundColor: "rgba(255,255,255,0.04)",
@@ -293,6 +344,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     paddingHorizontal: 16,
     paddingVertical: 16,
+  },
+  cardPressed: {
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderColor: "rgba(255,255,255,0.12)",
   },
   cardHeader: {
     alignItems: "flex-start",
@@ -305,6 +360,21 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flex: 1,
     gap: 8,
+  },
+  avatar: {
+    alignItems: "center",
+    backgroundColor: "rgba(56, 189, 248, 0.12)",
+    borderColor: "rgba(56, 189, 248, 0.20)",
+    borderRadius: 999,
+    borderWidth: 1,
+    height: 32,
+    justifyContent: "center",
+    width: 32,
+  },
+  avatarText: {
+    color: "#38bdf8",
+    fontSize: 14,
+    fontWeight: "700",
   },
   storeName: {
     color: theme.colors.text,
@@ -327,7 +397,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   timeText: {
-    color: "#64748b",
+    color: "#94a3b8",
     fontSize: 12,
   },
   preview: {

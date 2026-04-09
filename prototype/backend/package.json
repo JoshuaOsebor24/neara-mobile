@@ -9,6 +9,7 @@
     "start:prod": "NODE_ENV=production node server.js",
     "seed": "node seed.js",
     "seed:search": "node seedSearchResultsData.js",
+    "notifications:reminders": "node scripts/run-product-update-reminders.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

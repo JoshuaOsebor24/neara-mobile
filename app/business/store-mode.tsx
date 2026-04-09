@@ -14,30 +14,50 @@ import {
 import { BackPillButton } from "@/components/ui/back-pill-button";
 
 interface StorePlan {
-  id: "basic";
+  id: "basic" | "pro";
   title: string;
   description: string;
   price: string;
+  dailyEquivalent?: string;
   features: string[];
   isRecommended: boolean;
   buttonLabel: string;
   includesLabel?: string;
+  disabled?: boolean;
 }
 
 const STORE_PLANS: StorePlan[] = [
   {
     id: "basic",
     title: "Basic Store",
-    description: "Start selling with a simple store presence across Neara.",
+    description:
+      "Create your store and start getting discovered by nearby customers.",
     price: "₦1,000 / month",
+    dailyEquivalent: "About ₦33/day",
     features: [
-      "Create your store",
-      "Add and manage products",
-      "Appear in search results",
-      "Appear on the map",
+      "Get your store discovered by nearby customers searching for products",
+      "Display your products so customers can browse and message you",
+      "Appear on the map so people around you can find your store",
+      "Easily add and update your products anytime",
+    ],
+    isRecommended: true,
+    buttonLabel: "Start your store",
+    includesLabel: "Affordable monthly plan for getting visible fast",
+  },
+  {
+    id: "pro",
+    title: "Pro Store",
+    description: "More tools for faster growth and stronger visibility.",
+    price: "Coming soon",
+    features: [
+      "Boost visibility across Neara",
+      "Unlock more ways to attract ready-to-buy customers",
+      "Get advanced tools for scaling your store presence",
     ],
     isRecommended: false,
-    buttonLabel: "Choose Basic",
+    buttonLabel: "Coming soon",
+    disabled: true,
+    includesLabel: "Premium growth tools are on the way",
   },
 ];
 
@@ -66,7 +86,11 @@ export default function StoreModeScreen() {
     session.primaryStoreId,
   ]);
 
-  const handleChoosePlan = (planId: "basic") => {
+  const handleChoosePlan = (planId: "basic" | "pro") => {
+    if (planId !== "basic") {
+      return;
+    }
+
     router.push(`/store-payment?storePlan=${planId}`);
   };
 
@@ -97,7 +121,7 @@ export default function StoreModeScreen() {
           <Text style={styles.title}>Start Your Store</Text>
           <Text style={styles.subtitle}>
             {session.isAuthenticated
-              ? "Choose the plan that fits your business"
+              ? "Choose a plan that gets your store visible and brings in customers"
               : "Log in to continue into store mode"}
           </Text>
           {session.isAuthenticated && hasOwnerDraft && !session.isStoreOwner ? (
@@ -137,11 +161,14 @@ export default function StoreModeScreen() {
                 style={[
                   styles.planCard,
                   plan.isRecommended && styles.planCardRecommended,
+                  plan.disabled && styles.planCardDisabled,
                 ]}
               >
                 {plan.isRecommended && (
                   <View style={styles.recommendedBadge}>
-                    <Text style={styles.recommendedBadgeText}>Recommended</Text>
+                    <Text style={styles.recommendedBadgeText}>
+                      Best to start
+                    </Text>
                   </View>
                 )}
 
@@ -156,6 +183,11 @@ export default function StoreModeScreen() {
 
                 <View style={styles.priceSection}>
                   <Text style={styles.price}>{plan.price}</Text>
+                  {plan.dailyEquivalent ? (
+                    <Text style={styles.dailyEquivalent}>
+                      {plan.dailyEquivalent}
+                    </Text>
+                  ) : null}
                   {plan.includesLabel && (
                     <Text style={styles.includesLabel}>
                       {plan.includesLabel}
@@ -176,18 +208,33 @@ export default function StoreModeScreen() {
                   style={[
                     styles.button,
                     plan.isRecommended && styles.buttonRecommended,
+                    plan.disabled && styles.buttonDisabled,
                   ]}
+                  disabled={plan.disabled}
                   onPress={() => handleChoosePlan(plan.id)}
                 >
                   <Text
                     style={[
                       styles.buttonText,
                       plan.isRecommended && styles.buttonTextRecommended,
+                      plan.disabled && styles.buttonTextDisabled,
                     ]}
                   >
                     {plan.buttonLabel}
                   </Text>
                 </TouchableOpacity>
+                {plan.id === "basic" ? (
+                  <Text style={styles.buttonSupportingText}>
+                    Instant setup after payment
+                  </Text>
+                ) : null}
+                {plan.id === "basic" ? (
+                  <View style={styles.planTrustRow}>
+                    <Text style={styles.planTrustText}>Secure payment</Text>
+                    <Text style={styles.planTrustDivider}>•</Text>
+                    <Text style={styles.planTrustText}>Cancel anytime</Text>
+                  </View>
+                ) : null}
               </LinearGradient>
             </View>
           ))}
@@ -315,6 +362,9 @@ const styles = StyleSheet.create({
   planCardRecommended: {
     borderColor: "rgba(14, 165, 233, 0.3)",
   },
+  planCardDisabled: {
+    opacity: 0.72,
+  },
   recommendedBadge: {
     alignSelf: "flex-start",
     backgroundColor: "rgba(14, 165, 233, 0.14)",
@@ -353,6 +403,12 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: "600",
     color: "#FFFFFF",
+    marginBottom: 6,
+  },
+  dailyEquivalent: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#b0e7fe",
     marginBottom: 6,
   },
   includesLabel: {
@@ -398,5 +454,34 @@ const styles = StyleSheet.create({
   },
   buttonTextRecommended: {
     color: "#FFFFFF",
+  },
+  buttonDisabled: {
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+  buttonTextDisabled: {
+    color: "#94a3b8",
+  },
+  buttonSupportingText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#94a3b8",
+    textAlign: "center",
+    marginTop: 8,
+  },
+  planTrustRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 8,
+    marginTop: 14,
+  },
+  planTrustText: {
+    color: "#94a3b8",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  planTrustDivider: {
+    color: "#475569",
+    fontSize: 12,
   },
 });
