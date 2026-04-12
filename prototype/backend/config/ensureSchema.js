@@ -380,6 +380,12 @@ async function ensureSchema() {
     await client.query(`
       DROP INDEX IF EXISTS users_email_idx;
       CREATE INDEX IF NOT EXISTS stores_owner_id_idx ON stores (owner_id);
+      CREATE INDEX IF NOT EXISTS stores_public_store_name_idx
+      ON stores (store_name)
+      WHERE latitude IS NOT NULL AND longitude IS NOT NULL AND is_suspended = FALSE;
+      CREATE INDEX IF NOT EXISTS stores_public_coordinates_idx
+      ON stores (latitude, longitude)
+      WHERE latitude IS NOT NULL AND longitude IS NOT NULL AND is_suspended = FALSE;
       CREATE UNIQUE INDEX IF NOT EXISTS stores_owner_unique_idx
       ON stores (owner_id)
       WHERE owner_id IS NOT NULL;

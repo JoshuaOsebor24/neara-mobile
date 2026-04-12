@@ -1,6 +1,698 @@
 const MANAGED_SEED_OWNER_EMAIL_PATTERN = "owner+%@neara.test";
 
+const DEMO_STORE_IMAGES = {
+  bread: [
+    "https://commons.wikimedia.org/wiki/Special:FilePath/Bread%20loaf.jpg",
+    "https://commons.wikimedia.org/wiki/Special:FilePath/Loaf%20of%20bread..jpg",
+    "https://commons.wikimedia.org/wiki/Special:FilePath/Loaf%20Of%20Bread.jpg",
+    "https://commons.wikimedia.org/wiki/Special:FilePath/Loaf%20of%20bread.jpg",
+    "https://commons.wikimedia.org/wiki/Special:FilePath/Sourdough%20Bread%20Loaf.jpg",
+    "https://commons.wikimedia.org/wiki/Special:FilePath/Photograph%20of%20Bread.jpg",
+  ],
+  charger: [
+    "https://commons.wikimedia.org/wiki/Special:FilePath/USB-C.jpg",
+    "https://commons.wikimedia.org/wiki/Special:FilePath/USB-cable.jpg",
+    "https://commons.wikimedia.org/wiki/Special:FilePath/Cable%20USB.jpg",
+    "https://commons.wikimedia.org/wiki/Special:FilePath/USB%20cable.jpg",
+    "https://commons.wikimedia.org/wiki/Special:FilePath/USB%20Type%20C.jpg",
+    "https://commons.wikimedia.org/wiki/Special:FilePath/USB-C%20cable%20connected%20to%20a%20powerbank.jpg",
+  ],
+  coke: [
+    "https://commons.wikimedia.org/wiki/Special:FilePath/Coca-Cola%20bottle.jpg",
+    "https://commons.wikimedia.org/wiki/Special:FilePath/Coca-Cola%20Bottle.jpg",
+    "https://commons.wikimedia.org/wiki/Special:FilePath/Coca-Cola%20bottles.jpg",
+    "https://commons.wikimedia.org/wiki/Special:FilePath/Coca-Cola%20bottle%20%286699404437%29.jpg",
+    "https://commons.wikimedia.org/wiki/Special:FilePath/Coca-Cola%20bottles%20%282%29.jpg",
+    "https://commons.wikimedia.org/wiki/Special:FilePath/Coca%20Cola%20bottles.JPG",
+  ],
+  indomie: [
+    "https://indomieca.com/wp-content/uploads/2020/06/Chicken-Flavour-300x214.png",
+    "https://commons.wikimedia.org/wiki/Special:FilePath/Instant%20noodles.jpg",
+    "https://commons.wikimedia.org/wiki/Special:FilePath/Instant_Noodles.jpg",
+    "https://commons.wikimedia.org/wiki/Special:FilePath/Instantnoodles.jpg",
+    "https://commons.wikimedia.org/wiki/Special:FilePath/Typical%20instant%20noodles.jpg",
+    "https://commons.wikimedia.org/wiki/Special:FilePath/Hot%20Instant%20Noodles.jpg",
+  ],
+  storefront:
+    "https://images.unsplash.com/photo-1514933651103-005eec06c04b?auto=format&fit=crop&w=1200&q=80",
+  paracetamol: [
+    "https://commons.wikimedia.org/wiki/Special:FilePath/Panadol.JPG",
+    "https://commons.wikimedia.org/wiki/Special:FilePath/Panadol.jpg",
+    "https://commons.wikimedia.org/wiki/Special:FilePath/Yef%20paracetamol.jpg",
+    "https://commons.wikimedia.org/wiki/Special:FilePath/M%26B%20paracetamol.jpg",
+    "https://commons.wikimedia.org/wiki/Special:FilePath/Medication%20Paracetamol.JPG",
+    "https://commons.wikimedia.org/wiki/Special:FilePath/Acetaminophen%20%28cropped%29.jpg",
+  ],
+};
+
+function pickDemoImage(type, index) {
+  const list = DEMO_STORE_IMAGES[type];
+  if (!Array.isArray(list) || list.length === 0) {
+    return null;
+  }
+
+  return list[index % list.length];
+}
+
+function buildStapleProducts(prices, imageIndex) {
+  return [
+    {
+      product_name: "Indomie Instant Noodles",
+      category: "Groceries",
+      description: "Quick family noodle packs for breakfast, supper, and easy restocks.",
+      image_url: pickDemoImage("indomie", imageIndex),
+      tags: ["indomie", "noodles", "groceries"],
+      variants: [
+        {
+          variant_name: "Super Pack",
+          price: prices.indomie,
+          stock_quantity: prices.indomieStock ?? 24,
+          in_stock: prices.indomieInStock ?? true,
+        },
+        {
+          variant_name: "Hungry Man Pack",
+          price: prices.indomieLarge ?? prices.indomie + 180,
+          stock_quantity: prices.indomieLargeStock ?? 16,
+          in_stock: prices.indomieLargeInStock ?? true,
+        },
+      ],
+    },
+    {
+      product_name: "Coca-Cola",
+      category: "Drinks",
+      description: "Chilled soft drink bottles for quick refreshment and party supplies.",
+      image_url: pickDemoImage("coke", imageIndex),
+      tags: ["coke", "soft drink", "drinks"],
+      variants: [
+        {
+          variant_name: "50cl Bottle",
+          price: prices.coke,
+          stock_quantity: prices.cokeStock ?? 20,
+          in_stock: prices.cokeInStock ?? true,
+        },
+        {
+          variant_name: "1.5L Bottle",
+          price: prices.cokeLarge ?? prices.coke + 550,
+          stock_quantity: prices.cokeLargeStock ?? 12,
+          in_stock: prices.cokeLargeInStock ?? true,
+        },
+      ],
+    },
+    {
+      product_name: "Paracetamol Tablets",
+      category: "Pharmacy",
+      description: "Everyday pain relief tablets for headaches, fever, and body aches.",
+      image_url: pickDemoImage("paracetamol", imageIndex),
+      tags: ["paracetamol", "pain relief", "pharmacy"],
+      variants: [
+        {
+          variant_name: "1 Sachet",
+          price: prices.paracetamol,
+          stock_quantity: prices.paracetamolStock ?? 30,
+          in_stock: prices.paracetamolInStock ?? true,
+        },
+        {
+          variant_name: "10 Tablet Card",
+          price: prices.paracetamolCard ?? prices.paracetamol + 650,
+          stock_quantity: prices.paracetamolCardStock ?? 18,
+          in_stock: prices.paracetamolCardInStock ?? true,
+        },
+      ],
+    },
+    {
+      product_name: "Sliced Bread",
+      category: "Bakery",
+      description: "Soft fresh bread loaves for breakfast, toast, and quick sandwiches.",
+      image_url: pickDemoImage("bread", imageIndex),
+      tags: ["bread", "bakery", "breakfast"],
+      variants: [
+        {
+          variant_name: "Medium Loaf",
+          price: prices.bread,
+          stock_quantity: prices.breadStock ?? 14,
+          in_stock: prices.breadInStock ?? true,
+        },
+        {
+          variant_name: "Large Loaf",
+          price: prices.breadLarge ?? prices.bread + 300,
+          stock_quantity: prices.breadLargeStock ?? 10,
+          in_stock: prices.breadLargeInStock ?? true,
+        },
+      ],
+    },
+    {
+      product_name: "Phone Charger",
+      category: "Electronics",
+      description: "Fast everyday charger for quick top-ups at home, work, or in transit.",
+      image_url: pickDemoImage("charger", imageIndex),
+      tags: ["phone charger", "charger", "electronics"],
+      variants: [
+        {
+          variant_name: "USB Charger",
+          price: prices.phoneCharger,
+          stock_quantity: prices.phoneChargerStock ?? 10,
+          in_stock: prices.phoneChargerInStock ?? true,
+        },
+        {
+          variant_name: "Type-C Fast Charger",
+          price: prices.phoneChargerFast ?? prices.phoneCharger + 1200,
+          stock_quantity: prices.phoneChargerFastStock ?? 8,
+          in_stock: prices.phoneChargerFastInStock ?? true,
+        },
+      ],
+    },
+  ];
+}
+
+function buildDemoStore({
+  address,
+  description,
+  emailSlug,
+  latitude,
+  longitude,
+  ownerName,
+  phoneNumber,
+  prices,
+  productImageIndex,
+  storeName,
+}) {
+  return {
+    store: {
+      store_name: storeName,
+      category: "Convenience Store",
+      address,
+      state: "Lagos",
+      country: "Nigeria",
+      latitude,
+      longitude,
+      phone_number: phoneNumber,
+      verified: true,
+      subscription_tier: 1,
+      image_url: DEMO_STORE_IMAGES.storefront,
+      header_images: [DEMO_STORE_IMAGES.storefront],
+      description,
+      owner: {
+        name: ownerName,
+        email: `owner+${emailSlug}@neara.test`,
+        phone_number: phoneNumber.replace(" 41", " 51"),
+      },
+    },
+    products: buildStapleProducts(prices, productImageIndex),
+  };
+}
+
+const CURRENT_AREA_DEMO_STORES = [
+  buildDemoStore({
+    storeName: "Mama T Store",
+    emailSlug: "mama-t-store",
+    ownerName: "Temitope Hassan",
+    productImageIndex: 0,
+    address: "8 Udi Street, Osborne Foreshore Estate, Ikoyi, Lagos",
+    latitude: 6.44850,
+    longitude: 3.43454,
+    phoneNumber: "+234 801 555 4181",
+    description:
+      "Friendly neighborhood provisions shop for fast daily essentials, cold drinks, noodles, and quick medicine pickups.",
+    prices: {
+      indomie: 520,
+      indomieLarge: 700,
+      coke: 450,
+      cokeLarge: 980,
+      paracetamol: 300,
+      paracetamolCard: 900,
+      bread: 1400,
+      breadLarge: 1700,
+      phoneCharger: 4200,
+      phoneChargerFast: 5400,
+    },
+  }),
+  buildDemoStore({
+    storeName: "Lekki Mini Mart",
+    emailSlug: "lekki-mini-mart",
+    ownerName: "Lekan Afolabi",
+    productImageIndex: 1,
+    address: "15 Royal Palm Drive, Osborne Foreshore Estate, Ikoyi, Lagos",
+    latitude: 6.44836,
+    longitude: 3.43486,
+    phoneNumber: "+234 801 555 4182",
+    description:
+      "Compact mini mart stocked for quick home restocks, late-night drinks, pain relief, and phone accessories.",
+    prices: {
+      indomie: 560,
+      indomieLarge: 760,
+      coke: 500,
+      cokeLarge: 1050,
+      paracetamol: 350,
+      paracetamolCard: 980,
+      bread: 1500,
+      breadLarge: 1800,
+      phoneCharger: 4500,
+      phoneChargerFast: 5900,
+    },
+  }),
+  buildDemoStore({
+    storeName: "QuickBuy Supermarket",
+    emailSlug: "quickbuy-supermarket",
+    ownerName: "Kemi Ojo",
+    productImageIndex: 2,
+    address: "21 Osborne Road, Osborne Foreshore Estate, Ikoyi, Lagos",
+    latitude: 6.44867,
+    longitude: 3.43431,
+    phoneNumber: "+234 801 555 4183",
+    description:
+      "Reliable supermarket for pantry staples, family groceries, basic medication, and quick convenience buys.",
+    prices: {
+      indomie: 600,
+      indomieLarge: 820,
+      coke: 500,
+      cokeLarge: 1080,
+      paracetamol: 400,
+      paracetamolCard: 1100,
+      bread: 1600,
+      breadLarge: 1900,
+      phoneCharger: 4800,
+      phoneChargerFast: 6200,
+    },
+  }),
+  buildDemoStore({
+    storeName: "Jide Provision Store",
+    emailSlug: "jide-provision-store",
+    ownerName: "Jide Oladipo",
+    productImageIndex: 3,
+    address: "3 Frajend Close, Osborne Foreshore Estate, Ikoyi, Lagos",
+    latitude: 6.44822,
+    longitude: 3.43458,
+    phoneNumber: "+234 801 555 4184",
+    description:
+      "Busy corner shop for affordable provisions, school-run snacks, pain relief, and top-up chargers.",
+    prices: {
+      indomie: 540,
+      indomieLarge: 730,
+      coke: 430,
+      cokeLarge: 920,
+      paracetamol: 250,
+      paracetamolCard: 820,
+      bread: 1350,
+      breadLarge: 1650,
+      phoneCharger: 3900,
+      phoneChargerFast: 5200,
+    },
+  }),
+  buildDemoStore({
+    storeName: "24/7 Mart Lekki",
+    emailSlug: "247-mart-lekki",
+    ownerName: "Opeyemi Daniels",
+    productImageIndex: 4,
+    address: "6 Kebbi Street, Osborne Foreshore Estate, Ikoyi, Lagos",
+    latitude: 6.44874,
+    longitude: 3.43493,
+    phoneNumber: "+234 801 555 4185",
+    description:
+      "Always-open convenience stop for night purchases, chilled drinks, emergency medicine, and quick food staples.",
+    prices: {
+      indomie: 650,
+      indomieLarge: 870,
+      coke: 550,
+      cokeLarge: 1200,
+      paracetamol: 450,
+      paracetamolCard: 1180,
+      bread: 1700,
+      breadLarge: 2050,
+      phoneCharger: 5200,
+      phoneChargerFast: 6700,
+    },
+  }),
+  buildDemoStore({
+    storeName: "Aunty Bisi Corner Shop",
+    emailSlug: "aunty-bisi-corner-shop",
+    ownerName: "Bisi Akinwale",
+    productImageIndex: 5,
+    address: "10 12th Street, Osborne Foreshore Estate, Ikoyi, Lagos",
+    latitude: 6.44863,
+    longitude: 3.43518,
+    phoneNumber: "+234 801 555 4186",
+    description:
+      "Popular corner shop for family essentials, affordable noodles, fresh bread, and grab-and-go household needs.",
+    prices: {
+      indomie: 530,
+      indomieLarge: 720,
+      coke: 470,
+      cokeLarge: 1000,
+      paracetamol: 300,
+      paracetamolCard: 920,
+      bread: 1450,
+      breadLarge: 1750,
+      phoneCharger: 4100,
+      phoneChargerFast: 5500,
+    },
+  }),
+];
+
+const PREMIUM_DEMO_STORE = {
+  store: {
+    store_name: "Blue Harbour Market",
+    category: "Convenience Store",
+    address: "18 Admiralty Way, Lekki Phase 1, Lagos",
+    state: "Lagos",
+    country: "Nigeria",
+    latitude: 6.43178,
+    longitude: 3.45583,
+    phone_number: "+234 801 555 4199",
+    delivery_available: true,
+    verified: true,
+    subscription_tier: 3,
+    image_url:
+      "https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=1200&q=80",
+    header_images: [
+      "https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=1600&q=80",
+      "https://images.unsplash.com/photo-1579113800032-c38bd7635818?auto=format&fit=crop&w=1600&q=80",
+      "https://images.unsplash.com/photo-1604719312566-8912e9c8a213?auto=format&fit=crop&w=1600&q=80",
+    ],
+    description:
+      "Premium neighborhood market curated for fast daily shopping, chilled drinks, snack runs, pantry restocks, and polished same-day convenience in Lekki.",
+    owner: {
+      name: "Zainab Kareem",
+      email: "owner+blue-harbour-market@neara.test",
+      phone_number: "+234 801 555 5199",
+    },
+  },
+  products: [
+    {
+      product_name: "Coca-Cola Classic",
+      category: "Drinks",
+      description: "Ice-cold Coca-Cola for quick refreshment, lunches, and party packs.",
+      image_url:
+        "https://images.unsplash.com/photo-1622483767028-3f66f32aef97?auto=format&fit=crop&w=1200&q=80",
+      tags: ["drinks", "cold", "soft drink", "soda", "essentials"],
+      variants: [
+        { variant_name: "50cl Bottle", price: 500, stock_quantity: 40, in_stock: true },
+        { variant_name: "1.5L Bottle", price: 1100, stock_quantity: 20, in_stock: true },
+        { variant_name: "Pack of 6", price: 2950, stock_quantity: 10, in_stock: true },
+      ],
+    },
+    {
+      product_name: "Fanta Orange",
+      category: "Drinks",
+      description: "Bright orange soda served chilled for grab-and-go refreshment.",
+      image_url:
+        "https://images.unsplash.com/photo-1581006852262-e4307cf6283a?auto=format&fit=crop&w=1200&q=80",
+      tags: ["drinks", "orange", "cold", "soft drink", "soda"],
+      variants: [
+        { variant_name: "50cl Bottle", price: 500, stock_quantity: 34, in_stock: true },
+        { variant_name: "1L Bottle", price: 900, stock_quantity: 18, in_stock: true },
+      ],
+    },
+    {
+      product_name: "Aquafina Water",
+      category: "Drinks",
+      description: "Clean bottled water for hydration at home, work, and on the move.",
+      image_url:
+        "https://images.unsplash.com/photo-1564419439260-094b1b7a2712?auto=format&fit=crop&w=1200&q=80",
+      tags: ["drinks", "cold", "water", "essentials"],
+      variants: [
+        { variant_name: "75cl Bottle", price: 350, stock_quantity: 50, in_stock: true },
+        { variant_name: "Pack of 12", price: 3600, stock_quantity: 12, in_stock: true },
+      ],
+    },
+    {
+      product_name: "Five Alive Citrus Burst",
+      category: "Drinks",
+      description: "Chilled fruit drink with a bright citrus finish for quick energy.",
+      image_url:
+        "https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=1200&q=80",
+      tags: ["drinks", "juice", "cold", "fruit"],
+      variants: [
+        { variant_name: "35cl PET", price: 600, stock_quantity: 28, in_stock: true },
+        { variant_name: "1L Bottle", price: 1250, stock_quantity: 16, in_stock: true },
+      ],
+    },
+    {
+      product_name: "Monster Energy",
+      category: "Drinks",
+      description: "Popular energy drink for busy mornings, workouts, and long drives.",
+      image_url:
+        "https://images.unsplash.com/photo-1625772452859-1c03d5bf1137?auto=format&fit=crop&w=1200&q=80",
+      tags: ["drinks", "cold", "energy", "essentials"],
+      variants: [
+        { variant_name: "500ml Can", price: 1450, stock_quantity: 24, in_stock: true },
+      ],
+    },
+    {
+      product_name: "Chivita Orange Juice",
+      category: "Drinks",
+      description: "Smooth orange juice carton for breakfast tables and family fridges.",
+      image_url:
+        "https://images.unsplash.com/photo-1600271886742-f049cd451bba?auto=format&fit=crop&w=1200&q=80",
+      tags: ["drinks", "juice", "orange", "breakfast"],
+      variants: [
+        { variant_name: "1L Carton", price: 2200, stock_quantity: 18, in_stock: true },
+        { variant_name: "Pack of 6", price: 12600, stock_quantity: 6, in_stock: true },
+      ],
+    },
+    {
+      product_name: "Pringles Sour Cream & Onion",
+      category: "Snacks",
+      description: "Crisp stacked chips for movie nights, office desks, and snack baskets.",
+      image_url:
+        "https://images.unsplash.com/photo-1585238342024-78d387f4a707?auto=format&fit=crop&w=1200&q=80",
+      tags: ["snacks", "crisps", "snack", "essentials"],
+      variants: [
+        { variant_name: "Single Tube", price: 2400, stock_quantity: 20, in_stock: true },
+        { variant_name: "Pack of 3", price: 6900, stock_quantity: 8, in_stock: true },
+      ],
+    },
+    {
+      product_name: "Biscuit Assorted Pack",
+      category: "Snacks",
+      description: "Crunchy tea biscuits packed for desks, school runs, and home guests.",
+      image_url:
+        "https://images.unsplash.com/photo-1558961363-fa8fdf82db35?auto=format&fit=crop&w=1200&q=80",
+      tags: ["snacks", "biscuit", "breakfast", "essentials"],
+      variants: [
+        { variant_name: "200g Pack", price: 950, stock_quantity: 26, in_stock: true },
+        { variant_name: "Family Pack", price: 2400, stock_quantity: 14, in_stock: true },
+      ],
+    },
+    {
+      product_name: "Salted Plantain Chips",
+      category: "Snacks",
+      description: "Lightly salted crunchy plantain chips for easy everyday snacking.",
+      image_url:
+        "https://images.unsplash.com/photo-1621939514649-280e2ee25f60?auto=format&fit=crop&w=1200&q=80",
+      tags: ["snacks", "plantain", "snack", "local favorites"],
+      variants: [
+        { variant_name: "120g Bag", price: 1400, stock_quantity: 24, in_stock: true },
+      ],
+    },
+    {
+      product_name: "Cadbury Dairy Milk",
+      category: "Snacks",
+      description: "Smooth milk chocolate bar for quick treats and gift add-ons.",
+      image_url:
+        "https://images.unsplash.com/photo-1549007994-cb92caebd54b?auto=format&fit=crop&w=1200&q=80",
+      tags: ["snacks", "chocolate", "dessert"],
+      variants: [
+        { variant_name: "Single Bar", price: 1200, stock_quantity: 30, in_stock: true },
+        { variant_name: "Pack of 5", price: 5600, stock_quantity: 10, in_stock: true },
+      ],
+    },
+    {
+      product_name: "Golden Penny Spaghetti",
+      category: "Grocery",
+      description: "Reliable spaghetti packs for quick dinners and pantry restocks.",
+      image_url:
+        "https://images.unsplash.com/photo-1621996346565-e3dbc646d9a9?auto=format&fit=crop&w=1200&q=80",
+      tags: ["groceries", "essentials", "pasta", "pantry"],
+      variants: [
+        { variant_name: "500g Pack", price: 950, stock_quantity: 32, in_stock: true },
+        { variant_name: "Pack of 10", price: 8900, stock_quantity: 10, in_stock: true },
+      ],
+    },
+    {
+      product_name: "Indomie Chicken Noodles",
+      category: "Grocery",
+      description: "Popular instant noodles for easy breakfasts, late dinners, and bulk buys.",
+      image_url:
+        "https://images.unsplash.com/photo-1612929633738-8fe44f7ec841?auto=format&fit=crop&w=1200&q=80",
+      tags: ["groceries", "essentials", "noodles", "quick meals"],
+      variants: [
+        { variant_name: "Super Pack", price: 550, stock_quantity: 40, in_stock: true },
+        { variant_name: "Hungry Man", price: 750, stock_quantity: 24, in_stock: true },
+        { variant_name: "Carton of 40", price: 20500, stock_quantity: 6, in_stock: true },
+      ],
+    },
+    {
+      product_name: "Mama's Pride Rice",
+      category: "Grocery",
+      description: "Clean long-grain rice suitable for family cooking and weekly restocks.",
+      image_url:
+        "https://images.unsplash.com/photo-1516684732162-798a0062be99?auto=format&fit=crop&w=1200&q=80",
+      tags: ["groceries", "rice", "essentials", "pantry"],
+      variants: [
+        { variant_name: "1kg Bag", price: 2300, stock_quantity: 18, in_stock: true },
+        { variant_name: "5kg Bag", price: 11000, stock_quantity: 10, in_stock: true },
+      ],
+    },
+    {
+      product_name: "Honeywell Wheat Meal",
+      category: "Grocery",
+      description: "Smooth wheat meal staple for swallows and family lunch prep.",
+      image_url:
+        "https://images.unsplash.com/photo-1574323347407-f5e1ad6d020b?auto=format&fit=crop&w=1200&q=80",
+      tags: ["groceries", "essentials", "pantry", "family"],
+      variants: [
+        { variant_name: "1kg Bag", price: 1800, stock_quantity: 18, in_stock: true },
+        { variant_name: "2kg Bag", price: 3400, stock_quantity: 12, in_stock: true },
+      ],
+    },
+    {
+      product_name: "Peak Full Cream Milk",
+      category: "Dairy",
+      description: "Rich powdered milk for cereals, tea, and family breakfast routines.",
+      image_url:
+        "https://images.unsplash.com/photo-1550583724-b2692b85b150?auto=format&fit=crop&w=1200&q=80",
+      tags: ["dairy", "breakfast", "essentials", "milk"],
+      variants: [
+        { variant_name: "400g Tin", price: 4200, stock_quantity: 14, in_stock: true },
+        { variant_name: "900g Tin", price: 8900, stock_quantity: 8, in_stock: true },
+      ],
+    },
+    {
+      product_name: "Farm Fresh Eggs",
+      category: "Dairy",
+      description: "Fresh eggs delivered daily for breakfast, baking, and home cooking.",
+      image_url:
+        "https://images.unsplash.com/photo-1518569656558-1f25e69d93d7?auto=format&fit=crop&w=1200&q=80",
+      tags: ["dairy", "breakfast", "essentials", "fresh"],
+      variants: [
+        { variant_name: "Half Crate", price: 3800, stock_quantity: 18, in_stock: true },
+        { variant_name: "Full Crate", price: 7200, stock_quantity: 10, in_stock: true },
+      ],
+    },
+    {
+      product_name: "Freshly Baked Sourdough",
+      category: "Bakery",
+      description: "Artisan-style loaf with crisp crust and soft interior for premium breakfasts.",
+      image_url:
+        "https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=1200&q=80",
+      tags: ["bakery", "bread", "fresh", "breakfast"],
+      variants: [
+        { variant_name: "Large Loaf", price: 3200, stock_quantity: 14, in_stock: true },
+      ],
+    },
+    {
+      product_name: "Butter Croissant",
+      category: "Bakery",
+      description: "Flaky butter croissant baked fresh for premium breakfast and coffee runs.",
+      image_url:
+        "https://images.unsplash.com/photo-1555507036-ab794f4afe5d?auto=format&fit=crop&w=1200&q=80",
+      tags: ["bakery", "breakfast", "snack", "fresh"],
+      variants: [
+        { variant_name: "Single", price: 1800, stock_quantity: 20, in_stock: true },
+        { variant_name: "Box of 4", price: 6600, stock_quantity: 8, in_stock: true },
+      ],
+    },
+    {
+      product_name: "Banana Bunch",
+      category: "Produce",
+      description: "Fresh sweet bananas for breakfast, smoothies, and healthy snack trays.",
+      image_url:
+        "https://images.unsplash.com/photo-1574226516831-e1dff420e37f?auto=format&fit=crop&w=1200&q=80",
+      tags: ["produce", "fruit", "fresh", "essentials"],
+      variants: [
+        { variant_name: "Small Bunch", price: 1800, stock_quantity: 20, in_stock: true },
+        { variant_name: "Large Bunch", price: 2600, stock_quantity: 12, in_stock: true },
+      ],
+    },
+    {
+      product_name: "Avocado Pear",
+      category: "Produce",
+      description: "Creamy ripe avocados for salads, toast, and smoothie bowls.",
+      image_url:
+        "https://images.unsplash.com/photo-1519162808019-7de1683fa2ad?auto=format&fit=crop&w=1200&q=80",
+      tags: ["produce", "fruit", "fresh", "healthy"],
+      variants: [
+        { variant_name: "Single", price: 1200, stock_quantity: 24, in_stock: true },
+        { variant_name: "Pack of 4", price: 4300, stock_quantity: 10, in_stock: true },
+      ],
+    },
+    {
+      product_name: "Tomato Mix Pack",
+      category: "Produce",
+      description: "Bright tomatoes blended for sauces, stews, and quick home cooking.",
+      image_url:
+        "https://images.unsplash.com/photo-1546094096-0df4bcaaa337?auto=format&fit=crop&w=1200&q=80",
+      tags: ["produce", "vegetable", "fresh", "essentials"],
+      variants: [
+        { variant_name: "500g Pack", price: 1600, stock_quantity: 20, in_stock: true },
+        { variant_name: "1kg Pack", price: 2900, stock_quantity: 10, in_stock: true },
+      ],
+    },
+    {
+      product_name: "Kellogg's Corn Flakes",
+      category: "Grocery",
+      description: "Classic breakfast cereal for quick weekday mornings and family tables.",
+      image_url:
+        "https://images.unsplash.com/photo-1517093157656-b9eccef91cb1?auto=format&fit=crop&w=1200&q=80",
+      tags: ["groceries", "breakfast", "essentials", "cereal"],
+      variants: [
+        { variant_name: "300g Box", price: 2900, stock_quantity: 16, in_stock: true },
+        { variant_name: "750g Box", price: 6100, stock_quantity: 8, in_stock: true },
+      ],
+    },
+    {
+      product_name: "Heinz Baked Beans",
+      category: "Grocery",
+      description: "Quick protein-rich pantry staple for breakfast and easy meals.",
+      image_url:
+        "https://images.unsplash.com/photo-1515003197210-e0cd71810b5f?auto=format&fit=crop&w=1200&q=80",
+      tags: ["groceries", "essentials", "pantry", "breakfast"],
+      variants: [
+        { variant_name: "415g Tin", price: 1850, stock_quantity: 20, in_stock: true },
+        { variant_name: "Pack of 4", price: 7000, stock_quantity: 8, in_stock: true },
+      ],
+    },
+    {
+      product_name: "Dettol Antiseptic Liquid",
+      category: "Essentials",
+      description: "Trusted household antiseptic for cleaning, hygiene, and first-aid support.",
+      image_url:
+        "https://images.unsplash.com/photo-1585435557343-3b092031a831?auto=format&fit=crop&w=1200&q=80",
+      tags: ["essentials", "cleaning", "toiletries", "family"],
+      variants: [
+        { variant_name: "250ml Bottle", price: 2200, stock_quantity: 18, in_stock: true },
+        { variant_name: "750ml Bottle", price: 4900, stock_quantity: 10, in_stock: true },
+      ],
+    },
+    {
+      product_name: "Colgate Triple Action",
+      category: "Essentials",
+      description: "Everyday toothpaste for family oral care and travel bags.",
+      image_url:
+        "https://images.unsplash.com/photo-1559591937-abc3c517e5bd?auto=format&fit=crop&w=1200&q=80",
+      tags: ["essentials", "toiletries", "beauty", "family"],
+      variants: [
+        { variant_name: "140g Tube", price: 1650, stock_quantity: 22, in_stock: true },
+        { variant_name: "Pack of 3", price: 4700, stock_quantity: 10, in_stock: true },
+      ],
+    },
+    {
+      product_name: "Milo Refill Pack",
+      category: "Grocery",
+      description: "Chocolate malt drink refill for breakfast mugs and school lunches.",
+      image_url:
+        "https://images.unsplash.com/photo-1515823064-d6e0c04616a7?auto=format&fit=crop&w=1200&q=80",
+      tags: ["groceries", "breakfast", "drink", "family"],
+      variants: [
+        { variant_name: "400g Refill", price: 3400, stock_quantity: 16, in_stock: true },
+        { variant_name: "800g Refill", price: 6200, stock_quantity: 8, in_stock: true },
+      ],
+    },
+  ],
+};
+
 const STORE_BLUEPRINTS = [
+  PREMIUM_DEMO_STORE,
   {
     store: {
       store_name: "Osborne Fresh Market",
@@ -256,12 +948,14 @@ const STORE_BLUEPRINTS = [
       verified: false,
       subscription_tier: 1,
       image_url:
-        "https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1529139574466-a303027c1d8b?auto=format&fit=crop&w=1400&q=80",
       header_images: [
-        "https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1529139574466-a303027c1d8b?auto=format&fit=crop&w=1600&q=80",
+        "https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=1600&q=80",
+        "https://images.unsplash.com/photo-1496747611176-843222e1e57c?auto=format&fit=crop&w=1600&q=80",
       ],
       description:
-        "Contemporary fashion boutique for ready-to-wear looks, occasion styling, and wardrobe updates.",
+        "Contemporary fashion boutique for polished ready-to-wear, premium accessories, elevated weekend looks, and occasion styling in Ikoyi.",
       owner: {
         name: "Teni Lawson",
         email: "owner+foreshore-style-studio@neara.test",
@@ -282,6 +976,129 @@ const STORE_BLUEPRINTS = [
         ],
       },
       {
+        product_name: "Satin Evening Slip Dress",
+        category: "Womenswear",
+        description: "Fluid satin midi dress designed for dinners, events, and elegant evening styling.",
+        image_url:
+          "https://images.unsplash.com/photo-1496747611176-843222e1e57c?auto=format&fit=crop&w=1200&q=80",
+        tags: ["fashion", "dress", "womenswear", "evening"],
+        variants: [
+          { variant_name: "Size 8", price: 36500, stock_quantity: 4, in_stock: true },
+          { variant_name: "Size 10", price: 36500, stock_quantity: 6, in_stock: true },
+          { variant_name: "Size 12", price: 36500, stock_quantity: 5, in_stock: true },
+        ],
+      },
+      {
+        product_name: "Tailored Wide-Leg Trousers",
+        category: "Womenswear",
+        description: "Clean high-waist trousers with a flattering wide-leg cut for office and smart casual looks.",
+        image_url:
+          "https://images.unsplash.com/photo-1506629905607-d9b1c5c5f0b1?auto=format&fit=crop&w=1200&q=80",
+        tags: ["fashion", "trousers", "tailored", "womenswear"],
+        variants: [
+          { variant_name: "Size 10", price: 24500, stock_quantity: 7, in_stock: true },
+          { variant_name: "Size 12", price: 24500, stock_quantity: 8, in_stock: true },
+          { variant_name: "Size 14", price: 24500, stock_quantity: 6, in_stock: true },
+        ],
+      },
+      {
+        product_name: "Structured Blazer",
+        category: "Womenswear",
+        description: "Sharp single-breasted blazer for workwear, events, and elevated layering.",
+        image_url:
+          "https://images.unsplash.com/photo-1594633312681-425c7b97ccd1?auto=format&fit=crop&w=1200&q=80",
+        tags: ["fashion", "blazer", "tailored", "womenswear"],
+        variants: [
+          { variant_name: "Size 10", price: 32500, stock_quantity: 5, in_stock: true },
+          { variant_name: "Size 12", price: 32500, stock_quantity: 6, in_stock: true },
+        ],
+      },
+      {
+        product_name: "Pleated Midi Skirt",
+        category: "Womenswear",
+        description: "Flowing midi skirt with crisp pleats for polished day-to-night dressing.",
+        image_url:
+          "https://images.unsplash.com/photo-1583496661160-fb5886a13d36?auto=format&fit=crop&w=1200&q=80",
+        tags: ["fashion", "skirt", "womenswear", "classic"],
+        variants: [
+          { variant_name: "Size 10", price: 21000, stock_quantity: 8, in_stock: true },
+          { variant_name: "Size 12", price: 21000, stock_quantity: 7, in_stock: true },
+        ],
+      },
+      {
+        product_name: "Cotton Poplin Shirt",
+        category: "Womenswear",
+        description: "Crisp oversized shirt that styles easily with denim, trousers, or skirts.",
+        image_url:
+          "https://images.unsplash.com/photo-1551232864-3f0890e580d9?auto=format&fit=crop&w=1200&q=80",
+        tags: ["fashion", "shirt", "essentials", "womenswear"],
+        variants: [
+          { variant_name: "Small", price: 18500, stock_quantity: 9, in_stock: true },
+          { variant_name: "Medium", price: 18500, stock_quantity: 10, in_stock: true },
+          { variant_name: "Large", price: 18500, stock_quantity: 7, in_stock: true },
+        ],
+      },
+      {
+        product_name: "Soft Knit Lounge Set",
+        category: "Womenswear",
+        description: "Premium knit set for travel days, casual outings, and relaxed home styling.",
+        image_url:
+          "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=1200&q=80",
+        tags: ["fashion", "knitwear", "set", "loungewear"],
+        variants: [
+          { variant_name: "Small", price: 29500, stock_quantity: 5, in_stock: true },
+          { variant_name: "Medium", price: 29500, stock_quantity: 7, in_stock: true },
+        ],
+      },
+      {
+        product_name: "Leather Handbag",
+        category: "Accessories",
+        description: "Structured everyday handbag with clean hardware and roomy interior.",
+        image_url:
+          "https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&w=1200&q=80",
+        tags: ["fashion", "bag", "accessories", "leather"],
+        variants: [
+          { variant_name: "Tan", price: 42000, stock_quantity: 4, in_stock: true },
+          { variant_name: "Black", price: 42000, stock_quantity: 6, in_stock: true },
+        ],
+      },
+      {
+        product_name: "Mini Crossbody Bag",
+        category: "Accessories",
+        description: "Compact premium crossbody bag for errands, brunch, and light evening carry.",
+        image_url:
+          "https://images.unsplash.com/photo-1594223274512-ad4803739b7c?auto=format&fit=crop&w=1200&q=80",
+        tags: ["fashion", "bag", "accessories", "crossbody"],
+        variants: [
+          { variant_name: "Cream", price: 28500, stock_quantity: 5, in_stock: true },
+          { variant_name: "Black", price: 28500, stock_quantity: 5, in_stock: true },
+        ],
+      },
+      {
+        product_name: "Statement Sunglasses",
+        category: "Accessories",
+        description: "Bold square-frame sunglasses for bright afternoons and polished styling.",
+        image_url:
+          "https://images.unsplash.com/photo-1511499767150-a48a237f0083?auto=format&fit=crop&w=1200&q=80",
+        tags: ["fashion", "accessories", "sunglasses", "luxury"],
+        variants: [
+          { variant_name: "Black Frame", price: 16500, stock_quantity: 8, in_stock: true },
+          { variant_name: "Brown Frame", price: 16500, stock_quantity: 6, in_stock: true },
+        ],
+      },
+      {
+        product_name: "Gold Hoop Earrings",
+        category: "Jewelry",
+        description: "Classic polished hoops that finish both casual and dressy looks beautifully.",
+        image_url:
+          "https://images.unsplash.com/photo-1617038220319-276d3cfab638?auto=format&fit=crop&w=1200&q=80",
+        tags: ["fashion", "jewelry", "accessories", "gold"],
+        variants: [
+          { variant_name: "Medium Pair", price: 9800, stock_quantity: 12, in_stock: true },
+          { variant_name: "Large Pair", price: 12500, stock_quantity: 8, in_stock: true },
+        ],
+      },
+      {
         product_name: "Leather Slide Sandals",
         category: "Footwear",
         description: "Minimal leather slides with cushioned sole for everyday use.",
@@ -291,6 +1108,44 @@ const STORE_BLUEPRINTS = [
         variants: [
           { variant_name: "EU 39", price: 24500, stock_quantity: 5, in_stock: true },
           { variant_name: "EU 40", price: 24500, stock_quantity: 4, in_stock: true },
+        ],
+      },
+      {
+        product_name: "Block Heel Sandals",
+        category: "Footwear",
+        description: "Elegant block heels designed for events, dinners, and comfortable extended wear.",
+        image_url:
+          "https://images.unsplash.com/photo-1543163521-1bf539c55dd2?auto=format&fit=crop&w=1200&q=80",
+        tags: ["fashion", "footwear", "heels", "sandals"],
+        variants: [
+          { variant_name: "EU 38", price: 31500, stock_quantity: 4, in_stock: true },
+          { variant_name: "EU 39", price: 31500, stock_quantity: 5, in_stock: true },
+          { variant_name: "EU 40", price: 31500, stock_quantity: 4, in_stock: true },
+        ],
+      },
+      {
+        product_name: "White Leather Sneakers",
+        category: "Footwear",
+        description: "Clean low-profile sneakers for easy premium casual styling.",
+        image_url:
+          "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=1200&q=80",
+        tags: ["fashion", "footwear", "sneakers", "essentials"],
+        variants: [
+          { variant_name: "EU 38", price: 35500, stock_quantity: 5, in_stock: true },
+          { variant_name: "EU 39", price: 35500, stock_quantity: 6, in_stock: true },
+          { variant_name: "EU 40", price: 35500, stock_quantity: 5, in_stock: true },
+        ],
+      },
+      {
+        product_name: "Silk Headscarf",
+        category: "Accessories",
+        description: "Printed silk scarf for hair styling, neck wraps, and luxe finishing detail.",
+        image_url:
+          "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=1200&q=80",
+        tags: ["fashion", "accessories", "scarf", "luxury"],
+        variants: [
+          { variant_name: "Monogram Print", price: 11800, stock_quantity: 10, in_stock: true },
+          { variant_name: "Abstract Print", price: 11800, stock_quantity: 9, in_stock: true },
         ],
       },
     ],
@@ -785,6 +1640,7 @@ const STORE_BLUEPRINTS = [
       },
     ],
   },
+  ...CURRENT_AREA_DEMO_STORES,
 ];
 
 async function purgeManagedSeedStores(client) {

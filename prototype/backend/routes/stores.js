@@ -13,6 +13,11 @@ const {
   sendSuccess,
 } = require("../utils/apiResponse");
 const { auth: AUTH_MESSAGES } = require("../config/messages.json");
+const {
+  invalidatePublicReadCaches,
+  invalidatePublicStoreCaches,
+  publicStoreCache,
+} = require("../utils/publicRouteCaches");
 
 const router = express.Router();
 const STORE_HEADER_IMAGE_SLOT_COUNT = 3;
@@ -24,6 +29,19 @@ function normalizeNullableText(value) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
+function isInlineDataUrl(value) {
+  return typeof value === "string" && value.trim().toLowerCase().startsWith("data:");
+}
+
+function sanitizePublicImageUrl(value) {
+  const normalized = normalizeNullableText(value);
+  if (!normalized || isInlineDataUrl(normalized)) {
+    return null;
+  }
+
+  return normalized;
+}
+
 function hasValidPhoneNumber(value) {
   return String(value || "").replace(/\D/g, "").length >= 7;
 }
@@ -31,14 +49,14 @@ function hasValidPhoneNumber(value) {
 function normalizeHeaderImages(value, fallbackImageUrl = null) {
   const normalized = (Array.isArray(value) ? value : [])
     .slice(0, STORE_HEADER_IMAGE_SLOT_COUNT)
-    .map((item) => normalizeNullableText(item));
+    .map((item) => sanitizePublicImageUrl(item));
   const compact = normalized.filter(Boolean);
 
   if (compact.length > 0) {
     return compact;
   }
 
-  const fallback = normalizeNullableText(fallbackImageUrl);
+  const fallback = sanitizePublicImageUrl(fallbackImageUrl);
 
   if (!fallback) {
     return [];
@@ -49,10 +67,10 @@ function normalizeHeaderImages(value, fallbackImageUrl = null) {
 
 function pickPrimaryStoreImage(headerImages, fallbackImageUrl = null) {
   const fromHeaders = Array.isArray(headerImages)
-    ? headerImages.find((item) => normalizeNullableText(item))
+    ? headerImages.find((item) => sanitizePublicImageUrl(item))
     : null;
 
-  return normalizeNullableText(fromHeaders) || normalizeNullableText(fallbackImageUrl);
+  return sanitizePublicImageUrl(fromHeaders) || sanitizePublicImageUrl(fallbackImageUrl);
 }
 
 function serializeHeaderImages(headerImages) {
@@ -81,6 +99,71 @@ function normalizeCoordinateQueryParam(value) {
 
   const numeric = Number.parseFloat(String(value));
   return Number.isFinite(numeric) ? numeric : null;
+}
+
+function buildPublicStoreCacheKey(prefix, req) {
+  return `${prefix}:${req.originalUrl}`;
+}
+
+async function queryAllPublicStores({
+  latitude,
+  longitude,
+  hasLocation,
+}) {
+  return pool.query(
+    `
+      SELECT
+        s.id,
+        s.store_name,
+        s.category,
+        s.address,
+        s.state,
+        s.country,
+        s.latitude,
+        s.longitude,
+        s.phone_number,
+        CASE
+          WHEN s.image_url ILIKE 'data:%' THEN NULL
+          ELSE s.image_url
+        END AS image_url,
+        COALESCE(
+          (
+            SELECT jsonb_agg(image_item)
+            FROM jsonb_array_elements_text(COALESCE(s.header_images, '[]'::jsonb)) AS image_item
+            WHERE image_item NOT ILIKE 'data:%'
+          ),
+          '[]'::jsonb
+        ) AS header_images,
+        s.description,
+        CASE
+          WHEN $3::boolean THEN (
+            6371 * acos(
+              least(
+                1,
+                greatest(
+                  -1,
+                  cos(radians($1)) * cos(radians(s.latitude)) *
+                  cos(radians(s.longitude) - radians($2)) +
+                  sin(radians($1)) * sin(radians(s.latitude))
+                )
+              )
+            )
+          )
+          ELSE NULL
+        END AS distance_km
+      FROM stores s
+      WHERE
+        s.is_suspended = FALSE
+        AND s.latitude IS NOT NULL
+        AND s.longitude IS NOT NULL
+      ORDER BY distance_km ASC NULLS LAST, store_name ASC
+    `,
+    [
+      latitude,
+      longitude,
+      Boolean(hasLocation),
+    ],
+  );
 }
 
 async function syncOwnerUserRoles(client, userId) {
@@ -225,6 +308,7 @@ router.post("/", storeWriteLimiter, authMiddleware, async (req, res) => {
     await syncOwnerUserRoles(client, ownerId);
     await client.query("COMMIT");
     transactionOpen = false;
+    invalidatePublicReadCaches();
 
     res.status(201).json({
       message: "Store created successfully",
@@ -287,73 +371,29 @@ router.get("/owner/me", authMiddleware, async (req, res) => {
 router.get("/", async (req, res) => {
   try {
     console.debug("stores/ list");
+    const cacheKey = buildPublicStoreCacheKey("stores", req);
+    const cachedPayload = publicStoreCache.get(cacheKey);
+
+    if (cachedPayload) {
+      return res.json(cachedPayload);
+    }
+
     const latitude = normalizeCoordinateQueryParam(req.query.lat);
     const longitude = normalizeCoordinateQueryParam(req.query.lng);
     const hasLocation = latitude !== null && longitude !== null;
-    const limit = hasLocation ? 24 : 100;
-    const storesResult = hasLocation
-      ? await pool.query(
-          `
-          SELECT
-            id,
-            store_name,
-            category,
-            address,
-            state,
-            country,
-            latitude,
-            longitude,
-            phone_number,
-            image_url,
-            header_images,
-            description,
-            (
-              6371 * acos(
-                least(
-                  1,
-                  greatest(
-                    -1,
-                    cos(radians($1)) * cos(radians(latitude)) *
-                    cos(radians(longitude) - radians($2)) +
-                    sin(radians($1)) * sin(radians(latitude))
-                  )
-                )
-              )
-            ) AS distance_km
-          FROM stores
-          WHERE latitude IS NOT NULL AND longitude IS NOT NULL
-          ORDER BY distance_km ASC NULLS LAST, store_name ASC
-          LIMIT $3
-          `,
-          [latitude, longitude, limit],
-        )
-      : await pool.query(
-          `
-          SELECT
-            id,
-            store_name,
-            category,
-            address,
-            state,
-            country,
-            latitude,
-            longitude,
-            phone_number,
-            image_url,
-            header_images,
-            description
-          FROM stores
-          WHERE latitude IS NOT NULL AND longitude IS NOT NULL
-          ORDER BY store_name
-          LIMIT $1
-          `,
-          [limit],
-        );
+    const storesResult = await queryAllPublicStores({
+      latitude,
+      longitude,
+      hasLocation,
+    });
 
-    res.json({
+    const payload = {
       message: "Stores fetched successfully",
       stores: storesResult.rows.map(normalizeStoreRecord),
-    });
+    };
+
+    publicStoreCache.set(cacheKey, payload);
+    res.json(payload);
   } catch (error) {
     console.error(error);
     res.status(500).json({
@@ -373,94 +413,121 @@ router.get("/:id/full", async (req, res, next) => {
   }
 
   try {
+    const cacheKey = `store-full:${storeId}:${req.originalUrl}`;
+    const cachedPayload = publicStoreCache.get(cacheKey);
+
+    if (cachedPayload) {
+      return res.json(cachedPayload);
+    }
+
     console.debug("stores/:id/full params", { storeId });
-    const { rows } = await pool.query(
+    const storeResult = await pool.query(
       `
-      WITH product_data AS (
-        SELECT
-          p.store_id,
-          p.id AS product_id,
-          p.product_name,
-          p.category,
-          p.description,
-          p.image_url,
-          p.tags,
-          COALESCE(
-            json_agg(
-              jsonb_build_object(
-                'variant_id', pv.id,
-                'variant_name', pv.variant_name,
-                'price', COALESCE(pv.price, 0),
-                'unit_count', COALESCE(pv.unit_count, 1),
-                'stock_quantity', COALESCE(pv.stock_quantity, 0),
-                'in_stock', COALESCE(pv.in_stock, false)
-              )
-              ORDER BY pv.id
-            ) FILTER (WHERE pv.id IS NOT NULL),
-            '[]'::json
-          ) AS variants
-        FROM products p
-        LEFT JOIN product_variants pv ON pv.product_id = p.id
-        WHERE p.store_id = $1
-        GROUP BY p.id
-      )
       SELECT
-        jsonb_build_object(
-          'id', s.id,
-          'store_name', s.store_name,
-          'category', s.category,
-          'address', s.address,
-          'delivery_available', s.delivery_available,
-          'latitude', s.latitude,
-          'longitude', s.longitude,
-          'phone_number', s.phone_number,
-          'image_url', s.image_url,
-          'header_images', COALESCE(s.header_images, '[]'::jsonb),
-          'description', s.description
-        ) AS store,
+        id,
+        store_name,
+        category,
+        address,
+        state,
+        country,
+        delivery_available,
+        latitude,
+        longitude,
+        phone_number,
+        CASE
+          WHEN image_url ILIKE 'data:%' THEN NULL
+          ELSE image_url
+        END AS image_url,
         COALESCE(
-          json_agg(
-            jsonb_build_object(
-              'product_id', pd.product_id,
-              'product_name', pd.product_name,
-              'category', pd.category,
-              'description', pd.description,
-              'image_url', pd.image_url,
-              'tags', pd.tags,
-              'variants', pd.variants
-            )
-            ORDER BY pd.product_id DESC
-          ) FILTER (WHERE pd.product_id IS NOT NULL),
-          '[]'::json
-        ) AS products
-      FROM stores s
-      LEFT JOIN product_data pd ON pd.store_id = s.id
-      WHERE s.id = $1
-      GROUP BY s.id;
+          (
+            SELECT jsonb_agg(image_item)
+            FROM jsonb_array_elements_text(COALESCE(header_images, '[]'::jsonb)) AS image_item
+            WHERE image_item NOT ILIKE 'data:%'
+          ),
+          '[]'::jsonb
+        ) AS header_images,
+        description
+      FROM stores
+      WHERE id = $1
+        AND is_suspended = FALSE
       `,
-      [storeId]
+      [storeId],
     );
 
-    if (rows.length === 0) {
+    if (storeResult.rows.length === 0) {
       console.debug("stores/:id/full not found", { storeId });
       return res.status(404).json({ message: "Store not found" });
     }
 
-    // Normalize NUMERIC fields (returned as strings) to numbers for the frontend
-    const normalizeNumbers = (val) =>
-      typeof val === "string" && val.trim() !== "" ? Number(val) : val;
+    const productsResult = await pool.query(
+      `
+      SELECT
+        p.id AS product_id,
+        p.product_name,
+        p.category,
+        p.description,
+        CASE
+          WHEN p.image_url ILIKE 'data:%' THEN NULL
+          ELSE p.image_url
+        END AS image_url,
+        p.tags,
+        pv.id AS variant_id,
+        pv.variant_name,
+        pv.price,
+        pv.unit_count,
+        pv.stock_quantity,
+        pv.in_stock
+      FROM products p
+      LEFT JOIN product_variants pv ON pv.product_id = p.id
+      WHERE p.store_id = $1
+      ORDER BY p.id DESC, pv.id ASC
+      `,
+      [storeId],
+    );
 
-    const products = rows[0].products.map((product) => ({
-      ...product,
-      variants: product.variants.map((variant) => ({
-        ...variant,
-        price: normalizeNumbers(variant.price),
-        unit_count: normalizeNumbers(variant.unit_count),
-        stock_quantity: normalizeNumbers(variant.stock_quantity),
-      })),
-    }));
+    const variantsByProductId = new Map();
+    const productsById = new Map();
 
-    const store = normalizeStoreRecord(rows[0].store);
+    for (const row of productsResult.rows) {
+      if (!productsById.has(row.product_id)) {
+        productsById.set(row.product_id, {
+          product_id: row.product_id,
+          product_name: row.product_name,
+          category: row.category,
+          description: row.description,
+          image_url: sanitizePublicImageUrl(row.image_url),
+          tags: Array.isArray(row.tags) ? row.tags : [],
+          variants: [],
+        });
+      }
+
+      if (row.variant_id === null || row.variant_id === undefined) {
+        continue;
+      }
+
+      const product = productsById.get(row.product_id);
+      product.variants.push({
+        variant_id: row.variant_id,
+        variant_name: row.variant_name,
+        price:
+          typeof row.price === "string" && row.price.trim() !== ""
+            ? Number(row.price)
+            : row.price,
+        unit_count:
+          typeof row.unit_count === "string" && row.unit_count.trim() !== ""
+            ? Number(row.unit_count)
+            : row.unit_count,
+        stock_quantity:
+          typeof row.stock_quantity === "string" && row.stock_quantity.trim() !== ""
+            ? Number(row.stock_quantity)
+            : row.stock_quantity,
+        in_stock: Boolean(row.in_stock),
+      });
+      variantsByProductId.set(row.product_id, product.variants);
+    }
+
+    const store = normalizeStoreRecord(storeResult.rows[0]);
+    const products = Array.from(productsById.values());
 
     console.log("stores/:id/full loaded", {
       storeId,
@@ -468,11 +535,14 @@ router.get("/:id/full", async (req, res, next) => {
       duration_ms: Date.now() - startedAt,
     });
 
-    res.json({
+    const payload = {
       message: "Store full data fetched successfully",
       store,
       products,
-    });
+    };
+
+    publicStoreCache.set(cacheKey, payload);
+    res.json(payload);
   } catch (error) {
     console.error("stores/:id/full error", {
       storeId,
@@ -489,10 +559,27 @@ router.get("/:id", async (req, res) => {
   const startedAt = Date.now();
   try {
     const { id } = req.params;
+    const storeId = Number.parseInt(id, 10);
     logRouteHit(req, routeLabel, {
       id,
       storeId: id,
     });
+
+    if (!Number.isInteger(storeId) || storeId <= 0) {
+      return sendError(res, 400, "Invalid store id", {
+        message: "Invalid store id",
+      });
+    }
+
+    const cacheKey = `store:${storeId}:${req.originalUrl}`;
+    const cachedPayload = publicStoreCache.get(cacheKey);
+
+    if (cachedPayload) {
+      return sendSuccess(res, 200, cachedPayload.data, {
+        message: cachedPayload.message,
+        store: cachedPayload.store,
+      });
+    }
 
     const queryStartedAt = Date.now();
     console.log("[store] db query start", {
@@ -505,12 +592,28 @@ router.get("/:id", async (req, res) => {
         store_name,
         category,
         address,
+        state,
+        country,
+        delivery_available,
         latitude,
         longitude,
-        image_url,
-        header_images
+        phone_number,
+        CASE
+          WHEN image_url ILIKE 'data:%' THEN NULL
+          ELSE image_url
+        END AS image_url,
+        COALESCE(
+          (
+            SELECT jsonb_agg(image_item)
+            FROM jsonb_array_elements_text(COALESCE(header_images, '[]'::jsonb)) AS image_item
+            WHERE image_item NOT ILIKE 'data:%'
+          ),
+          '[]'::jsonb
+        ) AS header_images,
+        description
       FROM stores
       WHERE id = $1
+        AND is_suspended = FALSE
       `,
       [id],
     );
@@ -535,11 +638,21 @@ router.get("/:id", async (req, res) => {
       duration_ms: Date.now() - startedAt,
     });
 
-    return sendSuccess(res, 200, {
-      store: normalizeStoreRecord(storeResult.rows[0]),
-    }, {
+    const normalizedStore = normalizeStoreRecord(storeResult.rows[0]);
+    const payload = {
+      data: {
+        store: normalizedStore,
+      },
       message: "Store fetched successfully",
-      store: normalizeStoreRecord(storeResult.rows[0]),
+      store: normalizedStore,
+    };
+
+    publicStoreCache.set(cacheKey, payload);
+    return sendSuccess(res, 200, {
+      store: payload.store,
+    }, {
+      message: payload.message,
+      store: payload.store,
     });
   } catch (error) {
     logRouteFailure(req, routeLabel, 500, error, {
@@ -643,6 +756,8 @@ router.put("/:id", storeWriteLimiter, authMiddleware, async (req, res) => {
         id,
       ]
     );
+
+    invalidatePublicReadCaches();
 
     res.json({
       message: "Store updated successfully",

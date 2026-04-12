@@ -95,7 +95,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     right: 16,
     top: 16,
-    backgroundColor: "rgba(2, 6, 23, 0.86)",
+    backgroundColor: "rgba(10,15,31,0.86)",
     borderColor: "rgba(255,255,255,0.08)",
     borderRadius: 18,
     borderWidth: 1,

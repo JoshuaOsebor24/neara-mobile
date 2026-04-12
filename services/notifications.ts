@@ -33,7 +33,7 @@ Notifications.setNotificationHandler({
 });
 
 function getExpoProjectId() {
-  const constants = Constants as Constants & {
+  const constants = Constants as typeof Constants & {
     easConfig?: {
       projectId?: string | null;
     } | null;

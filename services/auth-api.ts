@@ -91,6 +91,10 @@ type OwnerAuthResponse = AuthResponse & {
   store?: BackendStore;
 };
 
+const SESSION_REFRESH_COOLDOWN_MS = 15000;
+let lastSessionRefreshAt = 0;
+let inflightSessionRefresh: Promise<void> | null = null;
+
 function normalizeBackendRoles(value: BackendUser["roles"] | string | undefined) {
   if (Array.isArray(value)) {
     return value
@@ -539,36 +543,60 @@ export async function verifyProSubscriptionWithBackend(token: string, reference:
   };
 }
 
-export async function refreshMobileSessionFromBackend() {
+export async function refreshMobileSessionFromBackend(options?: {
+  force?: boolean;
+}) {
+  const now = Date.now();
+  const force = Boolean(options?.force);
+
+  if (inflightSessionRefresh) {
+    return inflightSessionRefresh;
+  }
+
+  if (!force && now - lastSessionRefreshAt < SESSION_REFRESH_COOLDOWN_MS) {
+    return;
+  }
+
   const token = getMobileSession().authToken;
 
   if (!token) {
     return;
   }
 
-  const userResult = await fetchCurrentUserFromBackend(token);
+  inflightSessionRefresh = (async () => {
+    const userResult = await fetchCurrentUserFromBackend(token);
 
-  if (!userResult.ok) {
-    if (userResult.status === 401 || userResult.status === 403) {
-      resetMobileSession();
+    if (!userResult.ok) {
+      if (userResult.status === 401 || userResult.status === 403) {
+        resetMobileSession();
+        lastSessionRefreshAt = Date.now();
+      }
+
+      return;
     }
 
-    return;
-  }
+    const nextUserPatch = buildSessionPatchFromAuthUser(userResult.user, token);
+    let nextStorePatch: Partial<MobileUser> = {};
 
-  const nextUserPatch = buildSessionPatchFromAuthUser(userResult.user, token);
-  let nextStorePatch: Partial<MobileUser> = {};
+    if (nextUserPatch.isStoreOwner) {
+      const ownerStoreResult = await fetchOwnerPrimaryStoreFromBackend(token);
 
-  if (nextUserPatch.isStoreOwner) {
-    const ownerStoreResult = await fetchOwnerPrimaryStoreFromBackend(token);
-
-    if (ownerStoreResult.ok && ownerStoreResult.store) {
-      nextStorePatch = buildSessionPatchFromStore(ownerStoreResult.store);
+      if (ownerStoreResult.ok && ownerStoreResult.store) {
+        nextStorePatch = buildSessionPatchFromStore(ownerStoreResult.store);
+      }
     }
-  }
 
-  updateMobileSession({
-    ...nextUserPatch,
-    ...nextStorePatch,
-  });
+    updateMobileSession({
+      ...nextUserPatch,
+      ...nextStorePatch,
+    });
+
+    lastSessionRefreshAt = Date.now();
+  })();
+
+  try {
+    await inflightSessionRefresh;
+  } finally {
+    inflightSessionRefresh = null;
+  }
 }

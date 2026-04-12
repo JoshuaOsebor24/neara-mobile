@@ -3,6 +3,7 @@ import { useSyncExternalStore } from "react";
 
 import { requestMobileApi } from "@/services/api";
 import { getMobileSession } from "@/services/mobile-session";
+import { loadPublicStoreCatalog } from "@/services/store-data";
 
 export type SavedStoreRecord = {
   address?: string | null;
@@ -28,6 +29,7 @@ export type RecentStoreRecord = {
 const STORAGE_PREFIX = "neara:saved-stores:v1";
 const RECENT_STORAGE_PREFIX = "neara:recent-stores:v1";
 const MAX_RECENT_STORES = 8;
+const PUBLIC_STORE_CACHE_TTL_MS = 30_000;
 
 type CollectionState = {
   recentStores: RecentStoreRecord[];
@@ -47,6 +49,25 @@ let collectionState: CollectionState = {
   recentStores: [],
   savedStores: [],
 };
+let cachedPublicStores:
+  | {
+      expiresAt: number;
+      stores: PublicStoreRecord[];
+    }
+  | null = null;
+let inflightPublicStoresRequest: Promise<PublicStoreRecord[] | null> | null = null;
+let inflightSavedStoresLoad:
+  | {
+      key: string;
+      promise: Promise<SavedStoreRecord[]>;
+    }
+  | null = null;
+let inflightRecentStoresLoad:
+  | {
+      key: string;
+      promise: Promise<RecentStoreRecord[]>;
+    }
+  | null = null;
 const listeners = new Set<() => void>();
 
 function emit() {
@@ -158,19 +179,49 @@ function normalizePublicStore(value: unknown): PublicStoreRecord | null {
 }
 
 async function fetchCurrentPublicStores() {
-  const result = await requestMobileApi<{ stores?: unknown[] }>("/stores", {
-    method: "GET",
-  });
+  const now = Date.now();
 
-  if (!result.ok) {
-    return null;
+  if (cachedPublicStores && cachedPublicStores.expiresAt > now) {
+    return cachedPublicStores.stores;
   }
 
-  return Array.isArray(result.data.stores)
-    ? result.data.stores
-        .map((item) => normalizePublicStore(item))
-        .filter((item): item is PublicStoreRecord => item !== null)
-    : [];
+  if (inflightPublicStoresRequest) {
+    return inflightPublicStoresRequest;
+  }
+
+  inflightPublicStoresRequest = (async () => {
+    const result = await loadPublicStoreCatalog();
+
+    if (!result.ok) {
+      return null;
+    }
+
+    const stores = result.stores
+      .map((item) =>
+        normalizePublicStore({
+          address: item.address,
+          category: item.category,
+          id: item.id,
+          image_url: item.image,
+          phone_number: item.phoneNumber,
+          store_name: item.name,
+        }),
+      )
+      .filter((item): item is PublicStoreRecord => item !== null);
+
+    cachedPublicStores = {
+      expiresAt: Date.now() + PUBLIC_STORE_CACHE_TTL_MS,
+      stores,
+    };
+
+    return stores;
+  })();
+
+  try {
+    return await inflightPublicStoresRequest;
+  } finally {
+    inflightPublicStoresRequest = null;
+  }
 }
 
 function buildPublicStoreIndexes(stores: PublicStoreRecord[]) {
@@ -404,6 +455,13 @@ export async function clearRecentStores() {
 }
 
 export async function loadSavedStoresForSession() {
+  const loadKey = buildStorageKey();
+
+  if (inflightSavedStoresLoad?.key === loadKey) {
+    return inflightSavedStoresLoad.promise;
+  }
+
+  const request = (async () => {
   const session = getMobileSession();
 
   if (!session.isAuthenticated) {
@@ -435,9 +493,30 @@ export async function loadSavedStoresForSession() {
   } catch {
     return localStores;
   }
+  })();
+
+  inflightSavedStoresLoad = {
+    key: loadKey,
+    promise: request,
+  };
+
+  try {
+    return await request;
+  } finally {
+    if (inflightSavedStoresLoad?.promise === request) {
+      inflightSavedStoresLoad = null;
+    }
+  }
 }
 
 export async function loadRecentStoresForSession() {
+  const loadKey = buildRecentStorageKey();
+
+  if (inflightRecentStoresLoad?.key === loadKey) {
+    return inflightRecentStoresLoad.promise;
+  }
+
+  const request = (async () => {
   const localStores = await readStoredRecentStores();
   const currentPublicStores = await fetchCurrentPublicStores();
 
@@ -455,6 +534,20 @@ export async function loadRecentStoresForSession() {
   }
 
   return reconciledStores;
+  })();
+
+  inflightRecentStoresLoad = {
+    key: loadKey,
+    promise: request,
+  };
+
+  try {
+    return await request;
+  } finally {
+    if (inflightRecentStoresLoad?.promise === request) {
+      inflightRecentStoresLoad = null;
+    }
+  }
 }
 
 export async function getSavedStores(token: string) {
@@ -495,6 +588,8 @@ export async function saveStore(token: string, store: {
     throw new Error(result.error || "Could not save store.");
   }
 
+  cachedPublicStores = null;
+
   await upsertStoredSavedStore({
     address: store.address ?? null,
     category: store.category ?? null,
@@ -517,6 +612,8 @@ export async function unsaveStore(token: string, storeId: number) {
   if (!result.ok) {
     throw new Error(result.error || "Could not remove this store.");
   }
+
+  cachedPublicStores = null;
 
   await removeStoredSavedStore(storeId);
   return result.data;

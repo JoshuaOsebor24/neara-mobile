@@ -1,6 +1,6 @@
 import { useFocusEffect, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ScrollView,
   StyleSheet,
@@ -33,6 +33,7 @@ export default function StoreChatsScreen() {
   );
   const [errorMessage, setErrorMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const latestLoadIdRef = useRef(0);
 
   useEffect(() => {
     if (!session.isAuthenticated) {
@@ -55,10 +56,17 @@ export default function StoreChatsScreen() {
       return;
     }
 
+    const loadId = latestLoadIdRef.current + 1;
+    latestLoadIdRef.current = loadId;
+
     setIsLoading(true);
     setErrorMessage("");
 
     const result = await fetchChatConversations(session.authToken, "owner");
+
+    if (latestLoadIdRef.current !== loadId) {
+      return;
+    }
 
     if (!result.ok) {
       if (result.status === 401) {
@@ -90,6 +98,10 @@ export default function StoreChatsScreen() {
   useFocusEffect(
     useCallback(() => {
       void loadOwnerConversations();
+
+      return () => {
+        latestLoadIdRef.current += 1;
+      };
     }, [loadOwnerConversations]),
   );
 
@@ -281,7 +293,7 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
-    backgroundColor: "rgba(15,23,42,0.90)",
+    backgroundColor: "rgba(17,24,39,0.90)",
     padding: 16,
     gap: 8,
   },
@@ -297,7 +309,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   statusText: {
-    color: "#93c5fd",
+    color: "#D9E4FF",
     fontSize: 11,
     fontWeight: "700",
     textTransform: "uppercase",

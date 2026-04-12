@@ -97,7 +97,7 @@ const styles = StyleSheet.create({
   },
   imageWrap: {
     alignSelf: "flex-start",
-    backgroundColor: "#0f172a",
+    backgroundColor: "#111827",
     borderColor: "rgba(255,255,255,0.10)",
     borderRadius: 16,
     borderWidth: 1,
@@ -111,7 +111,7 @@ const styles = StyleSheet.create({
   },
   storeImageFallback: {
     alignItems: "center",
-    backgroundColor: "rgba(56,189,248,0.24)",
+    backgroundColor: "rgba(74,136,255,0.24)",
     flex: 1,
     justifyContent: "center",
   },
@@ -137,19 +137,19 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   categoryText: {
-    color: "#cbd5e1",
+    color: "#C7D2E5",
     fontSize: 14,
     marginTop: 8,
   },
   locationText: {
-    color: "#94a3b8",
+    color: "#B8C2D9",
     fontSize: 14,
     marginTop: 4,
   },
   savedButton: {
     alignSelf: "flex-start",
-    backgroundColor: "rgba(251, 113, 133, 0.10)",
-    borderColor: "rgba(251, 113, 133, 0.25)",
+    backgroundColor: "rgba(255,255,255,0.10)",
+    borderColor: "rgba(255,255,255,0.25)",
     borderRadius: 12,
     borderWidth: 1,
     marginTop: 16,

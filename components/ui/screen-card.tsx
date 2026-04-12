@@ -8,7 +8,7 @@ export function ScreenCard({ style, ...rest }: ViewProps) {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: theme.colors.surface,
+    backgroundColor: theme.colors.surfaceCard,
     borderColor: theme.colors.borderStrong,
     borderRadius: theme.radius.card,
     borderWidth: 1,

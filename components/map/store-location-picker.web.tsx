@@ -22,7 +22,7 @@ export function StoreLocationPicker({
     <View style={styles.container}>
       <View style={styles.overlay}>
         <View style={styles.titleRow}>
-          <Ionicons color="#7dd3fc" name="map-outline" size={18} />
+          <Ionicons color="#4A88FF" name="map-outline" size={18} />
           <Text style={styles.overlayTitle}>Map editing is mobile-only</Text>
         </View>
         <Text style={styles.overlayText}>
@@ -53,7 +53,7 @@ export function StoreLocationPicker({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: "rgba(8, 15, 28, 0.96)",
+    backgroundColor: "rgba(10,15,31,0.96)",
     borderColor: "rgba(255,255,255,0.10)",
     borderRadius: 24,
     borderWidth: 1,
@@ -62,7 +62,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   overlay: {
-    backgroundColor: "rgba(2, 6, 23, 0.86)",
+    backgroundColor: "rgba(10,15,31,0.86)",
     borderColor: "rgba(255,255,255,0.08)",
     borderRadius: 18,
     borderWidth: 1,
@@ -86,7 +86,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   infoCard: {
-    backgroundColor: "rgba(15, 23, 42, 0.84)",
+    backgroundColor: "rgba(17,24,39,0.84)",
     borderColor: "rgba(255,255,255,0.08)",
     borderRadius: 14,
     borderWidth: 1,
@@ -94,7 +94,7 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   infoLabel: {
-    color: "#94a3b8",
+    color: "#B8C2D9",
     fontSize: 11,
     fontWeight: "700",
     letterSpacing: 1.1,

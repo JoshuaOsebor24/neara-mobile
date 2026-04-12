@@ -3,6 +3,17 @@ import { Platform } from "react-native";
 
 const REQUEST_TIMEOUT_MS = 8000;
 const DEFAULT_API_PORTS = ["5050", "5051"] as const;
+const DISCOVERY_TIMEOUT_MS = 2500;
+const GET_DEDUPE_WINDOW_MS = 4000;
+const RETRYABLE_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504]);
+const successfulBaseUrlByPath = new Map<string, string>();
+const inflightGetRequests = new Map<
+  string,
+  {
+    expiresAt: number;
+    promise: Promise<MobileApiResult<unknown>>;
+  }
+>();
 
 type JsonValue =
   | null
@@ -31,21 +42,40 @@ function normalizeApiPath(path: string) {
   return path.startsWith("/") ? path : `/${path}`;
 }
 
-function toFriendlyNetworkError(error: unknown) {
+export function toFriendlyNetworkError(error: unknown) {
   const rawMessage = error instanceof Error ? error.message : String(error || "");
   const normalizedMessage = rawMessage.trim().toLowerCase();
 
   if (
-    normalizedMessage.includes("network request failed") ||
-    normalizedMessage.includes("fetch failed") ||
-    normalizedMessage.includes("load failed") ||
-    normalizedMessage.includes("could not reach")
+    normalizedMessage.includes("internet disconnected") ||
+    normalizedMessage.includes("offline") ||
+    normalizedMessage.includes("not connected to the internet")
   ) {
-    return "We couldn't connect right now. Check your internet and try again.";
+    return "Your device is offline. Reconnect to the internet and try again.";
   }
 
   if (normalizedMessage.includes("aborted") || normalizedMessage.includes("timeout")) {
-    return "The request took too long. Please try again.";
+    return "The server took too long to respond. Please try again.";
+  }
+
+  if (
+    normalizedMessage.includes("econnrefused") ||
+    normalizedMessage.includes("connection refused") ||
+    normalizedMessage.includes("failed to connect") ||
+    normalizedMessage.includes("could not connect") ||
+    normalizedMessage.includes("could not reach") ||
+    normalizedMessage.includes("enotfound") ||
+    normalizedMessage.includes("dns")
+  ) {
+    return "The Neara server is unavailable right now. Please try again shortly.";
+  }
+
+  if (
+    normalizedMessage.includes("network request failed") ||
+    normalizedMessage.includes("fetch failed") ||
+    normalizedMessage.includes("load failed")
+  ) {
+    return "We couldn't reach the Neara server. Check your connection and try again.";
   }
 
   return "Something went wrong while contacting Neara. Please try again.";
@@ -85,12 +115,234 @@ function normalizeBaseUrl(value?: string | null) {
   return normalized || null;
 }
 
+function buildDedupeKey(
+  method: string,
+  path: string,
+  queryString: string,
+  token?: string | null,
+) {
+  return `${method}:${path}${queryString}:${token || ""}`;
+}
+
+function readCachedBaseUrl(path: string) {
+  return successfulBaseUrlByPath.get(path) || null;
+}
+
+function rememberSuccessfulBaseUrl(path: string, baseUrl: string) {
+  successfulBaseUrlByPath.set(path, baseUrl);
+}
+
+function getOrderedCandidates(path: string, candidates: string[]) {
+  const cachedBaseUrl = readCachedBaseUrl(path);
+
+  if (!cachedBaseUrl) {
+    return candidates;
+  }
+
+  return [cachedBaseUrl, ...candidates.filter((candidate) => candidate !== cachedBaseUrl)];
+}
+
+function cleanupInflightGetRequests() {
+  const now = Date.now();
+
+  for (const [key, entry] of inflightGetRequests.entries()) {
+    if (entry.expiresAt <= now) {
+      inflightGetRequests.delete(key);
+    }
+  }
+}
+
 function buildHostCandidates(host: string | null, ports: readonly string[]) {
   if (!host) {
     return [];
   }
 
   return ports.map((port) => `http://${host}:${port}`);
+}
+
+function parseJsonResponse<T>(
+  rawText: string,
+): {
+  data: (T & { message?: string; error?: string }) | null;
+  error?: string;
+} {
+  const normalizedText = rawText.trim();
+
+  if (!normalizedText) {
+    return { data: null };
+  }
+
+  try {
+    return {
+      data: JSON.parse(normalizedText) as T & { message?: string; error?: string },
+    };
+  } catch {
+    return {
+      data: null,
+      error: "Neara returned unreadable data. Please try again.",
+    };
+  }
+}
+
+function isRetryableStatus(status: number) {
+  return RETRYABLE_STATUSES.has(status);
+}
+
+function buildHttpStatusErrorMessage(status: number, fallback?: string | null) {
+  const normalizedFallback = String(fallback || "").trim();
+
+  if (normalizedFallback) {
+    return normalizedFallback;
+  }
+
+  if (status === 400 || status === 422) {
+    return "Neara could not process that request.";
+  }
+
+  if (status === 401) {
+    return "Your session has expired. Log in again and retry.";
+  }
+
+  if (status === 403) {
+    return "Your account is not allowed to do that.";
+  }
+
+  if (status === 404) {
+    return "The requested Neara data was not found.";
+  }
+
+  if (status === 408 || status === 504) {
+    return "The Neara server took too long to respond.";
+  }
+
+  if (status === 429) {
+    return "Too many requests were sent to Neara. Please wait a moment.";
+  }
+
+  if (status >= 500) {
+    return "The Neara server is having trouble right now. Please try again shortly.";
+  }
+
+  return `Request failed with status ${status}.`;
+}
+
+type RequestOptions = {
+  body?: BodyInit | JsonValue;
+  headers?: Record<string, string>;
+  isJsonBody?: boolean;
+  method?: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
+  path: string;
+  query?: URLSearchParams;
+  token?: string | null;
+};
+
+async function executeMobileApiRequest<T>({
+  body,
+  headers = {},
+  isJsonBody = true,
+  method = "GET",
+  path,
+  query,
+  token,
+}: RequestOptions): Promise<MobileApiResult<T>> {
+  const requestPath = normalizeApiPath(path);
+  const queryString = query && query.toString() ? `?${query.toString()}` : "";
+  const candidates = getOrderedCandidates(requestPath, getMobileApiBaseCandidates());
+  let lastNetworkError = "We couldn't reach the Neara server. Please try again.";
+
+  for (const [candidateIndex, apiBase] of candidates.entries()) {
+    const maxAttempts = method === "GET" ? 2 : 1;
+
+    for (let attemptIndex = 0; attemptIndex < maxAttempts; attemptIndex += 1) {
+      const controller = new AbortController();
+      const timeoutMs =
+        candidateIndex === 0 &&
+        attemptIndex === 0 &&
+        readCachedBaseUrl(requestPath) === apiBase
+          ? REQUEST_TIMEOUT_MS
+          : DISCOVERY_TIMEOUT_MS;
+      const timeout = setTimeout(() => controller.abort(), timeoutMs);
+      const url = `${apiBase}${requestPath}${queryString}`;
+
+      try {
+        const response = await fetch(url, {
+          method,
+          headers: {
+            Accept: "application/json",
+            ...(isJsonBody ? { "Content-Type": "application/json" } : {}),
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            ...headers,
+          },
+          body:
+            body === undefined
+              ? undefined
+              : isJsonBody
+                ? JSON.stringify(body)
+                : (body as BodyInit),
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeout);
+
+        const rawText = await response.text();
+        const parsed = parseJsonResponse<T>(rawText);
+
+        if (parsed.error) {
+          lastNetworkError = parsed.error;
+
+          if (attemptIndex + 1 < maxAttempts && isRetryableStatus(response.status)) {
+            continue;
+          }
+
+          break;
+        }
+
+        if (response.ok || response.status < 500) {
+          rememberSuccessfulBaseUrl(requestPath, apiBase);
+        }
+
+        if (!response.ok) {
+          if (attemptIndex + 1 < maxAttempts && isRetryableStatus(response.status)) {
+            continue;
+          }
+
+          return {
+            data: (parsed.data ?? null) as T | null,
+            error: buildHttpStatusErrorMessage(
+              response.status,
+              parsed.data &&
+                typeof parsed.data === "object"
+                ? parsed.data.error || parsed.data.message
+                : undefined,
+            ),
+            ok: false as const,
+            status: response.status,
+            url,
+          };
+        }
+
+        return {
+          data: (parsed.data ?? {}) as T,
+          ok: true as const,
+          status: response.status,
+          url,
+        };
+      } catch (error) {
+        clearTimeout(timeout);
+        lastNetworkError = toFriendlyNetworkError(error);
+      }
+    }
+  }
+
+  return {
+    data: null,
+    error: lastNetworkError,
+    ok: false as const,
+    status: 0,
+    url: candidates[0]
+      ? `${candidates[0]}${requestPath}${queryString}`
+      : `${requestPath}${queryString}`,
+  };
 }
 
 export function getMobileApiBaseCandidates() {
@@ -133,63 +385,64 @@ export async function requestMobileApi<T>(
   const { body, headers = {}, method = "GET", query, token } = options;
   const requestPath = normalizeApiPath(path);
   const queryString = query && query.toString() ? `?${query.toString()}` : "";
-  const candidates = getMobileApiBaseCandidates();
-  let lastNetworkError = "We couldn't connect right now. Check your internet and try again.";
+  const dedupeKey = buildDedupeKey(method, requestPath, queryString, token);
 
-  for (const apiBase of candidates) {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-    const url = `${apiBase}${requestPath}${queryString}`;
+  if (method === "GET") {
+    cleanupInflightGetRequests();
+    const inflight = inflightGetRequests.get(dedupeKey);
 
-    try {
-      const response = await fetch(url, {
-        method,
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          ...headers,
-        },
-        body: body === undefined ? undefined : JSON.stringify(body),
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeout);
-
-      const rawText = await response.text();
-      const parsed = rawText ? (JSON.parse(rawText) as T & { message?: string; error?: string }) : null;
-
-      if (!response.ok) {
-        return {
-          data: (parsed ?? null) as T | null,
-          error:
-            (parsed &&
-              typeof parsed === "object" &&
-              (parsed.error || parsed.message)) ||
-            `Request failed with status ${response.status}.`,
-          ok: false,
-          status: response.status,
-          url,
-        };
-      }
-
-      return {
-        data: (parsed ?? {}) as T,
-        ok: true,
-        status: response.status,
-        url,
-      };
-    } catch (error) {
-      clearTimeout(timeout);
-      lastNetworkError = toFriendlyNetworkError(error);
+    if (inflight) {
+      return inflight.promise as Promise<MobileApiResult<T>>;
     }
   }
 
-  return {
-    data: null,
-    error: lastNetworkError,
-    ok: false,
-    status: 0,
-    url: candidates[0] ? `${candidates[0]}${requestPath}${queryString}` : `${requestPath}${queryString}`,
-  };
+  const requestPromise: Promise<MobileApiResult<T>> = (async () => {
+    return executeMobileApiRequest<T>({
+      body,
+      headers,
+      isJsonBody: true,
+      method,
+      path: requestPath,
+      query,
+      token,
+    });
+  })();
+
+  if (method === "GET") {
+    inflightGetRequests.set(dedupeKey, {
+      expiresAt: Date.now() + GET_DEDUPE_WINDOW_MS,
+      promise: requestPromise as Promise<MobileApiResult<unknown>>,
+    });
+
+    void requestPromise.finally(() => {
+      const entry = inflightGetRequests.get(dedupeKey);
+
+      if (entry?.promise === requestPromise) {
+        inflightGetRequests.delete(dedupeKey);
+      }
+    });
+  }
+
+  return requestPromise;
+}
+
+export async function requestMobileApiFormData<T>(
+  path: string,
+  options: {
+    body: FormData;
+    headers?: Record<string, string>;
+    method?: "POST" | "PUT" | "PATCH";
+    query?: URLSearchParams;
+    token?: string | null;
+  },
+) {
+  return executeMobileApiRequest<T>({
+    body: options.body,
+    headers: options.headers,
+    isJsonBody: false,
+    method: options.method,
+    path,
+    query: options.query,
+    token: options.token,
+  });
 }

@@ -35,7 +35,7 @@ export function BackPillButton({
 const styles = StyleSheet.create({
   button: {
     alignSelf: "flex-start",
-    backgroundColor: "rgba(255,255,255,0.06)",
+    backgroundColor: theme.button.secondaryBackground,
     borderColor: theme.colors.borderStrong,
     borderRadius: theme.radius.button,
     borderWidth: 1,
@@ -44,6 +44,7 @@ const styles = StyleSheet.create({
     minWidth: 92,
     paddingHorizontal: 18,
     paddingVertical: 10,
+    ...theme.shadows.soft,
   },
   text: {
     color: theme.colors.text,

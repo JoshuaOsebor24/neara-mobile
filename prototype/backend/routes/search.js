@@ -1,5 +1,6 @@
 const express = require("express");
 const pool = require("../config/db");
+const rateLimit = require("express-rate-limit");
 const {
   logRouteFailure,
   logRouteHit,
@@ -7,8 +8,19 @@ const {
   sendError,
   sendSuccess,
 } = require("../utils/apiResponse");
+const { searchCache } = require("../utils/publicRouteCaches");
+const { runtime } = require("../config/env");
 
 const router = express.Router();
+const searchLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: runtime.isProduction ? 90 : 600,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    message: "Too many search requests, please slow down.",
+  },
+});
 
 function normalizeSearchInput(value) {
   if (typeof value !== "string") {
@@ -53,10 +65,6 @@ function buildResultKey(row) {
 }
 
 function sortResults(a, b) {
-  if (a.match_priority !== b.match_priority) {
-    return b.match_priority - a.match_priority;
-  }
-
   if (a.distance_km != null && b.distance_km != null && a.distance_km !== b.distance_km) {
     return a.distance_km - b.distance_km;
   }
@@ -69,6 +77,10 @@ function sortResults(a, b) {
     return 1;
   }
 
+  if (a.match_priority !== b.match_priority) {
+    return b.match_priority - a.match_priority;
+  }
+
   const storeCompare = String(a.store_name || "").localeCompare(String(b.store_name || ""));
   if (storeCompare !== 0) {
     return storeCompare;
@@ -77,13 +89,15 @@ function sortResults(a, b) {
   return String(a.product_name || "").localeCompare(String(b.product_name || ""));
 }
 
-function normalizeSearchImageUrl(productImageUrl, storeImageUrl) {
-  const primaryImage =
-    typeof productImageUrl === "string" && productImageUrl.trim()
+function normalizeSearchImageUrl(productImageUrl, storeImageUrl, productId) {
+  const hasProduct = productId !== null && productId !== undefined;
+  const primaryImage = hasProduct
+    ? typeof productImageUrl === "string" && productImageUrl.trim()
       ? productImageUrl.trim()
-      : typeof storeImageUrl === "string" && storeImageUrl.trim()
-        ? storeImageUrl.trim()
-        : null;
+      : null
+    : typeof storeImageUrl === "string" && storeImageUrl.trim()
+      ? storeImageUrl.trim()
+      : null;
 
   if (!primaryImage) {
     return null;
@@ -148,17 +162,37 @@ function buildSearchResults(rows, { hasCoords, userLat, userLng }) {
     quantity: item.stock_quantity ?? null,
     in_stock: item.in_stock ?? null,
     match_source: item.match_source,
-    image_url: normalizeSearchImageUrl(item.image_url, item.store_image_url),
+    image_url: normalizeSearchImageUrl(
+      item.image_url,
+      item.store_image_url,
+      item.product_id,
+    ),
     distance_km: item.distance_km,
     distance: item.distance,
   }));
 }
 
-router.get("/", async (req, res) => {
+router.get("/", searchLimiter, async (req, res) => {
   const routeLabel = "search";
   const startedAt = Date.now();
 
   try {
+    const cacheKey = `search:${req.originalUrl}`;
+    const cachedPayload = searchCache.get(cacheKey);
+
+    if (cachedPayload) {
+      logRouteSuccess(req, routeLabel, 200, {
+        cache_hit: true,
+        duration_ms: Date.now() - startedAt,
+      });
+      return sendSuccess(res, 200, {
+        results: cachedPayload.results,
+      }, {
+        message: cachedPayload.message,
+        results: cachedPayload.results,
+      });
+    }
+
     const { product, q, query, lat, lng, limit, preview } = req.query;
     logRouteHit(req, routeLabel, {
       product,
@@ -216,7 +250,7 @@ router.get("/", async (req, res) => {
 
     const fetchLimit = isPreviewRequest
       ? Math.max(resultLimit + 2, 8)
-      : Math.max(resultLimit * 2, 12);
+      : Math.min(Math.max(resultLimit + 4, 12), 24);
 
     if (isPreviewRequest) {
       const storePreviewSql = `
@@ -241,8 +275,11 @@ router.get("/", async (req, res) => {
           1 AS match_priority
         FROM stores
         WHERE
+          stores.is_suspended = FALSE
+          AND (
           stores.store_name ILIKE $1
           OR COALESCE(stores.category, '') ILIKE $1
+          )
         ORDER BY stores.store_name ASC
         LIMIT $2
       `;
@@ -259,7 +296,10 @@ router.get("/", async (req, res) => {
           products.id AS product_id,
           products.product_name,
           NULL::text AS description,
-          products.image_url,
+          CASE
+            WHEN products.image_url ILIKE 'data:%' THEN NULL
+            ELSE products.image_url
+          END AS image_url,
           preview_variant.variant_id,
           preview_variant.variant_name,
           preview_variant.unit_count,
@@ -282,6 +322,8 @@ router.get("/", async (req, res) => {
           LIMIT 1
         ) AS preview_variant ON true
         WHERE
+          stores.is_suspended = FALSE
+          AND (
           COALESCE(products.product_name, '') ILIKE $1
           OR COALESCE(products.category, '') ILIKE $1
           OR EXISTS (
@@ -291,6 +333,7 @@ router.get("/", async (req, res) => {
           )
           OR COALESCE(stores.store_name, '') ILIKE $1
           OR COALESCE(stores.category, '') ILIKE $1
+          )
         ORDER BY stores.store_name ASC, products.product_name ASC
         LIMIT $2
       `;
@@ -307,7 +350,10 @@ router.get("/", async (req, res) => {
           products.id AS product_id,
           products.product_name,
           NULL::text AS description,
-          products.image_url,
+          CASE
+            WHEN products.image_url ILIKE 'data:%' THEN NULL
+            ELSE products.image_url
+          END AS image_url,
           product_variants.id AS variant_id,
           product_variants.variant_name,
           product_variants.unit_count,
@@ -320,6 +366,8 @@ router.get("/", async (req, res) => {
         INNER JOIN products ON products.id = product_variants.product_id
         INNER JOIN stores ON stores.id = products.store_id
         WHERE
+          stores.is_suspended = FALSE
+          AND (
           COALESCE(product_variants.variant_name, '') ILIKE $1
           OR COALESCE(products.product_name, '') ILIKE $1
           OR EXISTS (
@@ -328,6 +376,7 @@ router.get("/", async (req, res) => {
             WHERE product_tag ILIKE $1
           )
           OR COALESCE(stores.store_name, '') ILIKE $1
+          )
         ORDER BY stores.store_name ASC, products.product_name ASC
         LIMIT $2
       `;
@@ -376,6 +425,10 @@ router.get("/", async (req, res) => {
         duration_ms: Date.now() - startedAt,
       });
 
+      searchCache.set(cacheKey, {
+        message: "Search completed successfully",
+        results,
+      });
       logRouteSuccess(req, routeLabel, 200, {
         duration_ms: Date.now() - startedAt,
         preview: true,
@@ -411,8 +464,11 @@ router.get("/", async (req, res) => {
         1 AS match_priority
       FROM stores
       WHERE
+        stores.is_suspended = FALSE
+        AND (
         stores.store_name ILIKE $1
         OR COALESCE(stores.category, '') ILIKE $1
+        )
       ORDER BY stores.store_name ASC
       LIMIT $2
     `;
@@ -429,7 +485,10 @@ router.get("/", async (req, res) => {
         products.id AS product_id,
         products.product_name,
         products.description,
-        products.image_url,
+        CASE
+          WHEN products.image_url ILIKE 'data:%' THEN NULL
+          ELSE products.image_url
+        END AS image_url,
         display_variant.variant_id,
         display_variant.variant_name,
         display_variant.unit_count,
@@ -457,6 +516,8 @@ router.get("/", async (req, res) => {
         LIMIT 1
       ) AS display_variant ON true
       WHERE
+        stores.is_suspended = FALSE
+        AND (
         COALESCE(products.product_name, '') ILIKE $1
         OR COALESCE(products.description, '') ILIKE $1
         OR COALESCE(products.category, '') ILIKE $1
@@ -467,6 +528,7 @@ router.get("/", async (req, res) => {
         )
         OR COALESCE(stores.store_name, '') ILIKE $1
         OR COALESCE(stores.category, '') ILIKE $1
+        )
       ORDER BY stores.store_name ASC, products.product_name ASC
       LIMIT $2
     `;
@@ -483,7 +545,10 @@ router.get("/", async (req, res) => {
         products.id AS product_id,
         products.product_name,
         products.description,
-        products.image_url,
+        CASE
+          WHEN products.image_url ILIKE 'data:%' THEN NULL
+          ELSE products.image_url
+        END AS image_url,
         product_variants.id AS variant_id,
         product_variants.variant_name,
         product_variants.unit_count,
@@ -496,6 +561,8 @@ router.get("/", async (req, res) => {
       INNER JOIN products ON products.id = product_variants.product_id
       INNER JOIN stores ON stores.id = products.store_id
       WHERE
+        stores.is_suspended = FALSE
+        AND (
         COALESCE(product_variants.variant_name, '') ILIKE $1
         OR COALESCE(products.product_name, '') ILIKE $1
         OR EXISTS (
@@ -504,6 +571,7 @@ router.get("/", async (req, res) => {
           WHERE product_tag ILIKE $1
         )
         OR COALESCE(stores.store_name, '') ILIKE $1
+        )
       ORDER BY stores.store_name ASC, products.product_name ASC
       LIMIT $2
     `;
@@ -551,6 +619,10 @@ router.get("/", async (req, res) => {
       duration_ms: Date.now() - startedAt,
     });
 
+    searchCache.set(cacheKey, {
+      message: "Search completed successfully",
+      results,
+    });
     logRouteSuccess(req, routeLabel, 200, {
       duration_ms: Date.now() - startedAt,
       preview: false,

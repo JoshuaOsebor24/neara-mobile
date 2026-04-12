@@ -2,7 +2,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { ReactNode, useEffect, useMemo, useState } from "react";
+import { ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Image,
@@ -23,6 +23,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { BackPillButton } from "@/components/ui/back-pill-button";
+import { RemoteProductImage } from "@/components/ui/remote-product-image";
 import { SearchInput } from "@/components/ui/search-input";
 import {
   EmptyCard,
@@ -40,7 +41,11 @@ import {
   unsaveStore,
   useSavedStores,
 } from "@/services/saved-stores";
-import { fetchStoreFullData, updateStoreWithBackend } from "@/services/store-api";
+import { updateStoreWithBackend } from "@/services/store-api";
+import {
+  loadStoreDetailRecord,
+  toSavedStorePayload,
+} from "@/services/store-data";
 
 type StoreData = {
   id: string;
@@ -74,6 +79,7 @@ type ProductGroup = {
   category: string;
   description: string;
   image: string;
+  storeId: string;
   tags: string[];
   variants: ProductVariant[];
 };
@@ -228,7 +234,7 @@ function InfoRow({
           {children || (
             <TextInput
               style={styles.infoEditInput}
-              placeholderTextColor="#64748b"
+              placeholderTextColor="#7F8EAD"
               placeholder="Enter value"
               value={value}
               onChangeText={onChangeText}
@@ -307,17 +313,13 @@ function ProductCard({
             activeOpacity={0.92}
             onPress={() => onOpenImage(product.image)}
           >
-            <Image
-              source={{ uri: product.image }}
+            <RemoteProductImage
               style={styles.productImage}
+              uri={product.image}
             />
           </TouchableOpacity>
         ) : (
-          <View style={styles.productImageFallback}>
-            <Text style={styles.productImageFallbackText}>
-              {buildInitialLabel(product.name, "P")}
-            </Text>
-          </View>
+          <RemoteProductImage style={styles.productImage} />
         )}
 
         <View style={styles.productTopContent}>
@@ -409,7 +411,7 @@ function ProductCard({
                     >
                       <View style={styles.askButtonContent}>
                         <Ionicons
-                          color="#e0f2fe"
+                          color="#E2EBFF"
                           name="chatbubble-ellipses-outline"
                           size={15}
                         />
@@ -434,7 +436,7 @@ function ProductCard({
         >
           <View style={styles.askButtonContent}>
             <Ionicons
-              color="#e0f2fe"
+              color="#E2EBFF"
               name="chatbubble-ellipses-outline"
               size={16}
             />
@@ -473,11 +475,14 @@ export default function StoreScreen() {
   const [editContact, setEditContact] = useState("");
   const savedStores = useSavedStores();
   const storeId = id || session.primaryStoreId || "";
+  const latestStoreLoadIdRef = useRef(0);
+  const lastResolvedStoreIdRef = useRef("");
 
   useEffect(() => {
-    let cancelled = false;
-
     async function loadStoreData() {
+      const loadId = latestStoreLoadIdRef.current + 1;
+      latestStoreLoadIdRef.current = loadId;
+
       if (!storeId) {
         setStoreError("Store not found.");
         setRemoteStore(null);
@@ -489,26 +494,28 @@ export default function StoreScreen() {
       setIsStoreLoading(true);
       setStoreError("");
 
-      const result = await fetchStoreFullData(String(storeId));
+      const result = await loadStoreDetailRecord(String(storeId));
 
-      if (cancelled) {
+      if (latestStoreLoadIdRef.current !== loadId) {
         return;
       }
 
       if (!result.ok) {
         setStoreError(result.error || "We couldn’t load this store right now.");
-        setRemoteStore(null);
-        setRemoteProducts([]);
         setIsStoreLoading(false);
+
+        if (lastResolvedStoreIdRef.current !== String(storeId)) {
+          setRemoteStore(null);
+          setRemoteProducts([]);
+        }
+
         return;
       }
 
       const nextStorePhotos = result.store
         ? normalizeStorePhotos(
-            Array.isArray(result.store.header_images)
-              ? result.store.header_images
-              : [],
-            result.store.image_url || "",
+            result.store.headerImages,
+            result.store.imageUrl || "",
           )
         : [];
 
@@ -517,65 +524,32 @@ export default function StoreScreen() {
             address: result.store.address || "",
             category: result.store.category || "",
             description: result.store.description || "",
-            deliveryAvailable: Boolean(result.store.delivery_available),
+            deliveryAvailable: result.store.deliveryAvailable,
             deliveryFee: "Delivery information unavailable",
             deliveryTime: "",
             heroImage: nextStorePhotos[0] || "",
-            id: String(result.store.id ?? storeId),
+            id: String(result.store.id),
             isOpen: true,
-            latitude: parseCoordinate(result.store.latitude),
-            longitude: parseCoordinate(result.store.longitude),
-            phoneNumber: result.store.phone_number || "",
+            latitude: result.store.latitude,
+            longitude: result.store.longitude,
+            phoneNumber: result.store.phoneNumber || "",
             photos: nextStorePhotos,
-            storeName: result.store.store_name || "",
+            storeName: result.store.storeName || "",
           }
         : null;
 
-      const nextProducts = result.products
-        .filter(
-          (product) =>
-            product.product_id !== null && product.product_id !== undefined,
-        )
-        .map((product) => ({
-          category: product.category || nextStore?.category || "",
-          description: product.description || "",
-          id: String(product.product_id ?? Math.random()),
-          image: product.image_url || nextStore?.heroImage || "",
-          name: product.product_name || "",
-          tags: Array.isArray(product.tags) ? product.tags.filter(Boolean) : [],
-          variants:
-            product.variants?.map((variant) => ({
-              id: String(
-                variant.variant_id ??
-                  createVariantKey(product.product_id, variant.variant_name),
-              ),
-              inStock: Boolean(variant.in_stock),
-              label: variant.variant_name || "",
-              price:
-                typeof variant.price === "number"
-                  ? variant.price
-                  : Number(variant.price || 0),
-              stockQuantity:
-                typeof variant.stock_quantity === "number"
-                  ? variant.stock_quantity
-                  : Number(variant.stock_quantity || 0),
-              unitCount:
-                typeof variant.unit_count === "number"
-                  ? variant.unit_count
-                  : Number(variant.unit_count || 1),
-            })) ?? [],
-        }))
-        .filter((product) => product.name.trim().length > 0);
+      const nextProducts = result.products;
 
       setRemoteStore(nextStore);
       setRemoteProducts(nextProducts);
+      lastResolvedStoreIdRef.current = String(storeId);
       setIsStoreLoading(false);
     }
 
     void loadStoreData();
 
     return () => {
-      cancelled = true;
+      latestStoreLoadIdRef.current += 1;
     };
   }, [storeId]);
 
@@ -1022,10 +996,10 @@ export default function StoreScreen() {
                 <View style={styles.heroOverlay} />
                 <LinearGradient
                   colors={[
-                    "rgba(2, 6, 23, 0.24)",
-                    "rgba(2, 6, 23, 0.5)",
-                    "rgba(2, 6, 23, 0.82)",
-                    "rgba(2, 6, 23, 0.94)",
+                    "rgba(10,15,31,0.24)",
+                    "rgba(10,15,31,0.5)",
+                    "rgba(10,15,31,0.82)",
+                    "rgba(10,15,31,0.94)",
                   ]}
                   locations={[0, 0.28, 0.72, 1]}
                   pointerEvents="none"
@@ -1117,6 +1091,7 @@ export default function StoreScreen() {
                                 }
 
                                 setIsSaveSubmitting(true);
+                                setOwnerNotice("");
 
                                 try {
                                   if (saved) {
@@ -1125,19 +1100,33 @@ export default function StoreScreen() {
                                       numericStoreId,
                                     );
                                     setSaved(false);
+                                    setOwnerNotice("Removed from saved.");
                                   } else {
-                                    await saveStore(session.authToken, {
+                                    const savedStorePayload = toSavedStorePayload({
                                       address: resolvedStore.address,
                                       category: resolvedStore.category,
                                       id: numericStoreId,
-                                      image_url:
-                                        resolvedStore.heroImage || null,
-                                      phone_number: resolvedStore.phoneNumber,
-                                      store_name:
-                                        resolvedStore.storeName || "Store",
+                                      imageUrl: resolvedStore.heroImage || null,
+                                      name: resolvedStore.storeName || "Store",
+                                      phoneNumber: resolvedStore.phoneNumber,
                                     });
+
+                                    if (!savedStorePayload) {
+                                      throw new Error("Could not save this store.");
+                                    }
+
+                                    await saveStore(session.authToken, savedStorePayload);
                                     setSaved(true);
+                                    setOwnerNotice("Saved to your stores.");
                                   }
+                                } catch (error) {
+                                  setOwnerNotice(
+                                    error instanceof Error
+                                      ? error.message
+                                      : saved
+                                        ? "Could not remove this store."
+                                        : "Could not save this store.",
+                                  );
                                 } finally {
                                   setIsSaveSubmitting(false);
                                 }
@@ -1158,9 +1147,9 @@ export default function StoreScreen() {
                           <Ionicons
                             color={
                               isOwnerViewingStore
-                                ? "#f8fbff"
+                                ? "#F7FAFF"
                                 : saved
-                                  ? "#d1fae5"
+                                  ? "#D9E4FF"
                                   : theme.colors.text
                             }
                             name={
@@ -1273,7 +1262,7 @@ export default function StoreScreen() {
                           style={styles.photosEditButton}
                         >
                           <Ionicons
-                            color="#dbeafe"
+                            color="#D9E4FF"
                             name="create-outline"
                             size={14}
                           />
@@ -1620,7 +1609,7 @@ export default function StoreScreen() {
             onPress={() => openChat()}
             style={styles.stickyCtaButton}
           >
-            <Ionicons color="#f8fbff" name="chatbubble-ellipses" size={18} />
+            <Ionicons color="#F7FAFF" name="chatbubble-ellipses" size={18} />
             <Text style={styles.stickyCtaButtonText}>Chat store</Text>
           </TouchableOpacity>
         </View>
@@ -1643,7 +1632,7 @@ export default function StoreScreen() {
               onPress={() => setExpandedImageUrl(null)}
               style={styles.imageModalCloseButton}
             >
-              <Ionicons color="#e2e8f0" name="close" size={20} />
+              <Ionicons color="#E8EEF8" name="close" size={20} />
             </TouchableOpacity>
 
             {expandedImageUrl ? (
@@ -1660,19 +1649,12 @@ export default function StoreScreen() {
   );
 }
 
-function createVariantKey(
-  productId?: string | number,
-  variantName?: string | null,
-) {
-  return `${String(productId || "product")}:${variantName || "variant"}`;
-}
-
 const BORDER = "rgba(255,255,255,0.08)";
 
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: "transparent",
   },
   contentContainer: {
     paddingTop: 6,
@@ -1703,7 +1685,7 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
-    backgroundColor: "rgba(16, 26, 46, 0.96)",
+    backgroundColor: theme.colors.surfaceCard,
     marginBottom: 20,
   },
   heroBackground: {
@@ -1714,7 +1696,7 @@ const styles = StyleSheet.create({
   },
   heroOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(8, 17, 32, 0.5)",
+    backgroundColor: "rgba(17, 24, 39, 0.24)",
   },
   heroGradientOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -1732,7 +1714,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   heroEyebrow: {
-    color: "#94a3b8",
+    color: "#B8C2D9",
     fontSize: 11,
     fontWeight: "700",
     letterSpacing: 2,
@@ -1745,11 +1727,11 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   heroTitle: {
-    color: "#fff",
+    color: theme.colors.text,
     fontSize: 30,
     fontWeight: "800",
     lineHeight: 34,
-    textShadowColor: "rgba(2, 6, 23, 0.7)",
+    textShadowColor: "rgba(20, 53, 90, 0.34)",
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 10,
   },
@@ -1771,7 +1753,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(16, 185, 129, 0.15)",
   },
   statusPillClosed: {
-    backgroundColor: "rgba(244, 63, 94, 0.16)",
+    backgroundColor: "rgba(255,255,255,0.16)",
   },
   statusDot: {
     width: 8,
@@ -1779,31 +1761,31 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   statusDotOpen: {
-    backgroundColor: "#34d399",
+    backgroundColor: "#4A88FF",
   },
   statusDotClosed: {
-    backgroundColor: "#fb7185",
+    backgroundColor: "#B8C2D9",
   },
   statusPillText: {
-    color: "#e2e8f0",
+    color: "#E8EEF8",
     fontSize: 12,
     fontWeight: "700",
   },
   deliveryTime: {
-    color: "#cbd5e1",
+    color: "#C7D2E5",
     fontSize: 14,
   },
   heroCategory: {
-    color: "#cbd5e1",
+    color: "#C7D2E5",
     fontSize: 15,
     fontWeight: "600",
   },
   heroAddress: {
-    color: "#cbd5e1",
+    color: "#C7D2E5",
     fontSize: 14,
     lineHeight: 21,
     maxWidth: 540,
-    textShadowColor: "rgba(2, 6, 23, 0.6)",
+    textShadowColor: "rgba(10,15,31,0.6)",
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 8,
   },
@@ -1812,7 +1794,7 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.12)",
-    backgroundColor: "rgba(6, 12, 24, 0.84)",
+    backgroundColor: theme.colors.surfaceOverlay,
     padding: 16,
   },
   actionGrid: {
@@ -1831,9 +1813,9 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   gridActionButtonPrimary: {
-    borderColor: "rgba(56, 189, 248, 0.58)",
-    backgroundColor: "rgba(3, 105, 161, 0.9)",
-    shadowColor: "#0284c7",
+    borderColor: "rgba(74,136,255,0.58)",
+    backgroundColor: "rgba(86, 188, 255, 0.30)",
+    shadowColor: "#1F56E5",
     shadowOpacity: 0.2,
     shadowRadius: 14,
     shadowOffset: { width: 0, height: 8 },
@@ -1841,16 +1823,16 @@ const styles = StyleSheet.create({
   },
   gridActionButtonSecondary: {
     borderColor: "rgba(255,255,255,0.11)",
-    backgroundColor: "rgba(255,255,255,0.04)",
+    backgroundColor: "rgba(255,255,255,0.10)",
   },
   gridActionButtonSaved: {
-    borderColor: "rgba(52,211,153,0.28)",
-    backgroundColor: "rgba(52,211,153,0.16)",
+    borderColor: "rgba(74,136,255,0.28)",
+    backgroundColor: "rgba(74,136,255,0.16)",
   },
   gridActionButtonTertiary: {
-    borderColor: "rgba(56, 189, 248, 0.28)",
-    backgroundColor: "rgba(14, 116, 144, 0.26)",
-    shadowColor: "#0ea5e9",
+    borderColor: "rgba(74,136,255,0.28)",
+    backgroundColor: "rgba(95, 199, 255, 0.22)",
+    shadowColor: "#2F6BFF",
     shadowOpacity: 0.08,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 4 },
@@ -1869,10 +1851,10 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   gridActionButtonTextSaved: {
-    color: "#d1fae5",
+    color: "#D9E4FF",
   },
   gridActionButtonTextPrimary: {
-    color: "#f8fbff",
+    color: "#F7FAFF",
     fontSize: 14,
     fontWeight: "800",
     textAlign: "center",
@@ -1890,7 +1872,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   photosLabel: {
-    color: "#94a3b8",
+    color: "#B8C2D9",
     fontSize: 11,
     fontWeight: "700",
     letterSpacing: 1.6,
@@ -1902,13 +1884,13 @@ const styles = StyleSheet.create({
     gap: 6,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: "rgba(56, 189, 248, 0.2)",
-    backgroundColor: "rgba(56, 189, 248, 0.12)",
+    borderColor: "rgba(74,136,255,0.2)",
+    backgroundColor: "rgba(74,136,255,0.12)",
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
   photosEditButtonText: {
-    color: "#dbeafe",
+    color: "#D9E4FF",
     fontSize: 11,
     fontWeight: "800",
     textTransform: "uppercase",
@@ -1935,7 +1917,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
-    backgroundColor: "rgba(59,130,246,0.14)",
+    backgroundColor: "rgba(74,136,255,0.14)",
   },
   headerPhotoFallbackText: {
     color: theme.colors.text,
@@ -1963,16 +1945,16 @@ const styles = StyleSheet.create({
   },
   categoryChip: {
     borderRadius: 999,
-    backgroundColor: "rgba(16, 26, 46, 0.9)",
+    backgroundColor: theme.colors.surfaceCard,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
   categoryChipActive: {
-    backgroundColor: "#2563eb",
-    borderColor: "#60a5fa",
-    shadowColor: "#3b82f6",
+    backgroundColor: "#2F6BFF",
+    borderColor: "#4A88FF",
+    shadowColor: "#4A88FF",
     shadowOpacity: 0.36,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 6 },
@@ -1980,12 +1962,12 @@ const styles = StyleSheet.create({
     transform: [{ scale: 1.02 }],
   },
   categoryChipText: {
-    color: "#e2e8f0",
+    color: "#E8EEF8",
     fontSize: 12,
     fontWeight: "700",
   },
   categoryChipTextActive: {
-    color: "#fff",
+    color: "#F5F7FB",
   },
   section: {
     marginBottom: 24,
@@ -2024,8 +2006,8 @@ const styles = StyleSheet.create({
   ownerNoticeCard: {
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: "rgba(125, 211, 252, 0.18)",
-    backgroundColor: "rgba(56, 189, 248, 0.08)",
+    borderColor: "rgba(120,163,255,0.18)",
+    backgroundColor: "rgba(74,136,255,0.08)",
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
@@ -2038,7 +2020,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.1)",
-    backgroundColor: "rgba(16, 26, 46, 0.96)",
+    backgroundColor: theme.colors.surfaceCard,
     padding: 20,
     gap: 16,
     elevation: 5,
@@ -2058,13 +2040,13 @@ const styles = StyleSheet.create({
     width: 84,
     height: 84,
     borderRadius: 16,
-    backgroundColor: "#1e293b",
+    backgroundColor: "rgba(255,255,255,0.14)",
   },
   productImageFallback: {
     width: 84,
     height: 84,
     borderRadius: 16,
-    backgroundColor: "rgba(59,130,246,0.14)",
+    backgroundColor: "rgba(74,136,255,0.14)",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
     alignItems: "center",
@@ -2083,7 +2065,7 @@ const styles = StyleSheet.create({
   },
   imageModalBackdropPressable: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(2, 6, 23, 0.88)",
+    backgroundColor: theme.colors.surfaceOverlay,
   },
   imageModalCard: {
     width: "100%",
@@ -2091,7 +2073,7 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.10)",
-    backgroundColor: "rgba(15, 23, 42, 0.96)",
+    backgroundColor: "rgba(17,24,39,0.96)",
     overflow: "hidden",
     padding: 18,
   },
@@ -2109,7 +2091,7 @@ const styles = StyleSheet.create({
     width: "100%",
     height: 360,
     borderRadius: 20,
-    backgroundColor: "#020617",
+    backgroundColor: "rgba(255,255,255,0.12)",
   },
   productTopContent: {
     flex: 1,
@@ -2125,16 +2107,16 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   productName: {
-    color: "#f8fafc",
+    color: "#F5F7FB",
     fontSize: 15,
     fontWeight: "800",
   },
   productSubtitle: {
-    color: "#94a3b8",
+    color: "#B8C2D9",
     fontSize: 12,
   },
   productPriceSummary: {
-    color: "#f8fafc",
+    color: "#F5F7FB",
     fontSize: 14,
     fontWeight: "800",
   },
@@ -2160,12 +2142,12 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     borderWidth: 1,
     borderColor: "rgba(248,113,113,0.24)",
-    backgroundColor: "rgba(127,29,29,0.22)",
+    backgroundColor: "rgba(17,24,39,0.22)",
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
   ownerDangerButtonText: {
-    color: "#fecaca",
+    color: "#E2EBFF",
     fontSize: 12,
     fontWeight: "700",
   },
@@ -2185,7 +2167,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   variantToggleText: {
-    color: "#fff",
+    color: "#F5F7FB",
     fontSize: 14,
     fontWeight: "500",
   },
@@ -2209,12 +2191,12 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   variantProductName: {
-    color: "#fff",
+    color: "#F5F7FB",
     fontSize: 14,
     fontWeight: "500",
   },
   variantLabel: {
-    color: "#94a3b8",
+    color: "#B8C2D9",
     fontSize: 12,
   },
   variantActionWrap: {
@@ -2229,7 +2211,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   variantMetaText: {
-    color: "#94a3b8",
+    color: "#B8C2D9",
     fontSize: 12,
     fontWeight: "600",
   },
@@ -2240,8 +2222,8 @@ const styles = StyleSheet.create({
     minHeight: 44,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: "rgba(56, 189, 248, 0.28)",
-    backgroundColor: "rgba(56, 189, 248, 0.14)",
+    borderColor: "rgba(74,136,255,0.28)",
+    backgroundColor: "rgba(74,136,255,0.14)",
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
@@ -2252,21 +2234,21 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   askButtonMeta: {
-    color: "#e0f2fe",
+    color: "#E2EBFF",
     fontSize: 13,
     fontWeight: "700",
   },
   singleAskButton: {
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: "rgba(56, 189, 248, 0.28)",
-    backgroundColor: "rgba(56, 189, 248, 0.14)",
+    borderColor: "rgba(74,136,255,0.28)",
+    backgroundColor: "rgba(74,136,255,0.14)",
     alignItems: "center",
     justifyContent: "center",
     minHeight: 48,
   },
   singleAskButtonText: {
-    color: "#e0f2fe",
+    color: "#E2EBFF",
     fontSize: 14,
     fontWeight: "700",
   },
@@ -2290,7 +2272,7 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   addProductButtonText: {
-    color: "#082f49",
+    color: "#F5F7FB",
     fontSize: 12,
     fontWeight: "800",
   },
@@ -2298,7 +2280,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    backgroundColor: "rgba(15, 23, 42, 0.6)",
+    backgroundColor: "rgba(17,24,39,0.6)",
     padding: 20,
     gap: 8,
   },
@@ -2333,13 +2315,13 @@ const styles = StyleSheet.create({
   infoEditToggle: {
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: "rgba(56, 189, 248, 0.2)",
-    backgroundColor: "rgba(56, 189, 248, 0.1)",
+    borderColor: "rgba(74,136,255,0.2)",
+    backgroundColor: "rgba(74,136,255,0.1)",
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
   infoEditToggleText: {
-    color: "#e0f2fe",
+    color: "#E2EBFF",
     fontSize: 11,
     fontWeight: "700",
   },
@@ -2354,7 +2336,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   infoRowPressable: {
-    shadowColor: "#38bdf8",
+    shadowColor: "#4A88FF",
     shadowOpacity: 0.08,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 3 },
@@ -2364,7 +2346,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 14,
-    backgroundColor: "rgba(2, 6, 23, 1)",
+    backgroundColor: "rgba(10,15,31,1)",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -2373,7 +2355,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   infoLabel: {
-    color: "#94a3b8",
+    color: "#B8C2D9",
     fontSize: 12,
     fontWeight: "700",
     textTransform: "uppercase",
@@ -2385,8 +2367,8 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "rgba(56, 189, 248, 0.3)",
-    backgroundColor: "rgba(56, 189, 248, 0.08)",
+    borderColor: "rgba(74,136,255,0.3)",
+    backgroundColor: "rgba(74,136,255,0.08)",
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
@@ -2405,25 +2387,25 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   infoDeliveryOptionActive: {
-    borderColor: "rgba(56, 189, 248, 0.4)",
-    backgroundColor: "rgba(56, 189, 248, 0.15)",
+    borderColor: "rgba(74,136,255,0.4)",
+    backgroundColor: "rgba(74,136,255,0.15)",
   },
   infoDeliveryOptionText: {
-    color: "#94a3b8",
+    color: "#B8C2D9",
     fontSize: 13,
     fontWeight: "600",
   },
   infoDeliveryOptionTextActive: {
-    color: "#e0f2fe",
+    color: "#E2EBFF",
   },
   infoValue: {
-    color: "#f8fafc",
+    color: "#F5F7FB",
     fontSize: 14,
     fontWeight: "600",
     lineHeight: 20,
   },
   infoHint: {
-    color: "#94a3b8",
+    color: "#B8C2D9",
     fontSize: 13,
   },
   descriptionCard: {
@@ -2435,20 +2417,20 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   descriptionLabel: {
-    color: "#94a3b8",
+    color: "#B8C2D9",
     fontSize: 11,
     fontWeight: "700",
     letterSpacing: 1.4,
     textTransform: "uppercase",
   },
   descriptionText: {
-    color: "#e2e8f0",
+    color: "#E8EEF8",
     fontSize: 14,
     lineHeight: 22,
   },
   routeNote: {
     marginTop: 20,
-    color: "#475569",
+    color: "#667892",
     fontSize: 12,
     textAlign: "center",
   },
@@ -2466,16 +2448,16 @@ const styles = StyleSheet.create({
     minHeight: 54,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: "rgba(56, 189, 248, 0.52)",
+    borderColor: "rgba(74,136,255,0.52)",
     backgroundColor: "rgba(3, 105, 161, 0.96)",
-    shadowColor: "#0284c7",
+    shadowColor: "#1F56E5",
     shadowOpacity: 0.24,
     shadowRadius: 14,
     shadowOffset: { width: 0, height: 8 },
     elevation: 7,
   },
   stickyCtaButtonText: {
-    color: "#f8fbff",
+    color: "#F7FAFF",
     fontSize: 15,
     fontWeight: "800",
   },

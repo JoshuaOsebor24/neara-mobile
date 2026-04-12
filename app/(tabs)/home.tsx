@@ -11,6 +11,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   useWindowDimensions,
   View,
@@ -36,23 +37,19 @@ import {
   useRecentStores,
 } from "@/services/saved-stores";
 import {
-  searchProducts,
-  type SearchProductResult,
-} from "@/services/search-api";
-import { fetchStoresNearby, type BackendStore } from "@/services/store-api";
+  loadSearchResults,
+  type SearchResultRecord,
+} from "@/services/search-data";
+import {
+  loadPublicStoreCatalog,
+  type StoreListItem,
+} from "@/services/store-data";
 
-type HomePreviewResult = {
-  id: string;
-  image?: string | null;
-  price: number | null;
-  productId: string;
-  productName: string;
-  storeId: string;
-  storeName: string;
-  variant: string;
-};
+type HomePreviewResult = SearchResultRecord;
 
 type HomePreviewCard = {
+  distance: string;
+  distanceKm: number | null;
   id: string;
   image?: string | null;
   productName: string;
@@ -65,16 +62,7 @@ type HomePreviewCard = {
   }[];
 };
 
-type HomeStoreCard = {
-  address: string;
-  category: string;
-  distanceKm?: number | null;
-  id: string;
-  image?: string | null;
-  latitude?: number | null;
-  longitude?: number | null;
-  name: string;
-};
+type HomeStoreCard = StoreListItem;
 
 type SelectedMapStore = {
   address: string;
@@ -84,59 +72,56 @@ type SelectedMapStore = {
   name: string;
 };
 
-const NEARBY_STORE_RADIUS_KM = 2;
-
 function buildStoreInitial(name: string) {
   const trimmed = name.trim();
   return trimmed ? trimmed.charAt(0).toUpperCase() : "N";
-}
-
-function resolveStoreCoordinates(store: BackendStore | HomeStoreCard) {
-  const latitude =
-    typeof store.latitude === "number"
-      ? store.latitude
-      : store.latitude !== null && store.latitude !== undefined
-        ? Number(store.latitude)
-        : null;
-  const longitude =
-    typeof store.longitude === "number"
-      ? store.longitude
-      : store.longitude !== null && store.longitude !== undefined
-        ? Number(store.longitude)
-        : null;
-
-  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
-    return null;
-  }
-
-  return { latitude: Number(latitude), longitude: Number(longitude) };
 }
 
 function groupPreviewResults(items: HomePreviewResult[]) {
   const groups = new Map<string, HomePreviewCard>();
 
   items.forEach((item) => {
-    const key = item.productId
-      ? `${item.storeId}::${item.productId}`
-      : `${item.storeId}::${item.productName.trim().toLowerCase()}`;
+    const isStoreMatch = item.kind === "store";
+    const key = isStoreMatch
+      ? `${item.storeId}::store`
+      : item.productId
+        ? `${item.storeId}::${item.productId}`
+        : `${item.storeId}::${item.productName.trim().toLowerCase()}`;
     const existing = groups.get(key);
 
     if (!existing) {
       groups.set(key, {
+        distance: item.distance,
+        distanceKm: item.distanceKm,
         id: key,
         image: item.image || null,
-        productName: item.productName,
+        productName: item.productName || "Store match",
         storeId: item.storeId,
         storeName: item.storeName,
-        variants: [
-          {
-            id: item.id,
-            label: item.variant || "Product details available in store",
-            price: item.price,
-          },
-        ],
+        variants: isStoreMatch
+          ? []
+          : [
+              {
+                id: item.id,
+                label: item.variant || "Product details available in store",
+                price: item.price,
+              },
+            ],
       });
       return;
+    }
+
+    if (isStoreMatch) {
+      return;
+    }
+
+    if (
+      existing.distanceKm === null &&
+      typeof item.distanceKm === "number" &&
+      Number.isFinite(item.distanceKm)
+    ) {
+      existing.distanceKm = item.distanceKm;
+      existing.distance = item.distance;
     }
 
     if (
@@ -183,7 +168,7 @@ export default function HomeScreen() {
   const [isLoadingStores, setIsLoadingStores] = useState(true);
   const [previewError, setPreviewError] = useState("");
   const [selectedStoreId, setSelectedStoreId] = useState<string | null>(null);
-  const [storeMarkers, setStoreMarkers] = useState<BackendStore[]>([]);
+  const [storeMarkers, setStoreMarkers] = useState<StoreListItem[]>([]);
   const [storesError, setStoresError] = useState("");
   const [isSheetCollapsed, setIsSheetCollapsed] = useState(false);
   const [isSearchOverlayOpen, setIsSearchOverlayOpen] = useState(false);
@@ -192,15 +177,20 @@ export default function HomeScreen() {
   const [mapRecenterKey, setMapRecenterKey] = useState(0);
   const recentStores = useRecentStores();
   const wasReturnedFromStorePage = useRef(false);
+  const searchOverlayInputRef = useRef<TextInput | null>(null);
+  const storeMarkersRef = useRef<StoreListItem[]>([]);
+  const latestStoreFetchIdRef = useRef(0);
 
   useFocusEffect(
     useCallback(() => {
-      // If we're returning from a store page, ignore the focusStore parameter
       if (wasReturnedFromStorePage.current) {
         wasReturnedFromStorePage.current = false;
+        setSelectedStoreId(null);
+        setMapFocusCoordinates(null);
+        setUserInteractedWithMap(false);
         return;
       }
-      // Mark that on next blur->focus cycle we're returning from another screen
+
       return () => {
         wasReturnedFromStorePage.current = true;
       };
@@ -236,114 +226,98 @@ export default function HomeScreen() {
   const dragStartOffsetRef = useRef(0);
   const sheetOffsetRef = useRef(0);
   const sheetAnimationRef = useRef<Animated.CompositeAnimation | null>(null);
-  const mapSheetInteractionRef = useRef({
-    autoCollapsed: false,
-    isMapMoving: false,
-    originalOffset: 0,
-    panelManuallyControlled: false,
-  });
+  const [isManuallyCollapsed, setIsManuallyCollapsed] = useState(false);
+  const [isMapInteracting, setIsMapInteracting] = useState(false);
+  const isManuallyCollapsedRef = useRef(false);
+  const isMapInteractingRef = useRef(false);
 
   useEffect(() => {
-    let cancelled = false;
-    const timeout = setTimeout(() => {
-      void loadHomeData();
-    }, 220);
+    storeMarkersRef.current = storeMarkers;
+  }, [storeMarkers]);
 
-    async function loadHomeData() {
-      setIsLoadingStores(true);
+  const applyLoadedStores = useCallback((catalog: {
+    browseStores: StoreListItem[];
+    mapPins: StoreListItem[];
+    nearbyStores: StoreListItem[];
+    stores: StoreListItem[];
+  }) => {
+    setStoreMarkers(catalog.mapPins);
+    setBrowseStores(catalog.browseStores);
+    setNearbyStores(catalog.nearbyStores);
+    setSelectedStoreId((current) => {
+      if (!current) {
+        return null;
+      }
+
+      return catalog.mapPins.some((store) => store.id === current)
+        ? current
+        : null;
+    });
+
+    return catalog.mapPins.length > 0;
+  }, []);
+
+  useEffect(() => {
+    const fetchId = latestStoreFetchIdRef.current + 1;
+    latestStoreFetchIdRef.current = fetchId;
+    let cancelled = false;
+
+    async function loadStores() {
+      const shouldShowLoadingState = storeMarkersRef.current.length === 0;
+
+      if (shouldShowLoadingState) {
+        setIsLoadingStores(true);
+      }
       setStoresError("");
-      const storesResult = await fetchStoresNearby({
-        latitude: coordinates?.latitude ?? null,
-        longitude: coordinates?.longitude ?? null,
+
+      const storesResult = await loadPublicStoreCatalog({
+        coordinates,
       });
 
-      if (cancelled) {
+      if (cancelled || latestStoreFetchIdRef.current !== fetchId) {
         return;
       }
 
       if (!storesResult.ok) {
-        setNearbyStores([]);
-        setBrowseStores([]);
-        setStoreMarkers([]);
-        setStoresError(storesResult.error);
+        if (storeMarkersRef.current.length === 0) {
+          setStoresError(storesResult.error);
+        }
+
         setIsLoadingStores(false);
         return;
       }
 
-      setStoreMarkers(storesResult.stores);
-      const mappedStores = storesResult.stores
-        .filter(
-          (store) =>
-            store.id !== null && store.id !== undefined && store.store_name,
-        )
-        .map((store) => ({
-          address: store.address || "",
-          category: store.category || "",
-          distanceKm:
-            typeof store.distance_km === "number"
-              ? store.distance_km
-              : store.distance_km !== null && store.distance_km !== undefined
-                ? Number(store.distance_km)
-                : null,
-          id: String(store.id ?? ""),
-          image: store.image_url || null,
-          latitude:
-            typeof store.latitude === "number"
-              ? store.latitude
-              : store.latitude !== null && store.latitude !== undefined
-                ? Number(store.latitude)
-                : null,
-          longitude:
-            typeof store.longitude === "number"
-              ? store.longitude
-              : store.longitude !== null && store.longitude !== undefined
-                ? Number(store.longitude)
-                : null,
-          name: store.store_name || "",
-        }));
+      const didApplyStores = applyLoadedStores(storesResult);
 
-      setBrowseStores(mappedStores.slice(0, 6));
-      setNearbyStores(
-        mappedStores
-          .filter(
-            (store) =>
-              typeof store.distanceKm === "number" &&
-              Number.isFinite(store.distanceKm),
-          )
-          .filter(
-            (store) =>
-              store.distanceKm !== null &&
-              store.distanceKm <= NEARBY_STORE_RADIUS_KM,
-          )
-          .slice(0, 6),
-      );
-      setSelectedStoreId((current) => {
-        if (
-          current &&
-          storesResult.stores.some(
-            (store) => String(store.id ?? "") === current,
-          )
-        ) {
-          return current;
-        }
-        if (!focusStoreId) {
-          return null;
-        }
+      if (didApplyStores) {
+        setStoresError("");
+      } else if (storeMarkersRef.current.length === 0) {
+        setStoresError("No stores available yet.");
+      }
 
-        return (
-          storesResult.stores
-            .find((store) => String(store.id ?? "") === focusStoreId)
-            ?.id?.toString() ?? null
-        );
-      });
       setIsLoadingStores(false);
     }
 
+    void loadStores();
+
     return () => {
       cancelled = true;
-      clearTimeout(timeout);
     };
-  }, [coordinates?.latitude, coordinates?.longitude, focusStoreId]);
+  }, [applyLoadedStores, coordinates]);
+
+  useEffect(() => {
+    if (!focusStoreId) {
+      return;
+    }
+
+    const matchingStore = storeMarkers.find((store) => store.id === focusStoreId);
+
+    if (!matchingStore?.id) {
+      return;
+    }
+
+    setSelectedStoreId(matchingStore.id);
+  }, [focusStoreId, storeMarkers]);
 
   useEffect(() => {
     void loadRecentStoresForSession();
@@ -364,7 +338,7 @@ export default function HomeScreen() {
 
       setIsLoadingPreview(true);
       setPreviewError("");
-      const result = await searchProducts(normalized, { preview: true });
+      const result = await loadSearchResults(normalized, { preview: true });
 
       if (cancelled) {
         return;
@@ -377,28 +351,7 @@ export default function HomeScreen() {
         return;
       }
 
-      setPreviewResults(
-        result.results
-          .filter(
-            (item: SearchProductResult) => item.store_id && item.product_name,
-          )
-          .slice(0, 4)
-          .map((item: SearchProductResult, index: number) => ({
-            id: `${item.store_id}-${item.product_id || index}-${item.variant_name || "preview"}`,
-            image: item.image_url || null,
-            price:
-              typeof item.price === "number"
-                ? item.price
-                : item.price !== null && item.price !== undefined
-                  ? Number(item.price)
-                  : null,
-            productId: String(item.product_id || ""),
-            productName: item.product_name || "",
-            storeId: String(item.store_id),
-            storeName: item.store_name || "",
-            variant: item.variant_name || item.variant || "",
-          })),
-      );
+      setPreviewResults(result.items.slice(0, 4));
       setIsLoadingPreview(false);
     }
 
@@ -411,6 +364,18 @@ export default function HomeScreen() {
       clearTimeout(timeout);
     };
   }, [homeQuery]);
+
+  useEffect(() => {
+    if (!isSearchOverlayOpen) {
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      searchOverlayInputRef.current?.focus();
+    }, 60);
+
+    return () => clearTimeout(timeout);
+  }, [isSearchOverlayOpen]);
 
   const groupedPreviewResults = useMemo(
     () => groupPreviewResults(previewResults),
@@ -431,61 +396,79 @@ export default function HomeScreen() {
     }
 
     return {
-      address: store.address || "",
-      category: store.category || "",
-      id: String(store.id ?? ""),
-      image: store.image_url || null,
-      name: store.store_name || "Store",
+      address: store.address,
+      category: store.category,
+      id: store.id,
+      image: store.image,
+      name: store.name || "Store",
     };
   }, [selectedStoreId, storeMarkers]);
 
-  const setSheetOffset = useCallback(
-    (nextOffset: number) => {
-      const clamped = Math.max(0, Math.min(nextOffset, maxSheetOffset));
-      sheetAnimationRef.current?.stop();
-      sheetAnimationRef.current = null;
-      sheetOffsetRef.current = clamped;
-      setIsSheetCollapsed(clamped >= maxSheetOffset * 0.5);
-      sheetTranslateY.setValue(clamped);
+  const syncSheetFlags = useCallback(
+    (offset: number, options?: { manualCollapsed?: boolean }) => {
+      const manualCollapsed =
+        options?.manualCollapsed ?? offset >= maxSheetOffset * 0.5;
+      isManuallyCollapsedRef.current = manualCollapsed;
+      setIsManuallyCollapsed(manualCollapsed);
+      setIsSheetCollapsed(offset >= maxSheetOffset * 0.5);
     },
-    [maxSheetOffset, sheetTranslateY],
+    [maxSheetOffset],
   );
 
-  const animateSheetOffset = useCallback(
-    (nextOffset: number) => {
+  const setSheetPosition = useCallback(
+    (
+      nextOffset: number,
+      options?: { manualCollapsed?: boolean; stopAnimation?: boolean },
+    ) => {
+      const clamped = Math.max(0, Math.min(nextOffset, maxSheetOffset));
+      if (options?.stopAnimation !== false) {
+        sheetAnimationRef.current?.stop();
+        sheetAnimationRef.current = null;
+      }
+      sheetOffsetRef.current = clamped;
+      syncSheetFlags(clamped, { manualCollapsed: options?.manualCollapsed });
+      sheetTranslateY.setValue(clamped);
+    },
+    [maxSheetOffset, sheetTranslateY, syncSheetFlags],
+  );
+
+  const animateSheetPosition = useCallback(
+    (nextOffset: number, options?: { manualCollapsed?: boolean }) => {
       const clamped = Math.max(0, Math.min(nextOffset, maxSheetOffset));
 
-      sheetTranslateY.stopAnimation((currentValue) => {
-        sheetOffsetRef.current = currentValue;
+      sheetAnimationRef.current?.stop();
+      sheetAnimationRef.current = Animated.timing(sheetTranslateY, {
+        toValue: clamped,
+        duration: 260,
+        useNativeDriver: true,
+      });
 
-        if (clamped < maxSheetOffset * 0.5) {
-          setIsSheetCollapsed(false);
+      sheetAnimationRef.current.start(({ finished }) => {
+        if (!finished) {
+          return;
         }
 
-        sheetAnimationRef.current?.stop();
-        sheetAnimationRef.current = Animated.timing(sheetTranslateY, {
-          toValue: clamped,
-          duration: 260,
-          useNativeDriver: true,
-        });
-
-        sheetAnimationRef.current.start(({ finished }) => {
-          if (!finished) {
-            return;
-          }
-
-          sheetOffsetRef.current = clamped;
-          setIsSheetCollapsed(clamped >= maxSheetOffset * 0.5);
-          sheetAnimationRef.current = null;
-        });
+        sheetOffsetRef.current = clamped;
+        syncSheetFlags(clamped, { manualCollapsed: options?.manualCollapsed });
+        sheetAnimationRef.current = null;
       });
     },
-    [maxSheetOffset, sheetTranslateY],
+    [maxSheetOffset, sheetTranslateY, syncSheetFlags],
   );
 
   useEffect(() => {
-    setSheetOffset(sheetOffsetRef.current);
-  }, [setSheetOffset]);
+    setSheetPosition(sheetOffsetRef.current, {
+      manualCollapsed: isManuallyCollapsedRef.current,
+    });
+  }, [setSheetPosition]);
+
+  useEffect(() => {
+    isManuallyCollapsedRef.current = isManuallyCollapsed;
+  }, [isManuallyCollapsed]);
+
+  useEffect(() => {
+    isMapInteractingRef.current = isMapInteracting;
+  }, [isMapInteracting]);
 
   useEffect(() => {
     if (!focusStoreId) {
@@ -495,8 +478,8 @@ export default function HomeScreen() {
     setUserInteractedWithMap(false);
     setSelectedStoreId(focusStoreId);
     setMapFocusCoordinates(focusedCoordinates);
-    setSheetOffset(maxSheetOffset);
-  }, [focusStoreId, focusedCoordinates, maxSheetOffset, setSheetOffset]);
+    setSheetPosition(maxSheetOffset, { manualCollapsed: true });
+  }, [focusStoreId, focusedCoordinates, maxSheetOffset, setSheetPosition]);
 
   const handleRequestLocation = useCallback(() => {
     setUserInteractedWithMap(false);
@@ -515,10 +498,16 @@ export default function HomeScreen() {
     (storeId: string) => {
       setUserInteractedWithMap(false);
       setSelectedStoreId(storeId);
-      const store = storeMarkers.find(
-        (item) => String(item.id ?? "") === storeId,
-      );
-      const coordinates = store ? resolveStoreCoordinates(store) : null;
+      const store = storeMarkers.find((item) => item.id === storeId);
+      const coordinates =
+        store &&
+        typeof store.latitude === "number" &&
+        typeof store.longitude === "number"
+          ? {
+              latitude: store.latitude,
+              longitude: store.longitude,
+            }
+          : null;
 
       if (coordinates) {
         setMapFocusCoordinates({
@@ -532,61 +521,62 @@ export default function HomeScreen() {
     [storeMarkers],
   );
 
+  const handleOpenStoreFromHomeList = useCallback(
+    (storeId: string) => {
+      setSelectedStoreId(null);
+      setMapFocusCoordinates(null);
+      setUserInteractedWithMap(false);
+      router.push(`/store/${storeId}`);
+    },
+    [router],
+  );
+
   const handleMapMoveStart = useCallback(() => {
     setUserInteractedWithMap(true);
     setSelectedStoreId(null);
     setMapFocusCoordinates(null);
-    const state = mapSheetInteractionRef.current;
-
-    if (state.isMapMoving) {
+    if (isMapInteractingRef.current) {
       return;
     }
 
-    state.isMapMoving = true;
-    state.panelManuallyControlled = false;
-    state.originalOffset = sheetOffsetRef.current;
-    state.autoCollapsed = sheetOffsetRef.current < maxSheetOffset;
+    isMapInteractingRef.current = true;
+    setIsMapInteracting(true);
 
-    if (state.autoCollapsed) {
-      animateSheetOffset(maxSheetOffset);
+    if (!isManuallyCollapsedRef.current) {
+      animateSheetPosition(maxSheetOffset, { manualCollapsed: false });
     }
-  }, [animateSheetOffset, maxSheetOffset]);
+  }, [animateSheetPosition, maxSheetOffset]);
 
   const handleMapMoveEnd = useCallback(() => {
-    const state = mapSheetInteractionRef.current;
-
-    if (!state.isMapMoving) {
+    if (!isMapInteractingRef.current) {
       return;
     }
 
-    state.isMapMoving = false;
+    isMapInteractingRef.current = false;
+    setIsMapInteracting(false);
 
-    if (state.autoCollapsed && !state.panelManuallyControlled) {
-      animateSheetOffset(state.originalOffset);
+    if (!isManuallyCollapsedRef.current) {
+      animateSheetPosition(0, { manualCollapsed: false });
     }
-
-    state.autoCollapsed = false;
-    state.originalOffset = sheetOffsetRef.current;
-    state.panelManuallyControlled = false;
-  }, [animateSheetOffset]);
+  }, [animateSheetPosition]);
 
   const snapSheet = useCallback(
     (velocityY: number) => {
       const currentOffset = sheetOffsetRef.current;
+      const nextOffset =
+        velocityY > 0.5
+          ? maxSheetOffset
+          : velocityY < -0.5
+            ? 0
+            : currentOffset > maxSheetOffset / 2
+              ? maxSheetOffset
+              : 0;
 
-      if (velocityY > 0.5) {
-        setSheetOffset(maxSheetOffset);
-        return;
-      }
-
-      if (velocityY < -0.5) {
-        setSheetOffset(0);
-        return;
-      }
-
-      setSheetOffset(currentOffset > maxSheetOffset / 2 ? maxSheetOffset : 0);
+      animateSheetPosition(nextOffset, {
+        manualCollapsed: nextOffset >= maxSheetOffset * 0.5,
+      });
     },
-    [maxSheetOffset, setSheetOffset],
+    [animateSheetPosition, maxSheetOffset],
   );
 
   const sheetPanResponder = useMemo(
@@ -596,15 +586,16 @@ export default function HomeScreen() {
           Math.abs(gestureState.dy) > 6 &&
           Math.abs(gestureState.dy) > Math.abs(gestureState.dx),
         onPanResponderGrant: () => {
+          sheetAnimationRef.current?.stop();
+          sheetAnimationRef.current = null;
           dragStartOffsetRef.current = sheetOffsetRef.current;
-          mapSheetInteractionRef.current.panelManuallyControlled = true;
-          mapSheetInteractionRef.current.autoCollapsed = false;
         },
         onPanResponderMove: (_, gestureState) => {
           const nextOffset = dragStartOffsetRef.current + gestureState.dy;
-          const clamped = Math.max(0, Math.min(nextOffset, maxSheetOffset));
-          sheetOffsetRef.current = clamped;
-          sheetTranslateY.setValue(clamped);
+          setSheetPosition(nextOffset, {
+            manualCollapsed: nextOffset >= maxSheetOffset * 0.5,
+            stopAnimation: false,
+          });
         },
         onPanResponderRelease: (_, gestureState) => {
           snapSheet(gestureState.vy);
@@ -613,7 +604,7 @@ export default function HomeScreen() {
           snapSheet(gestureState.vy);
         },
       }),
-    [maxSheetOffset, sheetTranslateY, snapSheet],
+    [maxSheetOffset, setSheetPosition, snapSheet],
   );
 
   return (
@@ -671,49 +662,62 @@ export default function HomeScreen() {
         </View>
 
         {selectedMapStore ? (
-          <View pointerEvents="box-none" style={styles.mapPreviewWrap}>
+          <View
+            pointerEvents="box-none"
+            style={[
+              styles.mapPreviewWrap,
+              { top: insets.top + 112 },
+            ]}
+          >
             <View style={styles.mapPreviewCard}>
-              {selectedMapStore.image ? (
-                <Image
-                  source={{ uri: selectedMapStore.image }}
-                  style={styles.mapPreviewImage}
-                />
-              ) : (
-                <View style={styles.mapPreviewImageFallback}>
-                  <Text style={styles.mapPreviewImageFallbackText}>
-                    {buildStoreInitial(selectedMapStore.name)}
-                  </Text>
-                </View>
-              )}
+              <View style={styles.mapPreviewMediaWrap}>
+                {selectedMapStore.image ? (
+                  <Image
+                    source={{ uri: selectedMapStore.image }}
+                    style={styles.mapPreviewImage}
+                  />
+                ) : (
+                  <View style={styles.mapPreviewImageFallback}>
+                    <Text style={styles.mapPreviewImageFallbackText}>
+                      {buildStoreInitial(selectedMapStore.name)}
+                    </Text>
+                  </View>
+                )}
+              </View>
               <View style={styles.mapPreviewBody}>
                 <View style={styles.mapPreviewTopRow}>
-                  <Text numberOfLines={1} style={styles.mapPreviewTitle}>
-                    {selectedMapStore.name}
-                  </Text>
+                  <View style={styles.mapPreviewTitleBlock}>
+                    <Text numberOfLines={1} style={styles.mapPreviewTitle}>
+                      {selectedMapStore.name}
+                    </Text>
+                    <Text numberOfLines={1} style={styles.mapPreviewCategory}>
+                      {selectedMapStore.category || "Store"}
+                    </Text>
+                  </View>
                   <TouchableOpacity
                     activeOpacity={0.85}
                     onPress={() => setSelectedStoreId(null)}
                     style={styles.mapPreviewDismissButton}
                   >
-                    <Ionicons color="#94a3b8" name="close" size={16} />
+                    <Ionicons color="#B8C2D9" name="close" size={16} />
                   </TouchableOpacity>
                 </View>
-                <Text numberOfLines={1} style={styles.mapPreviewCategory}>
-                  {selectedMapStore.category || "Store"}
-                </Text>
                 {selectedMapStore.address ? (
                   <Text numberOfLines={2} style={styles.mapPreviewAddress}>
                     {selectedMapStore.address}
                   </Text>
                 ) : null}
-                <TouchableOpacity
-                  activeOpacity={0.85}
-                  onPress={() => router.push(`/store/${selectedMapStore.id}`)}
-                  style={styles.mapPreviewOpenButton}
-                >
-                  <Text style={styles.mapPreviewOpenText}>Open store</Text>
-                  <Ionicons color="#dbeafe" name="chevron-forward" size={14} />
-                </TouchableOpacity>
+                <View style={styles.mapPreviewFooter}>
+                  <View style={styles.mapPreviewFooterSpacer} />
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={() => router.push(`/store/${selectedMapStore.id}`)}
+                    style={styles.mapPreviewOpenButton}
+                  >
+                    <Text style={styles.mapPreviewOpenText}>Open store</Text>
+                    <Ionicons color="#0A0F1F" name="chevron-forward" size={14} />
+                  </TouchableOpacity>
+                </View>
               </View>
             </View>
           </View>
@@ -735,7 +739,7 @@ export default function HomeScreen() {
                   onPress={() => setIsSearchOverlayOpen(false)}
                   style={styles.searchOverlayCloseButton}
                 >
-                  <Ionicons color="#f8fafc" name="close" size={22} />
+                  <Ionicons color="#F5F7FB" name="close" size={22} />
                 </TouchableOpacity>
               </View>
 
@@ -753,6 +757,7 @@ export default function HomeScreen() {
               </TouchableOpacity>
 
               <SearchInput
+                inputRef={searchOverlayInputRef}
                 onChangeText={(value) => {
                   setOverlaySearchQuery(value);
                   setHomeQuery(value);
@@ -852,31 +857,51 @@ export default function HomeScreen() {
                           >
                             {item.storeName}
                           </Text>
+                          {item.distance ? (
+                            <Text
+                              numberOfLines={1}
+                              style={styles.previewDistanceText}
+                            >
+                              {item.distance}
+                            </Text>
+                          ) : null}
                         </View>
                         <Text
                           numberOfLines={2}
                           style={styles.previewProductName}
                         >
-                          {item.productName}
+                          {item.productName || "Store match"}
                         </Text>
-                        {item.variants.map((variant) => (
-                          <View
-                            key={variant.id}
-                            style={styles.previewVariantRow}
-                          >
+                        {item.variants.length > 0 ? (
+                          item.variants.map((variant) => (
+                            <View
+                              key={variant.id}
+                              style={styles.previewVariantRow}
+                            >
+                              <Text
+                                numberOfLines={1}
+                                style={styles.previewVariantText}
+                              >
+                                {variant.label}
+                              </Text>
+                              <Text style={styles.previewPriceText}>
+                                {variant.price !== null
+                                  ? `₦${variant.price.toLocaleString("en-NG")}`
+                                  : "View"}
+                              </Text>
+                            </View>
+                          ))
+                        ) : (
+                          <View style={styles.previewVariantRow}>
                             <Text
                               numberOfLines={1}
                               style={styles.previewVariantText}
                             >
-                              {variant.label}
+                              Open this store to view products and location
                             </Text>
-                            <Text style={styles.previewPriceText}>
-                              {variant.price !== null
-                                ? `₦${variant.price.toLocaleString("en-NG")}`
-                                : "View"}
-                            </Text>
+                            <Text style={styles.previewPriceText}>View</Text>
                           </View>
-                        ))}
+                        )}
                       </View>
                     </TouchableOpacity>
                   ))
@@ -954,9 +979,12 @@ export default function HomeScreen() {
           <View {...sheetPanResponder.panHandlers} style={styles.sheetDragZone}>
             <TouchableOpacity
               activeOpacity={0.9}
-              onPress={() =>
-                animateSheetOffset(isSheetCollapsed ? 0 : maxSheetOffset)
-              }
+              onPress={() => {
+                const nextOffset = isSheetCollapsed ? 0 : maxSheetOffset;
+                animateSheetPosition(nextOffset, {
+                  manualCollapsed: nextOffset >= maxSheetOffset * 0.5,
+                });
+              }}
               style={styles.handleButton}
             >
               <View style={styles.handle} />
@@ -976,7 +1004,10 @@ export default function HomeScreen() {
             >
               <SearchInput
                 mode="pressable"
-                onPress={() => setIsSearchOverlayOpen(true)}
+                onPress={() => {
+                  animateSheetPosition(0, { manualCollapsed: false });
+                  setIsSearchOverlayOpen(true);
+                }}
                 placeholder="Search for food, groceries, electronics"
                 style={styles.searchBar}
               />
@@ -1094,7 +1125,7 @@ export default function HomeScreen() {
                       <TouchableOpacity
                         key={`${store.id}-nearby-${index}`}
                         activeOpacity={0.85}
-                        onPress={() => router.push(`/store/${store.id}`)}
+                        onPress={() => handleOpenStoreFromHomeList(store.id)}
                         style={[
                           styles.storeRowCard,
                           selectedStoreId === store.id
@@ -1138,10 +1169,10 @@ export default function HomeScreen() {
                   ) : (
                     <View style={styles.infoCard}>
                       <Text style={styles.infoCardTitle}>
-                        Search or browse to discover nearby stores
+                        Waiting for stores near you
                       </Text>
                       <Text style={styles.infoCardText}>
-                        Stores will show here when they are within 1 km of you.
+                        Stores are sorted by distance as soon as your location is available.
                       </Text>
                     </View>
                   )}
@@ -1176,10 +1207,7 @@ export default function HomeScreen() {
                       <TouchableOpacity
                         key={`${store.id}-${index}`}
                         activeOpacity={0.85}
-                        onPress={() => {
-                          handleSelectStore(store.id);
-                          router.push(`/store/${store.id}`);
-                        }}
+                        onPress={() => handleOpenStoreFromHomeList(store.id)}
                         style={[
                           styles.storeRowCard,
                           selectedStoreId === store.id
@@ -1223,11 +1251,10 @@ export default function HomeScreen() {
                   ) : (
                     <View style={styles.infoCard}>
                       <Text style={styles.infoCardTitle}>
-                        Search or browse to discover nearby stores
+                        No stores available yet
                       </Text>
                       <Text style={styles.infoCardText}>
-                        Stores will appear here when nearby results are
-                        available.
+                        Public stores with valid map coordinates will appear here automatically.
                       </Text>
                     </View>
                   )}
@@ -1243,16 +1270,14 @@ export default function HomeScreen() {
   );
 }
 
-const BORDER = "rgba(255,255,255,0.08)";
-
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: "transparent",
   },
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: "transparent",
   },
   mapArea: {
     ...StyleSheet.absoluteFillObject,
@@ -1270,12 +1295,12 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: "rgba(31, 41, 55, 0.96)",
+    backgroundColor: theme.colors.surfaceCard,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.10)",
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#020617",
+    shadowColor: theme.colors.shadow,
     shadowOffset: { width: 0, height: 18 },
     shadowOpacity: 0.24,
     shadowRadius: 26,
@@ -1290,13 +1315,13 @@ const styles = StyleSheet.create({
     width: 24,
     height: 2.5,
     borderRadius: 999,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#F5F7FB",
   },
   homeMenuLineShort: {
     width: 14,
     height: 2.5,
     borderRadius: 999,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#F5F7FB",
   },
   accountStatusChip: {
     minWidth: 132,
@@ -1304,7 +1329,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.10)",
-    backgroundColor: "rgba(17, 24, 39, 0.94)",
+    backgroundColor: theme.colors.surfaceCard,
     paddingHorizontal: 16,
     paddingVertical: 12,
     gap: 8,
@@ -1328,8 +1353,8 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: 16,
     right: 16,
-    top: 140,
     zIndex: 58,
+    alignItems: "center",
   },
   searchOverlayWrap: {
     ...StyleSheet.absoluteFillObject,
@@ -1340,7 +1365,7 @@ const styles = StyleSheet.create({
   },
   searchOverlayBackdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(2, 6, 23, 0.28)",
+    backgroundColor: "rgba(7,11,24,0.76)",
   },
   searchOverlayCard: {
     width: "100%",
@@ -1348,12 +1373,12 @@ const styles = StyleSheet.create({
     maxHeight: "72%",
     borderRadius: 30,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
-    backgroundColor: "rgba(11, 18, 32, 0.94)",
+    borderColor: theme.colors.borderStrong,
+    backgroundColor: theme.colors.surfaceCard,
     paddingHorizontal: 18,
     paddingTop: 20,
     paddingBottom: 20,
-    shadowColor: "#020617",
+    shadowColor: theme.colors.shadow,
     shadowOffset: { width: 0, height: 18 },
     shadowOpacity: 0.28,
     shadowRadius: 28,
@@ -1376,20 +1401,22 @@ const styles = StyleSheet.create({
     borderRadius: 26,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(17,24,39,0.82)",
+    borderWidth: 1,
+    borderColor: theme.colors.borderSoft,
     opacity: 0.92,
   },
   searchOverlayLocationCard: {
     borderRadius: 30,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-    backgroundColor: "rgba(255,255,255,0.08)",
+    borderColor: theme.colors.borderStrong,
+    backgroundColor: "rgba(19,29,49,0.9)",
     paddingHorizontal: 18,
     paddingVertical: 18,
     marginBottom: 18,
   },
   searchOverlayLocationEyebrow: {
-    color: "#9ca3af",
+    color: theme.colors.mutedText,
     fontSize: 12,
     fontWeight: "800",
     letterSpacing: 1.2,
@@ -1402,7 +1429,7 @@ const styles = StyleSheet.create({
   },
   searchOverlayInput: {
     marginBottom: 28,
-    backgroundColor: "rgba(12, 22, 42, 0.96)",
+    backgroundColor: theme.colors.surfaceElevated,
   },
   searchOverlaySectionHeader: {
     flexDirection: "row",
@@ -1422,80 +1449,109 @@ const styles = StyleSheet.create({
     paddingBottom: 36,
   },
   mapPreviewCard: {
+    width: "100%",
+    maxWidth: 560,
     flexDirection: "row",
     overflow: "hidden",
-    borderRadius: 24,
+    alignItems: "center",
+    borderRadius: 22,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.10)",
-    backgroundColor: "rgba(9, 15, 29, 0.94)",
-    shadowColor: "#020617",
-    shadowOffset: { width: 0, height: 18 },
-    shadowOpacity: 0.28,
-    shadowRadius: 26,
-    elevation: 10,
+    backgroundColor: theme.colors.surfaceCard,
+    shadowColor: "#0A0F1F",
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.22,
+    shadowRadius: 20,
+    elevation: 8,
+  },
+  mapPreviewMediaWrap: {
+    paddingLeft: 10,
+    paddingVertical: 10,
   },
   mapPreviewImage: {
-    width: 116,
-    height: 104,
+    width: 72,
+    height: 72,
+    borderRadius: 18,
   },
   mapPreviewImageFallback: {
-    width: 116,
-    height: 104,
+    width: 72,
+    height: 72,
+    borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(30, 41, 59, 0.98)",
+    backgroundColor: "rgba(255,255,255,0.14)",
   },
   mapPreviewImageFallbackText: {
-    color: "#f8fafc",
-    fontSize: 34,
+    color: "#F5F7FB",
+    fontSize: 24,
     fontWeight: "800",
   },
   mapPreviewBody: {
     flex: 1,
-    justifyContent: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingLeft: 12,
+    paddingRight: 12,
+    paddingVertical: 12,
   },
   mapPreviewTopRow: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
+    gap: 10,
+  },
+  mapPreviewTitleBlock: {
+    flex: 1,
+    gap: 3,
   },
   mapPreviewTitle: {
-    flex: 1,
     color: theme.colors.text,
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "800",
+    letterSpacing: -0.2,
   },
   mapPreviewDismissButton: {
-    width: 24,
-    height: 24,
+    width: 28,
+    height: 28,
     borderRadius: 999,
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
   },
   mapPreviewCategory: {
-    marginTop: 10,
-    color: "#b8c6d9",
-    fontSize: 13,
+    color: theme.colors.mutedText,
+    fontSize: 11,
     fontWeight: "700",
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
   },
   mapPreviewAddress: {
-    marginTop: 6,
-    color: "#8fa2ba",
+    marginTop: 8,
+    color: theme.colors.mutedText,
     fontSize: 12,
-    lineHeight: 18,
+    lineHeight: 16,
   },
-  mapPreviewOpenButton: {
-    alignSelf: "flex-start",
+  mapPreviewFooter: {
+    marginTop: 10,
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
-    marginTop: 10,
+    justifyContent: "space-between",
+  },
+  mapPreviewFooterSpacer: {
+    flex: 1,
+  },
+  mapPreviewOpenButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    height: 30,
+    borderRadius: 999,
+    backgroundColor: theme.colors.accent,
   },
   mapPreviewOpenText: {
-    color: "#dbeafe",
+    color: theme.colors.primaryTextOnAccent,
     fontSize: 12,
-    fontWeight: "700",
+    fontWeight: "800",
   },
   sheet: {
     position: "absolute",
@@ -1507,8 +1563,8 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 32,
     borderWidth: 1,
     borderBottomWidth: 0,
-    borderColor: "rgba(255,255,255,0.08)",
-    backgroundColor: "rgba(10, 18, 32, 0.94)",
+    borderColor: theme.colors.borderStrong,
+    backgroundColor: theme.colors.surfaceOverlay,
     shadowColor: theme.colors.shadow,
     shadowOffset: { width: 0, height: -10 },
     shadowOpacity: 0.22,
@@ -1528,7 +1584,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginBottom: 8,
     borderRadius: 999,
-    backgroundColor: "rgba(255,255,255,0.18)",
+    backgroundColor: theme.colors.borderStrong,
   },
   searchHeader: {
     paddingHorizontal: 18,
@@ -1550,8 +1606,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.14)",
-    backgroundColor: "rgba(255,255,255,0.12)",
+    borderColor: theme.colors.borderStrong,
+    backgroundColor: "rgba(19,29,49,0.9)",
   },
   locationIconWrap: {
     width: 24,
@@ -1559,10 +1615,10 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(79,124,255,0.30)",
+    backgroundColor: "rgba(74,136,255,0.24)",
   },
   locationButtonText: {
-    color: "#d8e6f6",
+    color: theme.colors.subduedText,
     fontSize: 13,
     fontWeight: "800",
   },
@@ -1590,7 +1646,7 @@ const styles = StyleSheet.create({
     letterSpacing: -0.3,
   },
   clearText: {
-    color: "#5FA0FF",
+    color: theme.colors.accentStrong,
     fontSize: 14,
     fontWeight: "700",
   },
@@ -1599,8 +1655,8 @@ const styles = StyleSheet.create({
     padding: 18,
     borderRadius: 22,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-    backgroundColor: "rgba(16, 26, 46, 0.88)",
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surfaceCard,
   },
   infoCardTitle: {
     color: theme.colors.text,
@@ -1608,7 +1664,7 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   infoCardText: {
-    color: "#9fb0c4",
+    color: theme.colors.mutedText,
     fontSize: 14,
     lineHeight: 22,
   },
@@ -1620,20 +1676,20 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 22,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-    backgroundColor: "rgba(16, 26, 46, 0.9)",
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surfaceCard,
   },
   previewImage: {
     width: 56,
     height: 56,
     borderRadius: 16,
-    backgroundColor: "#111827",
+    backgroundColor: "rgba(255,255,255,0.12)",
   },
   previewImageFallback: {
     width: 56,
     height: 56,
     borderRadius: 16,
-    backgroundColor: "rgba(59,130,246,0.14)",
+    backgroundColor: "rgba(74,136,255,0.14)",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
     alignItems: "center",
@@ -1659,16 +1715,22 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "800",
   },
+  previewDistanceText: {
+    color: theme.colors.accentStrong,
+    fontSize: 12,
+    fontWeight: "700",
+    marginLeft: "auto",
+  },
   previewProductName: {
     marginTop: 3,
-    color: "#E2E8F0",
+    color: theme.colors.subduedText,
     fontSize: 13,
     fontWeight: "700",
     lineHeight: 18,
   },
   previewVariantText: {
     marginTop: 4,
-    color: "#94a8bf",
+    color: theme.colors.mutedText,
     fontSize: 12,
   },
   previewVariantRow: {
@@ -1689,7 +1751,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   previewLinkText: {
-    color: "#5FA0FF",
+    color: theme.colors.accentStrong,
     fontSize: 11,
     fontWeight: "700",
   },
@@ -1699,16 +1761,16 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: 26,
     borderWidth: 1,
-    borderColor: BORDER,
-    backgroundColor: "rgba(16, 26, 46, 0.94)",
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surfaceCard,
   },
   recentVisualCard: {
     height: 152,
     overflow: "hidden",
     borderRadius: 24,
     borderWidth: 1,
-    borderColor: BORDER,
-    backgroundColor: "#111827",
+    borderColor: theme.colors.border,
+    backgroundColor: "rgba(19,29,49,0.9)",
   },
   recentVisualImage: {
     ...StyleSheet.absoluteFillObject,
@@ -1717,16 +1779,16 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(59,130,246,0.18)",
+    backgroundColor: "rgba(74,136,255,0.18)",
   },
   recentVisualFallbackText: {
-    color: "#f8fafc",
+    color: "#F5F7FB",
     fontSize: 34,
     fontWeight: "800",
   },
   recentVisualOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(2, 6, 23, 0.22)",
+    backgroundColor: "rgba(10, 15, 31, 0.22)",
   },
   recentAvatar: {
     position: "absolute",
@@ -1737,12 +1799,12 @@ const styles = StyleSheet.create({
     borderRadius: 29,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(2, 6, 23, 0.72)",
+    backgroundColor: "rgba(20, 31, 54, 0.78)",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.10)",
   },
   recentAvatarText: {
-    color: "#f8fafc",
+    color: "#F5F7FB",
     fontSize: 22,
     fontWeight: "800",
   },
@@ -1752,7 +1814,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     padding: 18,
-    backgroundColor: "rgba(2, 6, 23, 0.56)",
+    backgroundColor: "rgba(12, 18, 34, 0.68)",
   },
   recentStoreInfo: {
     gap: 2,
@@ -1763,7 +1825,7 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   recentStoreSubtitle: {
-    color: "#c3d1e6",
+    color: theme.colors.subduedText,
     fontSize: 13,
   },
   storeRowCard: {
@@ -1773,12 +1835,12 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 22,
     borderWidth: 1,
-    borderColor: BORDER,
-    backgroundColor: "rgba(16, 26, 46, 0.9)",
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surfaceCard,
   },
   storeRowCardSelected: {
-    borderColor: "rgba(125, 211, 252, 0.32)",
-    backgroundColor: "rgba(8, 47, 73, 0.88)",
+    borderColor: "rgba(120,163,255,0.32)",
+    backgroundColor: "rgba(19,29,49,0.92)",
   },
   storeRowImage: {
     width: 58,
@@ -1791,7 +1853,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(59,130,246,0.16)",
+    backgroundColor: "rgba(74,136,255,0.16)",
   },
   storeRowImageFallbackText: {
     color: theme.colors.text,
@@ -1815,12 +1877,12 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   storeRowMeta: {
-    color: "#b9c6d8",
+    color: theme.colors.subduedText,
     fontSize: 13,
     fontWeight: "700",
   },
   storeRowAddress: {
-    color: "#8fa2ba",
+    color: theme.colors.mutedText,
     fontSize: 12,
     lineHeight: 16,
   },

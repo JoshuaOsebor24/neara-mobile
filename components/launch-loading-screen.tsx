@@ -18,19 +18,23 @@ export function LaunchLoadingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: "transparent",
     alignItems: "center",
     justifyContent: "center",
   },
   logo: {
-    width: 88,
-    height: 88,
-    marginBottom: 18,
+    width: 124,
+    height: 124,
+    marginBottom: 4,
   },
   label: {
     color: theme.colors.text,
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: "900",
-    letterSpacing: 0.5,
+    letterSpacing: 0.2,
+    lineHeight: 30,
+    textShadowColor: "rgba(141, 221, 255, 0.26)",
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 10,
   },
 });

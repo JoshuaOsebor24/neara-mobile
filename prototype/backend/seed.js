@@ -126,7 +126,10 @@ async function ensureStore(client, storeData, ownerId) {
           is_suspended = FALSE,
           image_url = $10,
           header_images = $11::jsonb,
-          description = $12
+          description = $12,
+          delivery_available = $13,
+          verified = $14,
+          subscription_tier = $15
         WHERE id = $1
         RETURNING id
       `,
@@ -143,6 +146,9 @@ async function ensureStore(client, storeData, ownerId) {
         storeData.image_url || null,
         JSON.stringify(headerImages),
         storeData.description || null,
+        Boolean(storeData.delivery_available),
+        Boolean(storeData.verified),
+        Number.isInteger(storeData.subscription_tier) ? storeData.subscription_tier : 1,
       ],
     );
 
@@ -164,9 +170,12 @@ async function ensureStore(client, storeData, ownerId) {
         is_suspended,
         image_url,
         header_images,
-        description
+        description,
+        delivery_available,
+        verified,
+        subscription_tier
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, FALSE, $10, $11::jsonb, $12)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, FALSE, $10, $11::jsonb, $12, $13, $14, $15)
       RETURNING id
     `,
     [
@@ -182,6 +191,9 @@ async function ensureStore(client, storeData, ownerId) {
       storeData.image_url || null,
       JSON.stringify(headerImages),
       storeData.description || null,
+      Boolean(storeData.delivery_available),
+      Boolean(storeData.verified),
+      Number.isInteger(storeData.subscription_tier) ? storeData.subscription_tier : 1,
     ],
   );
 
@@ -319,7 +331,7 @@ async function seed() {
     for (const blueprint of STORE_BLUEPRINTS) {
       const owner = await ensureUser(client, blueprint.store.owner, {
         isOwner: true,
-        premiumStatus: false,
+        premiumStatus: Number(blueprint.store.subscription_tier || 1) > 1,
       });
 
       const storeResult = await ensureStore(client, blueprint.store, owner.id);

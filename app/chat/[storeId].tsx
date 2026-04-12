@@ -105,6 +105,7 @@ export default function ChatThreadScreen() {
   const session = useMobileSession();
   const scrollViewRef = useRef<ScrollView>(null);
   const lastAppliedDraftSeedRef = useRef("");
+  const latestConversationLoadIdRef = useRef(0);
   const [conversation, setConversation] =
     useState<ChatConversationDetail | null>(null);
   const [storeName, setStoreName] = useState("");
@@ -177,6 +178,10 @@ export default function ChatThreadScreen() {
       return;
     }
 
+    let cancelled = false;
+    const loadId = latestConversationLoadIdRef.current + 1;
+    latestConversationLoadIdRef.current = loadId;
+
     async function loadConversation() {
       setIsLoading(true);
       setErrorMessage("");
@@ -186,6 +191,10 @@ export default function ChatThreadScreen() {
           session.authToken!,
           conversationId,
         );
+
+        if (cancelled || latestConversationLoadIdRef.current !== loadId) {
+          return;
+        }
 
         if (!result.ok) {
           if (result.status === 0 || result.status >= 500) {
@@ -227,6 +236,10 @@ export default function ChatThreadScreen() {
 
       const result = await fetchStoreChatPreview(session.authToken!, storeId);
 
+      if (cancelled || latestConversationLoadIdRef.current !== loadId) {
+        return;
+      }
+
       if (!result.ok) {
         if (result.status === 0 || result.status >= 500) {
           console.error("[chat] fetch store preview failed", {
@@ -266,6 +279,10 @@ export default function ChatThreadScreen() {
     }
 
     void loadConversation();
+
+    return () => {
+      cancelled = true;
+    };
   }, [
     conversationId,
     router,
@@ -480,7 +497,7 @@ export default function ChatThreadScreen() {
               </Text>
               <Text style={styles.headerSubtitle}>{subtitle}</Text>
             </View>
-            <Ionicons color="#64748b" name="chevron-forward" size={16} />
+            <Ionicons color="#7F8EAD" name="chevron-forward" size={16} />
           </TouchableOpacity>
         </View>
 
@@ -488,8 +505,8 @@ export default function ChatThreadScreen() {
         <View style={styles.threadWrap}>
           <LinearGradient
             colors={[
-              "rgba(8, 15, 28, 0.96)",
-              "rgba(6, 12, 24, 1)",
+              "rgba(10,15,31,0.96)",
+              "rgba(8,12,24,1)",
               "rgba(4, 10, 20, 1)",
             ]}
             pointerEvents="none"
@@ -641,7 +658,7 @@ export default function ChatThreadScreen() {
                                 />
                               ) : ownStatus === "read" ? (
                                 <Ionicons
-                                  color="#7dd3fc"
+                                  color="#4A88FF"
                                   name="checkmark-done"
                                   size={13}
                                 />
@@ -707,7 +724,7 @@ export default function ChatThreadScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: "transparent",
   },
   keyboardAvoidingView: {
     flex: 1,
@@ -719,8 +736,8 @@ const styles = StyleSheet.create({
     paddingTop: theme.spacing.screenTop + 4,
     paddingBottom: 18,
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(255,255,255,0.06)",
-    backgroundColor: "rgba(10, 18, 32, 0.96)",
+    borderBottomColor: theme.colors.borderSoft,
+    backgroundColor: theme.colors.surfaceCard,
   },
   headerContentButton: {
     alignItems: "center",
@@ -731,8 +748,8 @@ const styles = StyleSheet.create({
   },
   headerAvatar: {
     alignItems: "center",
-    backgroundColor: "rgba(56,189,248,0.16)",
-    borderColor: "rgba(56,189,248,0.22)",
+    backgroundColor: "rgba(74,136,255,0.16)",
+    borderColor: "rgba(74,136,255,0.22)",
     borderRadius: 22,
     borderWidth: 1,
     height: 44,
@@ -740,7 +757,7 @@ const styles = StyleSheet.create({
     width: 44,
   },
   headerAvatarText: {
-    color: "#dbeafe",
+    color: theme.colors.text,
     fontSize: 16,
     fontWeight: "800",
   },
@@ -755,7 +772,7 @@ const styles = StyleSheet.create({
   },
   headerSubtitle: {
     fontSize: 13,
-    color: "#7dd3fc",
+    color: "#D9E4FF",
     fontWeight: "600",
   },
   threadWrap: {
@@ -785,13 +802,13 @@ const styles = StyleSheet.create({
   },
   emptyThreadLabel: {
     alignSelf: "center",
-    color: "#64748b",
+    color: theme.colors.mutedText,
     fontSize: 13,
     paddingVertical: 12,
   },
   noticeCard: {
-    backgroundColor: "rgba(125, 211, 252, 0.08)",
-    borderColor: "rgba(125, 211, 252, 0.18)",
+    backgroundColor: "rgba(120,163,255,0.08)",
+    borderColor: "rgba(120,163,255,0.18)",
     borderRadius: 18,
     borderWidth: 1,
     marginBottom: 14,
@@ -799,22 +816,22 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   noticeTitle: {
-    color: "#dbeafe",
+    color: theme.colors.text,
     fontSize: 12,
     fontWeight: "700",
     letterSpacing: 1.2,
     textTransform: "uppercase",
   },
   noticeText: {
-    color: "#cbd5e1",
+    color: theme.colors.subduedText,
     fontSize: 14,
     lineHeight: 20,
     marginTop: 6,
   },
   contextCard: {
     alignSelf: "flex-start",
-    backgroundColor: "rgba(15,23,42,0.84)",
-    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: theme.colors.surfaceOverlay,
+    borderColor: theme.colors.borderSoft,
     borderRadius: 16,
     borderWidth: 1,
     marginBottom: 18,
@@ -823,7 +840,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   contextLabel: {
-    color: "#93c5fd",
+    color: "#D9E4FF",
     fontSize: 11,
     fontWeight: "700",
     letterSpacing: 1.2,
@@ -837,7 +854,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   contextMeta: {
-    color: "#94a3b8",
+    color: theme.colors.mutedText,
     fontSize: 12,
     marginTop: 4,
   },
@@ -854,7 +871,7 @@ const styles = StyleSheet.create({
     height: 1,
   },
   dateSeparatorText: {
-    color: "#64748b",
+    color: theme.colors.mutedText,
     fontSize: 12,
     fontWeight: "700",
   },
@@ -875,14 +892,14 @@ const styles = StyleSheet.create({
   },
   ownMessage: {
     alignSelf: "flex-end",
-    backgroundColor: "rgba(59, 130, 246, 0.24)",
+    backgroundColor: "rgba(74,136,255,0.24)",
     borderWidth: 1,
     borderColor: "rgba(96, 165, 250, 0.3)",
     borderBottomRightRadius: 8,
   },
   otherMessage: {
     alignSelf: "flex-start",
-    backgroundColor: "rgba(11, 18, 32, 0.98)",
+    backgroundColor: theme.colors.surfaceOverlay,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.1)",
     borderBottomLeftRadius: 8,
@@ -920,7 +937,7 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   ownMessageTime: {
-    color: "rgba(56, 189, 248, 0.7)",
+    color: "rgba(74,136,255,0.7)",
   },
   otherMessageTime: {
     color: theme.colors.mutedText,

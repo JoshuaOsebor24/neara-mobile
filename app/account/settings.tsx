@@ -141,7 +141,7 @@ export default function SettingsScreen() {
                           {settingsName || "Add name"}
                         </Text>
                         <Ionicons
-                          color="#64748b"
+                          color="#7F8EAD"
                           name="chevron-forward"
                           size={16}
                         />
@@ -152,7 +152,7 @@ export default function SettingsScreen() {
                         <TextInput
                           onChangeText={setSettingsName}
                           placeholder="Your name"
-                          placeholderTextColor="#64748b"
+                          placeholderTextColor="#7F8EAD"
                           selectionColor={theme.colors.accent}
                           style={styles.textField}
                           value={settingsName}
@@ -175,7 +175,7 @@ export default function SettingsScreen() {
                           {settingsEmail || "Add email"}
                         </Text>
                         <Ionicons
-                          color="#64748b"
+                          color="#7F8EAD"
                           name="chevron-forward"
                           size={16}
                         />
@@ -188,7 +188,7 @@ export default function SettingsScreen() {
                           keyboardType="email-address"
                           onChangeText={setSettingsEmail}
                           placeholder="you@example.com"
-                          placeholderTextColor="#64748b"
+                          placeholderTextColor="#7F8EAD"
                           selectionColor={theme.colors.accent}
                           style={styles.textField}
                           value={settingsEmail}
@@ -214,7 +214,7 @@ export default function SettingsScreen() {
                         ) : (
                           <View style={styles.addPhoneRow}>
                             <Ionicons
-                              color="#38bdf8"
+                              color="#4A88FF"
                               name="add-circle-outline"
                               size={16}
                               style={styles.addIcon}
@@ -225,7 +225,7 @@ export default function SettingsScreen() {
                           </View>
                         )}
                         <Ionicons
-                          color="#64748b"
+                          color="#7F8EAD"
                           name="chevron-forward"
                           size={16}
                         />
@@ -237,7 +237,7 @@ export default function SettingsScreen() {
                           keyboardType="phone-pad"
                           onChangeText={setSettingsPhone}
                           placeholder="0800 000 0000"
-                          placeholderTextColor="#64748b"
+                          placeholderTextColor="#7F8EAD"
                           selectionColor={theme.colors.accent}
                           style={styles.textField}
                           value={settingsPhone}
@@ -257,9 +257,9 @@ export default function SettingsScreen() {
                       <Switch
                         trackColor={{
                           false: "#374151",
-                          true: "rgba(56, 189, 248, 0.3)",
+                          true: "rgba(74,136,255,0.3)",
                         }}
-                        thumbColor={locationSuggestions ? "#38bdf8" : "#9ca3af"}
+                        thumbColor={locationSuggestions ? "#4A88FF" : "#9ca3af"}
                         ios_backgroundColor="#374151"
                         onValueChange={setLocationSuggestions}
                         value={locationSuggestions}
@@ -271,9 +271,9 @@ export default function SettingsScreen() {
                       <Switch
                         trackColor={{
                           false: "#374151",
-                          true: "rgba(56, 189, 248, 0.3)",
+                          true: "rgba(74,136,255,0.3)",
                         }}
-                        thumbColor={savedSync ? "#38bdf8" : "#9ca3af"}
+                        thumbColor={savedSync ? "#4A88FF" : "#9ca3af"}
                         ios_backgroundColor="#374151"
                         onValueChange={setSavedSync}
                         value={savedSync}
@@ -289,7 +289,7 @@ export default function SettingsScreen() {
                     style={styles.logoutRow}
                   >
                     <Ionicons
-                      color="#fda4af"
+                      color="#D9E1F0"
                       name="log-out-outline"
                       size={16}
                       style={styles.logoutIcon}
@@ -334,7 +334,7 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: "transparent",
   },
   scrollContent: {
     paddingHorizontal: 16,
@@ -365,7 +365,7 @@ const styles = StyleSheet.create({
     marginBottom: 28,
   },
   headerBrand: {
-    color: "#94a3b8",
+    color: "#B8C2D9",
     fontSize: 12,
     letterSpacing: 2.2,
     textTransform: "uppercase",
@@ -384,7 +384,7 @@ const styles = StyleSheet.create({
     marginTop: 28,
   },
   groupLabel: {
-    color: "#94a3b8",
+    color: "#B8C2D9",
     fontSize: 12,
     fontWeight: "700",
     letterSpacing: 1.8,
@@ -418,12 +418,12 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   addPhoneText: {
-    color: "#38bdf8",
+    color: "#4A88FF",
     fontSize: 14,
     fontWeight: "500",
   },
   settingLabel: {
-    color: "#cbd5e1",
+    color: "#C7D2E5",
     fontSize: 14,
   },
   settingValue: {
@@ -437,7 +437,7 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
   },
   textField: {
-    backgroundColor: "rgba(2, 6, 23, 0.6)",
+    backgroundColor: "rgba(10,15,31,0.6)",
     borderColor: "rgba(255,255,255,0.10)",
     borderRadius: 16,
     borderWidth: 1,
@@ -467,7 +467,7 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   logoutText: {
-    color: "#fda4af",
+    color: "#D9E1F0",
     fontSize: 14,
     fontWeight: "500",
     paddingVertical: 16,
@@ -481,13 +481,13 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   noticeText: {
-    color: "#d1fae5",
+    color: "#D9E4FF",
     fontSize: 14,
   },
   saveButton: {
     alignItems: "center",
-    backgroundColor: "rgba(56, 189, 248, 0.12)",
-    borderColor: "rgba(56, 189, 248, 0.20)",
+    backgroundColor: "rgba(74,136,255,0.12)",
+    borderColor: "rgba(74,136,255,0.20)",
     borderRadius: 16,
     borderWidth: 1,
     justifyContent: "center",
@@ -499,16 +499,16 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   saveButtonText: {
-    color: "#38bdf8",
+    color: "#4A88FF",
     fontSize: 16,
     fontWeight: "600",
   },
   saveButtonTextDisabled: {
-    color: "#64748b",
+    color: "#7F8EAD",
   },
   primaryButton: {
     alignItems: "center",
-    backgroundColor: "#ffffff",
+    backgroundColor: "#F5F7FB",
     borderRadius: 16,
     justifyContent: "center",
     minHeight: 52,
@@ -518,7 +518,7 @@ const styles = StyleSheet.create({
     opacity: 0.72,
   },
   primaryButtonText: {
-    color: "#020617",
+    color: "#0A0F1F",
     fontSize: 14,
     fontWeight: "700",
   },

@@ -1,7 +1,44 @@
 import {
-  getMobileApiBaseCandidates,
   requestMobileApi,
+  requestMobileApiFormData,
 } from "@/services/api";
+import { invalidateStoreCache } from "@/services/store-api";
+
+const STORE_PRODUCT_CACHE_TTL_MS = 20_000;
+const storeProductsCache = new Map<
+  string,
+  {
+    expiresAt: number;
+    value:
+      | {
+          ok: true;
+          products: BackendProduct[];
+          status: number;
+        }
+      | {
+          error: string;
+          ok: false;
+          products: BackendProduct[];
+          status: number;
+        };
+  }
+>();
+const inflightStoreProductsRequests = new Map<
+  string,
+  Promise<
+    | {
+        ok: true;
+        products: BackendProduct[];
+        status: number;
+      }
+    | {
+        error: string;
+        ok: false;
+        products: BackendProduct[];
+        status: number;
+      }
+  >
+>();
 
 export type BackendProductVariant = {
   id?: number | string;
@@ -28,6 +65,10 @@ type ProductListResponse = {
   products?: BackendProduct[];
 };
 
+type LegacyProductListResponse = {
+  products?: BackendProduct[];
+};
+
 type ProductMutationResponse = {
   errors?: {
     message?: string;
@@ -41,25 +82,102 @@ type ProductDeleteResponse = {
   message?: string;
 };
 
-export async function fetchStoreProducts(storeId: string) {
-  const result = await requestMobileApi<ProductListResponse>(`/products?store_id=${storeId}`, {
-    method: "GET",
-  });
+function cleanupStoreProductsCache() {
+  const now = Date.now();
 
-  if (!result.ok) {
-    return {
-      error: result.error,
-      ok: false as const,
-      products: [] as BackendProduct[],
-      status: result.status,
-    };
+  for (const [key, entry] of storeProductsCache.entries()) {
+    if (entry.expiresAt <= now) {
+      storeProductsCache.delete(key);
+    }
+  }
+}
+
+export function invalidateStoreProductCache(storeId?: string | number | null) {
+  if (storeId === null || storeId === undefined || storeId === "") {
+    storeProductsCache.clear();
+    inflightStoreProductsRequests.clear();
+    return;
   }
 
-  return {
-    ok: true as const,
-    products: result.data.products ?? [],
-    status: result.status,
-  };
+  const normalizedStoreId = String(storeId);
+  storeProductsCache.delete(normalizedStoreId);
+  inflightStoreProductsRequests.delete(normalizedStoreId);
+}
+
+export async function fetchStoreProducts(storeId: string) {
+  cleanupStoreProductsCache();
+  const normalizedStoreId = String(storeId);
+  const cached = storeProductsCache.get(normalizedStoreId);
+
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.value;
+  }
+
+  const inflight = inflightStoreProductsRequests.get(normalizedStoreId);
+
+  if (inflight) {
+    return inflight;
+  }
+
+  const request = (async () => {
+    const query = new URLSearchParams();
+    query.set("store_id", normalizedStoreId);
+    const result = await requestMobileApi<ProductListResponse>("/products", {
+      method: "GET",
+      query,
+    });
+
+    if (!result.ok) {
+      const legacyResult = await requestMobileApi<LegacyProductListResponse>(`/products/${normalizedStoreId}`, {
+        method: "GET",
+      });
+
+      if (!legacyResult.ok) {
+        return {
+          error: result.error,
+          ok: false as const,
+          products: [] as BackendProduct[],
+          status: result.status,
+        };
+      }
+
+      const value = {
+        ok: true as const,
+        products: legacyResult.data.products ?? [],
+        status: legacyResult.status,
+      };
+
+      storeProductsCache.set(normalizedStoreId, {
+        expiresAt: Date.now() + STORE_PRODUCT_CACHE_TTL_MS,
+        value,
+      });
+
+      return value;
+    }
+
+    const value = {
+      ok: true as const,
+      products: result.data.products ?? [],
+      status: result.status,
+    };
+
+    storeProductsCache.set(normalizedStoreId, {
+      expiresAt: Date.now() + STORE_PRODUCT_CACHE_TTL_MS,
+      value,
+    });
+
+    return value;
+  })();
+
+  inflightStoreProductsRequests.set(normalizedStoreId, request);
+
+  try {
+    return await request;
+  } finally {
+    if (inflightStoreProductsRequests.get(normalizedStoreId) === request) {
+      inflightStoreProductsRequests.delete(normalizedStoreId);
+    }
+  }
 }
 
 export async function createProductWithBackend(
@@ -96,6 +214,9 @@ export async function createProductWithBackend(
     };
   }
 
+  invalidateStoreProductCache(payload.store_id);
+  invalidateStoreCache(String(payload.store_id));
+
   return {
     message: result.data.message,
     ok: true as const,
@@ -115,87 +236,50 @@ export async function importProductsCsvWithBackend(
     store_id: number;
   },
 ) {
-  const candidates = getMobileApiBaseCandidates();
-  let lastNetworkError =
-    "We couldn't connect right now. Check your internet and try again.";
+  const formData = new FormData();
+  formData.append("store_id", String(payload.store_id));
+  formData.append("file", {
+    name: payload.file.name,
+    type: payload.file.mimeType || "text/csv",
+    uri: payload.file.uri,
+  } as never);
 
-  for (const apiBase of candidates) {
-    const formData = new FormData();
-    formData.append("store_id", String(payload.store_id));
-    formData.append("file", {
-      name: payload.file.name,
-      type: payload.file.mimeType || "text/csv",
-      uri: payload.file.uri,
-    } as never);
-
-    const url = `${apiBase}/products/import`;
-
-    try {
-      const response = await fetch(url, {
-        method: "POST",
-        headers: {
-          Accept: "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: formData,
-      });
-
-      const rawText = await response.text();
-      const parsed = rawText
-        ? (JSON.parse(rawText) as ProductMutationResponse & {
-            count?: number;
-            products?: BackendProduct[];
-          })
-        : null;
-
-      if (!response.ok) {
-        return {
-          count: 0,
-          error:
-            parsed?.message || `Request failed with status ${response.status}.`,
-          errors:
-            parsed?.errors?.map((item) => ({
-              message: item.message || "Invalid row",
-              row: Number(item.row || 0),
-            })) || [],
-          ok: false as const,
-          products: [] as BackendProduct[],
-          status: response.status,
-        };
-      }
-
-      return {
-        count: parsed?.count ?? parsed?.products?.length ?? 0,
-        errors: [] as { message: string; row: number }[],
-        message: parsed?.message,
-        ok: true as const,
-        products: parsed?.products ?? [],
-        status: response.status,
-      };
-    } catch (error) {
-      const message = error instanceof Error ? error.message.toLowerCase() : "";
-
-      if (
-        message.includes("network request failed") ||
-        message.includes("fetch failed") ||
-        message.includes("load failed")
-      ) {
-        lastNetworkError =
-          "We couldn't connect right now. Check your internet and try again.";
-      } else {
-        lastNetworkError =
-          "Something went wrong while importing products. Please try again.";
-      }
+  const result = await requestMobileApiFormData<
+    ProductMutationResponse & {
+      count?: number;
+      products?: BackendProduct[];
     }
+  >("/products/import", {
+    body: formData,
+    method: "POST",
+    token,
+  });
+
+  if (!result.ok) {
+    return {
+      count: 0,
+      error: result.error,
+      errors:
+        result.data?.errors?.map((item) => ({
+          message: item.message || "Invalid row",
+          row: Number(item.row || 0),
+        })) || [],
+      ok: false as const,
+      products: [] as BackendProduct[],
+      status: result.status,
+    };
   }
 
+  invalidateStoreProductCache(payload.store_id);
+  invalidateStoreCache(String(payload.store_id));
+
   return {
-    count: 0,
-    error: lastNetworkError,
+    count: result.data.count ?? result.data.products?.length ?? 0,
     errors: [] as { message: string; row: number }[],
-    ok: false as const,
-    products: [] as BackendProduct[],
-    status: 0,
+    message: result.data.message,
+    ok: true as const,
+    products: result.data.products ?? [],
+    status: result.status,
   };
 }
 
@@ -233,6 +317,9 @@ export async function updateProductWithBackend(
     };
   }
 
+  invalidateStoreProductCache();
+  invalidateStoreCache();
+
   return {
     message: result.data.message,
     ok: true as const,
@@ -254,6 +341,9 @@ export async function deleteProductWithBackend(token: string, productId: string)
       status: result.status,
     };
   }
+
+  invalidateStoreProductCache();
+  invalidateStoreCache();
 
   return {
     message: result.data.message,

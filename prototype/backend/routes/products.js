@@ -4,6 +4,7 @@
 const express = require("express");
 const { Buffer } = require("node:buffer");
 const authMiddleware = require("../middleware/authMiddleware");
+const { invalidatePublicReadCaches } = require("../utils/publicRouteCaches");
 
 const router = express.Router();
 
@@ -20,6 +21,19 @@ function normalizeText(value) {
 function normalizeNullableText(value) {
   const trimmed = normalizeText(value);
   return trimmed ? trimmed : null;
+}
+
+function isInlineDataUrl(value) {
+  return typeof value === "string" && value.trim().toLowerCase().startsWith("data:");
+}
+
+function sanitizePublicImageUrl(value) {
+  const normalized = normalizeNullableText(value);
+  if (!normalized || isInlineDataUrl(normalized)) {
+    return null;
+  }
+
+  return normalized;
 }
 
 function normalizePrice(value) {
@@ -575,7 +589,7 @@ router.post("/", authMiddleware, async (req, res) => {
     const normalizedProductName = normalizeText(product_name);
     const normalizedCategory = normalizeNullableText(category);
     const normalizedDescription = normalizeNullableText(description);
-    const normalizedImageUrl = normalizeNullableText(image_url);
+    const normalizedImageUrl = sanitizePublicImageUrl(image_url);
     const normalizedTags = normalizeTagList(tags);
     const normalizedBasePrice = normalizePrice(price);
     const rawBaseQuantity = quantity_available ?? stock_quantity;
@@ -659,6 +673,7 @@ router.post("/", authMiddleware, async (req, res) => {
 
     await client.query("COMMIT");
     transactionOpen = false;
+    invalidatePublicReadCaches();
 
     res.status(201).json({
       message: "Product added successfully",
@@ -807,6 +822,7 @@ router.post("/bulk", authMiddleware, async (req, res) => {
 
     await client.query("COMMIT");
     transactionOpen = false;
+    invalidatePublicReadCaches();
 
     return res.status(201).json({
       count: createdProducts.length,
@@ -913,6 +929,7 @@ router.post("/import", authMiddleware, async (req, res) => {
 
     await client.query("COMMIT");
     transactionOpen = false;
+    invalidatePublicReadCaches();
 
     return res.status(201).json({
       count: createdProducts.length,
@@ -975,10 +992,23 @@ router.get("/", async (req, res) => {
       SELECT
         p.id AS product_id,
         p.product_name,
-        p.image_url
+        p.category,
+        p.description,
+        CASE
+          WHEN p.image_url ILIKE 'data:%' THEN NULL
+          ELSE p.image_url
+        END AS image_url,
+        p.tags,
+        pv.id AS variant_id,
+        pv.variant_name,
+        pv.unit_count,
+        pv.price,
+        pv.stock_quantity,
+        pv.in_stock
       FROM products p
+      LEFT JOIN product_variants pv ON pv.product_id = p.id
       WHERE p.store_id = $1
-      ORDER BY p.id DESC
+      ORDER BY p.id DESC, pv.id ASC
       `,
       [storeId],
     );
@@ -1005,63 +1035,51 @@ router.get("/", async (req, res) => {
       });
     }
 
-    const productIds = productsResult.rows.map((product) => product.product_id);
-    const variantsQueryStartedAt = Date.now();
-    const variantsResult = await pool.query(
-      `
-      SELECT
-        pv.product_id,
-        pv.id AS variant_id,
-        pv.variant_name,
-        pv.unit_count,
-        pv.price
-      FROM product_variants pv
-      WHERE pv.product_id = ANY($1::int[])
-      ORDER BY pv.product_id DESC, pv.id ASC
-      `,
-      [productIds],
-    );
-    const variantsQueryDurationMs = Date.now() - variantsQueryStartedAt;
+    const productsById = new Map();
 
-    console.log("products?store_id=:id variants query", {
-      storeId,
-      duration_ms: variantsQueryDurationMs,
-      row_count: variantsResult.rowCount,
-    });
+    for (const row of productsResult.rows) {
+      if (!productsById.has(row.product_id)) {
+        productsById.set(row.product_id, {
+          product_id: row.product_id,
+          product_name: row.product_name,
+          category: row.category,
+          description: row.description,
+          image_url: sanitizePublicImageUrl(row.image_url),
+          tags: Array.isArray(row.tags) ? row.tags : [],
+          variants: [],
+        });
+      }
 
-    const normalizeNumbers = (val) =>
-      typeof val === "string" && val.trim() !== "" ? Number(val) : val;
+      if (row.variant_id === null || row.variant_id === undefined) {
+        continue;
+      }
 
-    const variantsByProductId = new Map();
-
-    for (const variant of variantsResult.rows) {
-      const nextVariant = {
-        variant_id: variant.variant_id,
-        variant_name: variant.variant_name,
+      productsById.get(row.product_id).variants.push({
+        variant_id: row.variant_id,
+        variant_name: row.variant_name,
         unit_count:
-          typeof variant.unit_count === "number"
-            ? variant.unit_count
-            : Number(variant.unit_count || 1),
-        price: normalizeNumbers(variant.price),
-      };
-
-      const currentVariants = variantsByProductId.get(variant.product_id) || [];
-      currentVariants.push(nextVariant);
-      variantsByProductId.set(variant.product_id, currentVariants);
+          typeof row.unit_count === "number"
+            ? row.unit_count
+            : Number(row.unit_count || 1),
+        price:
+          typeof row.price === "string" && row.price.trim() !== ""
+            ? Number(row.price)
+            : row.price,
+        stock_quantity:
+          typeof row.stock_quantity === "string" && row.stock_quantity.trim() !== ""
+            ? Number(row.stock_quantity)
+            : row.stock_quantity,
+        in_stock: Boolean(row.in_stock),
+      });
     }
 
-    const products = productsResult.rows.map((product) => ({
-      product_id: product.product_id,
-      product_name: product.product_name,
-      image_url: product.image_url,
-      variants: variantsByProductId.get(product.product_id) || [],
-    }));
+    const products = Array.from(productsById.values());
 
     console.log("PRODUCTS API END", {
       route: "/products?store_id=:id",
       storeId,
       productCount: products.length,
-      variantCount: variantsResult.rowCount,
+      variantCount: products.reduce((sum, product) => sum + product.variants.length, 0),
       duration_ms: Date.now() - startedAt,
     });
 
@@ -1090,13 +1108,33 @@ router.get("/:storeId", async (req, res) => {
     const { storeId } = req.params;
 
     const products = await pool.query(
-      "SELECT * FROM products WHERE store_id = $1 ORDER BY created_at DESC",
+      `
+      SELECT
+        id,
+        store_id,
+        product_name,
+        category,
+        description,
+        CASE
+          WHEN image_url ILIKE 'data:%' THEN NULL
+          ELSE image_url
+        END AS image_url,
+        tags,
+        created_at,
+        updated_at
+      FROM products
+      WHERE store_id = $1
+      ORDER BY created_at DESC
+      `,
       [storeId]
     );
 
     res.json({
       message: "Products fetched successfully",
-      products: products.rows,
+      products: products.rows.map((product) => ({
+        ...product,
+        image_url: sanitizePublicImageUrl(product.image_url),
+      })),
     });
   } catch (error) {
     console.error(error);
@@ -1179,7 +1217,7 @@ router.put("/:id", authMiddleware, async (req, res) => {
         ? normalizeNullableText(description)
         : product.description;
     const normalizedImageUrl =
-      image_url !== undefined ? normalizeNullableText(image_url) : product.image_url;
+      image_url !== undefined ? sanitizePublicImageUrl(image_url) : sanitizePublicImageUrl(product.image_url);
 
     const normalizedBasePrice = normalizePrice(price);
     const rawBaseQuantity = quantity_available ?? stock_quantity;
@@ -1314,6 +1352,7 @@ router.put("/:id", authMiddleware, async (req, res) => {
 
     await client.query("COMMIT");
     transactionOpen = false;
+    invalidatePublicReadCaches();
 
     res.json({
       message: "Product updated successfully",
@@ -1374,6 +1413,7 @@ router.delete("/:id", authMiddleware, async (req, res) => {
     }
 
     await pool.query("DELETE FROM products WHERE id = $1", [id]);
+    invalidatePublicReadCaches();
 
     res.json({
       message: "Product deleted successfully",

@@ -50,7 +50,7 @@ export function ChatInputBar({
           ]}
         >
           <Ionicons
-            color={sendDisabled ? theme.colors.mutedText : "#082f49"}
+            color={sendDisabled ? theme.colors.mutedText : theme.colors.primaryTextOnAccent}
             name={isSending ? "time-outline" : "send"}
             size={18}
           />
@@ -62,8 +62,8 @@ export function ChatInputBar({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: "rgba(6, 12, 24, 0.98)",
-    borderTopColor: "rgba(255,255,255,0.05)",
+    backgroundColor: "rgba(8, 12, 24, 0.98)",
+    borderTopColor: theme.colors.borderSoft,
     borderTopWidth: 1,
     paddingBottom: theme.spacing.screenBottom,
     paddingHorizontal: theme.spacing.screenHorizontal,
@@ -71,8 +71,8 @@ const styles = StyleSheet.create({
   },
   wrapper: {
     alignItems: "flex-end",
-    backgroundColor: "rgba(15, 23, 42, 0.98)",
-    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: theme.colors.surfaceElevated,
+    borderColor: theme.colors.border,
     borderRadius: 28,
     borderWidth: 1,
     flexDirection: "row",
@@ -80,8 +80,8 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   wrapperActive: {
-    borderColor: "rgba(56,189,248,0.24)",
-    backgroundColor: "rgba(15, 23, 42, 1)",
+    borderColor: "rgba(96,143,255,0.28)",
+    backgroundColor: "rgba(18, 28, 47, 1)",
   },
   input: {
     color: theme.colors.text,
@@ -98,7 +98,7 @@ const styles = StyleSheet.create({
   },
   sendButton: {
     alignItems: "center",
-    backgroundColor: "rgba(56,189,248,0.24)",
+    backgroundColor: "rgba(74,136,255,0.22)",
     borderRadius: 22,
     justifyContent: "center",
     height: 44,
@@ -109,7 +109,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.accent,
   },
   sendButtonDisabled: {
-    backgroundColor: "rgba(148,163,184,0.18)",
+    backgroundColor: "rgba(184,194,217,0.14)",
     elevation: 0,
     shadowOpacity: 0,
   },

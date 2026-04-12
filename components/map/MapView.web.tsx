@@ -15,7 +15,7 @@ import {
   type LocationPermissionState,
   type UserCoordinates,
 } from "@/services/location";
-import type { BackendStore } from "@/services/store-api";
+import type { StoreListItem } from "@/services/store-data";
 
 function formatCoordinate(value: number | null | undefined) {
   if (!Number.isFinite(value)) {
@@ -48,14 +48,14 @@ export function NearaMapView({
   onSelectStore?: (storeId: string) => void;
   permissionStatus: LocationPermissionState;
   selectedStoreId?: string | null;
-  stores?: BackendStore[];
+  stores?: StoreListItem[];
   style?: ViewStyle;
 }) {
   const currentCoordinates = coordinates ?? DEFAULT_MAP_COORDINATES;
   const validStores = useMemo(
     () =>
       (stores ?? []).filter(
-        (store) => store.id !== null && store.id !== undefined && store.store_name,
+        (store) => store.id && store.name,
       ),
     [stores],
   );
@@ -68,7 +68,7 @@ export function NearaMapView({
           <Text style={styles.title}>Map is simplified on web</Text>
         </View>
         <Pressable onPress={onRequestLocation} style={styles.locationButton}>
-          <Ionicons color="#dbeafe" name="locate-outline" size={16} />
+          <Ionicons color="#D9E4FF" name="locate-outline" size={16} />
           <Text style={styles.locationButtonText}>Use my location</Text>
         </Pressable>
       </View>
@@ -112,12 +112,10 @@ export function NearaMapView({
                 ]}
               >
                 <View style={styles.storeCardTopRow}>
-                  <Text numberOfLines={1} style={styles.storeName}>
-                    {store.store_name}
-                  </Text>
+                  <Text numberOfLines={1} style={styles.storeName}>{store.name}</Text>
                   {isSelected ? (
                     <Ionicons
-                      color="#38bdf8"
+                      color="#4A88FF"
                       name="checkmark-circle"
                       size={18}
                     />
@@ -151,7 +149,7 @@ export { NearaMapView as MapView };
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: "rgba(8, 15, 28, 0.96)",
+    backgroundColor: "rgba(10,15,31,0.96)",
     borderColor: "rgba(255,255,255,0.08)",
     borderRadius: 24,
     borderWidth: 1,
@@ -165,7 +163,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   eyebrow: {
-    color: "#94a3b8",
+    color: "#B8C2D9",
     fontSize: 11,
     fontWeight: "700",
     letterSpacing: 1.4,
@@ -179,8 +177,8 @@ const styles = StyleSheet.create({
   },
   locationButton: {
     alignItems: "center",
-    backgroundColor: "rgba(59,130,246,0.14)",
-    borderColor: "rgba(59,130,246,0.24)",
+    backgroundColor: "rgba(74,136,255,0.14)",
+    borderColor: "rgba(74,136,255,0.24)",
     borderRadius: 999,
     borderWidth: 1,
     flexDirection: "row",
@@ -189,12 +187,12 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   locationButtonText: {
-    color: "#dbeafe",
+    color: "#D9E4FF",
     fontSize: 12,
     fontWeight: "700",
   },
   coordinatesCard: {
-    backgroundColor: "rgba(15, 23, 42, 0.92)",
+    backgroundColor: "rgba(17,24,39,0.92)",
     borderColor: "rgba(255,255,255,0.08)",
     borderRadius: 18,
     borderWidth: 1,
@@ -202,7 +200,7 @@ const styles = StyleSheet.create({
     padding: 14,
   },
   coordinatesLabel: {
-    color: "#94a3b8",
+    color: "#B8C2D9",
     fontSize: 11,
     fontWeight: "700",
     letterSpacing: 1.2,
@@ -215,7 +213,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   coordinatesHint: {
-    color: "#cbd5e1",
+    color: "#C7D2E5",
     fontSize: 13,
     lineHeight: 19,
     marginTop: 8,
@@ -225,14 +223,14 @@ const styles = StyleSheet.create({
     paddingTop: 16,
   },
   storeCard: {
-    backgroundColor: "rgba(15, 23, 42, 0.88)",
+    backgroundColor: "rgba(17,24,39,0.88)",
     borderColor: "rgba(255,255,255,0.08)",
     borderRadius: 18,
     borderWidth: 1,
     padding: 14,
   },
   storeCardSelected: {
-    borderColor: "rgba(56,189,248,0.28)",
+    borderColor: "rgba(74,136,255,0.28)",
     backgroundColor: "rgba(8, 47, 73, 0.72)",
   },
   storeCardTopRow: {
@@ -248,20 +246,20 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   storeCategory: {
-    color: "#93c5fd",
+    color: "#D9E4FF",
     fontSize: 12,
     fontWeight: "700",
     marginTop: 4,
   },
   storeAddress: {
-    color: "#cbd5e1",
+    color: "#C7D2E5",
     fontSize: 13,
     lineHeight: 18,
     marginTop: 6,
   },
   emptyState: {
     alignItems: "center",
-    backgroundColor: "rgba(15, 23, 42, 0.72)",
+    backgroundColor: "rgba(17,24,39,0.72)",
     borderColor: "rgba(255,255,255,0.08)",
     borderRadius: 18,
     borderWidth: 1,
@@ -273,7 +271,7 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   emptyStateText: {
-    color: "#94a3b8",
+    color: "#B8C2D9",
     fontSize: 13,
     lineHeight: 19,
     marginTop: 8,

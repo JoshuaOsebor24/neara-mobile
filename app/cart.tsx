@@ -183,7 +183,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   backButton: {
-    backgroundColor: "rgba(15, 23, 42, 0.72)",
+    backgroundColor: "rgba(17,24,39,0.72)",
     borderColor: BORDER,
     borderRadius: 999,
     borderWidth: 1,
@@ -203,14 +203,14 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
   },
   heroCard: {
-    backgroundColor: "rgba(15, 23, 42, 0.78)",
+    backgroundColor: "rgba(17,24,39,0.78)",
     borderColor: BORDER,
     borderRadius: 28,
     borderWidth: 1,
     padding: 24,
   },
   eyebrow: {
-    color: "#bae6fd",
+    color: "#D4E1FF",
     fontSize: 11,
     fontWeight: "700",
     letterSpacing: 1.8,
@@ -243,7 +243,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   primaryButtonText: {
-    color: "#082f49",
+    color: "#F5F7FB",
     fontSize: 15,
     fontWeight: "800",
   },
@@ -261,7 +261,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   sectionCard: {
-    backgroundColor: "rgba(15, 23, 42, 0.72)",
+    backgroundColor: "rgba(17,24,39,0.72)",
     borderColor: BORDER,
     borderRadius: 24,
     borderWidth: 1,
@@ -283,7 +283,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   emptyCard: {
-    backgroundColor: "rgba(2, 6, 23, 0.42)",
+    backgroundColor: "rgba(10,15,31,0.42)",
     borderColor: "rgba(255,255,255,0.08)",
     borderRadius: 18,
     borderWidth: 1,
@@ -322,14 +322,14 @@ const styles = StyleSheet.create({
   },
   storeImageFallback: {
     alignItems: "center",
-    backgroundColor: "rgba(56, 189, 248, 0.12)",
+    backgroundColor: "rgba(74,136,255,0.12)",
     borderRadius: 16,
     height: 68,
     justifyContent: "center",
     width: 68,
   },
   storeImageFallbackText: {
-    color: "#e0f2fe",
+    color: "#E2EBFF",
     fontSize: 22,
     fontWeight: "800",
   },

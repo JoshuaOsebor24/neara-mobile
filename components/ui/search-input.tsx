@@ -1,9 +1,11 @@
+import type { RefObject } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import {
   Pressable,
   StyleSheet,
   Text,
   TextInput,
+  type TextInput as TextInputHandle,
   View,
   type StyleProp,
   type TextInputProps,
@@ -14,6 +16,7 @@ import {
 import { theme } from "@/constants/theme";
 
 type SearchInputInputProps = TextInputProps & {
+  inputRef?: RefObject<TextInputHandle | null>;
   inputStyle?: StyleProp<TextStyle>;
   mode?: "input";
   onPress?: never;
@@ -45,11 +48,18 @@ export function SearchInput(props: SearchInputProps) {
         </Pressable>
       ) : (
         (() => {
-          const { inputStyle, style: _style, mode: _mode, ...inputProps } = props;
+          const {
+            inputRef,
+            inputStyle,
+            style: _style,
+            mode: _mode,
+            ...inputProps
+          } = props;
 
           return (
             <TextInput
               {...inputProps}
+              ref={inputRef}
               placeholder={placeholder}
               placeholderTextColor={theme.colors.mutedText}
               selectionColor={theme.colors.accent}
@@ -72,6 +82,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     minHeight: theme.controls.inputHeight,
     paddingHorizontal: 16,
+    shadowColor: theme.colors.shadow,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.18,
+    shadowRadius: 18,
+    elevation: 4,
   },
   input: {
     color: theme.colors.text,

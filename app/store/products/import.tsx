@@ -373,7 +373,7 @@ export default function ImportProductsScreen() {
 
 const styles = StyleSheet.create({
   safeArea: {
-    backgroundColor: theme.colors.background,
+    backgroundColor: "transparent",
     flex: 1,
   },
   keyboardAvoidingView: {
@@ -400,8 +400,8 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
   },
   heroCard: {
-    backgroundColor: "rgba(15, 23, 42, 0.96)",
-    borderColor: "rgba(96, 165, 250, 0.18)",
+    backgroundColor: theme.colors.surfaceCard,
+    borderColor: theme.colors.borderStrong,
     borderRadius: 26,
     borderWidth: 1,
     gap: 8,
@@ -418,15 +418,15 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   storeCard: {
-    backgroundColor: "rgba(15, 23, 42, 0.78)",
-    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: theme.colors.surfaceElevated,
+    borderColor: theme.colors.border,
     borderRadius: 22,
     borderWidth: 1,
     gap: 6,
     padding: 18,
   },
   sectionLabel: {
-    color: "#93c5fd",
+    color: "#D9E4FF",
     fontSize: 12,
     fontWeight: "700",
     letterSpacing: 0.5,
@@ -443,8 +443,8 @@ const styles = StyleSheet.create({
     lineHeight: 19,
   },
   card: {
-    backgroundColor: "rgba(15, 23, 42, 0.86)",
-    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: theme.colors.surfaceCard,
+    borderColor: theme.colors.border,
     borderRadius: 24,
     borderWidth: 1,
     gap: 16,
@@ -467,21 +467,21 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     alignItems: "center",
-    backgroundColor: "#2563eb",
+    backgroundColor: theme.colors.accent,
     borderRadius: 16,
     flex: 1,
     paddingHorizontal: 14,
     paddingVertical: 14,
   },
   primaryButtonText: {
-    color: "#f8fbff",
+    color: "#F7FAFF",
     fontSize: 15,
     fontWeight: "700",
   },
   secondaryButton: {
     alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.05)",
-    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: theme.button.secondaryBackground,
+    borderColor: theme.colors.border,
     borderRadius: 16,
     borderWidth: 1,
     justifyContent: "center",
@@ -494,7 +494,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   fileCard: {
-    backgroundColor: "rgba(2, 6, 23, 0.44)",
+    backgroundColor: theme.colors.surfaceOverlay,
     borderRadius: 18,
     gap: 4,
     padding: 14,
@@ -514,13 +514,13 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   noticeError: {
-    backgroundColor: "rgba(248, 113, 113, 0.12)",
-    borderColor: "rgba(248, 113, 113, 0.3)",
+    backgroundColor: theme.colors.surfaceElevated,
+    borderColor: theme.colors.borderStrong,
     borderWidth: 1,
   },
   noticeSuccess: {
-    backgroundColor: "rgba(52, 211, 153, 0.12)",
-    borderColor: "rgba(52, 211, 153, 0.3)",
+    backgroundColor: "rgba(74,136,255,0.16)",
+    borderColor: theme.colors.borderStrong,
     borderWidth: 1,
   },
   noticeText: {
@@ -532,7 +532,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   errorText: {
-    color: "#fecaca",
+    color: theme.colors.subduedText,
     fontSize: 14,
     lineHeight: 20,
   },
@@ -540,8 +540,8 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   previewCard: {
-    backgroundColor: "rgba(2, 6, 23, 0.4)",
-    borderColor: "rgba(255,255,255,0.06)",
+    backgroundColor: theme.colors.surfaceOverlay,
+    borderColor: theme.colors.borderSoft,
     borderRadius: 20,
     borderWidth: 1,
     gap: 12,
@@ -568,9 +568,9 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   previewBadge: {
-    backgroundColor: "rgba(37, 99, 235, 0.18)",
+    backgroundColor: "rgba(74,136,255,0.18)",
     borderRadius: 999,
-    color: "#bfdbfe",
+    color: theme.colors.subduedText,
     fontSize: 12,
     fontWeight: "700",
     overflow: "hidden",
@@ -578,7 +578,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   variantRow: {
-    borderTopColor: "rgba(255,255,255,0.06)",
+    borderTopColor: theme.colors.borderSoft,
     borderTopWidth: 1,
     paddingTop: 12,
   },
@@ -597,16 +597,16 @@ const styles = StyleSheet.create({
   },
   importButton: {
     alignItems: "center",
-    backgroundColor: "#2563eb",
+    backgroundColor: theme.colors.accent,
     borderRadius: 18,
     marginTop: 4,
     paddingVertical: 17,
   },
   importButtonDisabled: {
-    backgroundColor: "rgba(37, 99, 235, 0.35)",
+    backgroundColor: "rgba(74,136,255,0.35)",
   },
   importButtonText: {
-    color: "#f8fbff",
+    color: "#F7FAFF",
     fontSize: 16,
     fontWeight: "800",
   },

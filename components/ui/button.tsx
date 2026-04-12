@@ -1,7 +1,9 @@
+import { LinearGradient } from "expo-linear-gradient";
 import {
   StyleSheet,
   Text,
   TouchableOpacity,
+  View,
   type StyleProp,
   type ViewStyle,
 } from "react-native";
@@ -37,17 +39,32 @@ export function Button({
         style,
       ]}
     >
-      <Text
-        style={[
-          styles.label,
-          variant === "secondary" && styles.secondaryLabel,
-          variant === "ghost" && styles.ghostLabel,
-          variant === "danger" && styles.dangerLabel,
-          disabled && styles.disabledLabel,
-        ]}
-      >
-        {label}
-      </Text>
+      {variant === "primary" ? (
+        <LinearGradient colors={theme.gradients.primaryButton} style={styles.primaryFill}>
+          <Text
+            style={[
+              styles.label,
+              disabled && styles.disabledLabel,
+            ]}
+          >
+            {label}
+          </Text>
+        </LinearGradient>
+      ) : (
+        <View style={styles.innerFill}>
+          <Text
+            style={[
+              styles.label,
+              variant === "secondary" && styles.secondaryLabel,
+              variant === "ghost" && styles.ghostLabel,
+              variant === "danger" && styles.dangerLabel,
+              disabled && styles.disabledLabel,
+            ]}
+          >
+            {label}
+          </Text>
+        </View>
+      )}
     </TouchableOpacity>
   );
 }
@@ -58,17 +75,28 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     minHeight: theme.controls.actionButtonMinHeight,
     borderRadius: theme.radius.button,
-    paddingHorizontal: 18,
-    backgroundColor: theme.colors.accent,
-    shadowColor: theme.colors.shadow,
+    overflow: "hidden",
+    shadowColor: theme.colors.accentStrong,
     shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.18,
-    shadowRadius: 18,
-    elevation: 4,
+    shadowOpacity: 0.22,
+    shadowRadius: 22,
+    elevation: 6,
+  },
+  primaryFill: {
+    minHeight: theme.controls.actionButtonMinHeight,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 18,
+  },
+  innerFill: {
+    minHeight: theme.controls.actionButtonMinHeight,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 18,
   },
   secondary: {
-    backgroundColor: "rgba(255,255,255,0.06)",
-    borderColor: "rgba(255,255,255,0.12)",
+    backgroundColor: theme.button.secondaryBackground,
+    borderColor: theme.button.secondaryBorder,
     borderWidth: 1,
     shadowOpacity: 0,
     elevation: 0,
@@ -86,9 +114,9 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   label: {
-    color: theme.colors.background,
+    color: theme.colors.primaryTextOnAccent,
     fontSize: 15,
-    fontWeight: "700",
+    fontWeight: "800",
   },
   secondaryLabel: {
     color: theme.colors.text,
@@ -97,7 +125,7 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
   },
   dangerLabel: {
-    color: theme.colors.background,
+    color: theme.colors.text,
   },
   disabledLabel: {
     color: theme.colors.mutedText,

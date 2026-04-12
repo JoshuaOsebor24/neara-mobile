@@ -6,6 +6,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { FlashFeedback } from "@/components/flash-feedback";
 import { LaunchLoadingScreen } from "@/components/launch-loading-screen";
+import { AppBackground } from "@/components/ui/app-background";
 import { theme } from "@/constants/theme";
 import { refreshMobileSessionFromBackend } from "@/services/auth-api";
 import {
@@ -31,6 +32,7 @@ import {
   loadRecentStoresForSession,
   loadSavedStoresForSession,
 } from "@/services/saved-stores";
+import { loadPublicStoreCatalog } from "@/services/store-data";
 
 const appTheme = {
   ...DarkTheme,
@@ -63,7 +65,9 @@ export default function RootLayout() {
 
     const bootstrap = async () => {
       await hydrateMobileSession();
-      await refreshMobileSessionFromBackend();
+      const refreshPromise = refreshMobileSessionFromBackend();
+      void loadPublicStoreCatalog();
+      await refreshPromise;
 
       if (mounted) {
         setIsAuthBootstrapComplete(true);
@@ -83,11 +87,7 @@ export default function RootLayout() {
 
     const bootstrapNotifications = async () => {
       teardown = await initializeNotificationLifecycle({
-        onNotificationReceived(notification) {
-          console.log("[notifications] received", {
-            identifier: notification.request.identifier,
-          });
-        },
+        onNotificationReceived() {},
         onNotificationResponse(response) {
           const targetPath = resolveNotificationTargetPath(response);
 
@@ -182,6 +182,7 @@ export default function RootLayout() {
 
     void loadSavedStoresForSession();
     void loadRecentStoresForSession();
+    void loadPublicStoreCatalog();
   }, [
     isAuthBootstrapComplete,
     isSessionHydrated,
@@ -218,6 +219,7 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <ThemeProvider value={appTheme}>
           <StatusBar style="light" />
+          <AppBackground />
           <LaunchLoadingScreen />
         </ThemeProvider>
       </SafeAreaProvider>
@@ -228,12 +230,13 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <ThemeProvider value={appTheme}>
         <StatusBar style="light" />
+        <AppBackground />
         <FlashFeedback />
         <Stack
           screenOptions={{
             headerShown: false,
             contentStyle: {
-              backgroundColor: appTheme.colors.background,
+              backgroundColor: "transparent",
             },
             animation: "none",
           }}

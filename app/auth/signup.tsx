@@ -1374,7 +1374,7 @@ export default function SignupScreen() {
                             ]}
                           >
                             <Ionicons
-                              color="#64748b"
+                              color="#7F8EAD"
                               name="person-outline"
                               size={18}
                             />
@@ -1404,7 +1404,7 @@ export default function SignupScreen() {
                             ]}
                           >
                             <Ionicons
-                              color="#64748b"
+                              color="#7F8EAD"
                               name="mail-outline"
                               size={18}
                             />
@@ -1436,7 +1436,7 @@ export default function SignupScreen() {
                             ]}
                           >
                             <Ionicons
-                              color="#64748b"
+                              color="#7F8EAD"
                               name="call-outline"
                               size={18}
                             />
@@ -1471,7 +1471,7 @@ export default function SignupScreen() {
                             ]}
                           >
                             <Ionicons
-                              color="#64748b"
+                              color="#7F8EAD"
                               name="storefront-outline"
                               size={18}
                             />
@@ -1527,7 +1527,7 @@ export default function SignupScreen() {
                                     </Text>
                                     {active ? (
                                       <Ionicons
-                                        color="#f8fafc"
+                                        color="#F5F7FB"
                                         name="checkmark-circle"
                                         size={16}
                                       />
@@ -1553,7 +1553,7 @@ export default function SignupScreen() {
                             ]}
                           >
                             <Ionicons
-                              color="#64748b"
+                              color="#7F8EAD"
                               name="call-outline"
                               size={18}
                             />
@@ -1623,7 +1623,7 @@ export default function SignupScreen() {
                             ]}
                           >
                             <Ionicons
-                              color="#64748b"
+                              color="#7F8EAD"
                               name="earth-outline"
                               size={18}
                             />
@@ -1698,7 +1698,7 @@ export default function SignupScreen() {
                             ]}
                           >
                             <Ionicons
-                              color="#64748b"
+                              color="#7F8EAD"
                               name="location-outline"
                               size={18}
                             />
@@ -1795,7 +1795,7 @@ export default function SignupScreen() {
                                     ]}
                                   >
                                     <Ionicons
-                                      color="#94a3b8"
+                                      color="#B8C2D9"
                                       name="image-outline"
                                       size={28}
                                     />
@@ -1836,7 +1836,7 @@ export default function SignupScreen() {
                             style={styles.addPhotosButton}
                           >
                             <Ionicons
-                              color="#f8fafc"
+                              color="#F5F7FB"
                               name="images-outline"
                               size={18}
                             />
@@ -1869,7 +1869,7 @@ export default function SignupScreen() {
                             ]}
                           >
                             <Ionicons
-                              color="#64748b"
+                              color="#7F8EAD"
                               name="search-outline"
                               size={18}
                             />
@@ -1963,7 +1963,7 @@ export default function SignupScreen() {
                           style={styles.locationAssistButton}
                         >
                           <Ionicons
-                            color="#f8fafc"
+                            color="#F5F7FB"
                             name="locate"
                             size={18}
                           />
@@ -2021,7 +2021,7 @@ export default function SignupScreen() {
                         ]}
                       >
                         <Ionicons
-                          color="#64748b"
+                          color="#7F8EAD"
                           name="person-outline"
                           size={18}
                         />
@@ -2049,7 +2049,7 @@ export default function SignupScreen() {
                         ]}
                       >
                         <Ionicons
-                          color="#64748b"
+                          color="#7F8EAD"
                           name="mail-outline"
                           size={18}
                         />
@@ -2081,7 +2081,7 @@ export default function SignupScreen() {
                         ]}
                       >
                         <Ionicons
-                          color="#64748b"
+                          color="#7F8EAD"
                           name="lock-closed-outline"
                           size={18}
                         />
@@ -2103,7 +2103,7 @@ export default function SignupScreen() {
                           onPress={() => setShowPassword((current) => !current)}
                         >
                           <Ionicons
-                            color="#94a3b8"
+                            color="#B8C2D9"
                             name={
                               showPassword ? "eye-off-outline" : "eye-outline"
                             }
@@ -2125,7 +2125,7 @@ export default function SignupScreen() {
                         ]}
                       >
                         <Ionicons
-                          color="#64748b"
+                          color="#7F8EAD"
                           name="shield-checkmark-outline"
                           size={18}
                         />
@@ -2184,7 +2184,7 @@ export default function SignupScreen() {
                     colors={
                       primaryActionDisabled
                         ? ["rgba(255,255,255,0.16)", "rgba(255,255,255,0.12)"]
-                        : ["#f8fafc", "#7dd3fc", "#38bdf8"]
+                        : ["#4A88FF", "#2F6BFF", "#1F56E5"]
                     }
                     end={{ x: 1, y: 0.5 }}
                     start={{ x: 0, y: 0.5 }}
@@ -2247,7 +2247,7 @@ const BORDER = "rgba(255,255,255,0.10)";
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: "transparent",
   },
   keyboardAvoidingView: {
     flex: 1,
@@ -2271,7 +2271,7 @@ const styles = StyleSheet.create({
     width: 180,
     height: 180,
     borderRadius: 999,
-    backgroundColor: "rgba(56, 189, 248, 0.10)",
+    backgroundColor: "rgba(74,136,255,0.10)",
   },
   heroGlowSecondary: {
     position: "absolute",
@@ -2280,7 +2280,7 @@ const styles = StyleSheet.create({
     width: 140,
     height: 140,
     borderRadius: 999,
-    backgroundColor: "rgba(125, 211, 252, 0.08)",
+    backgroundColor: "rgba(120,163,255,0.08)",
   },
   header: {
     alignItems: "center",
@@ -2299,11 +2299,11 @@ const styles = StyleSheet.create({
   },
   brandGlow: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(56,189,248,0.18)",
+    backgroundColor: "rgba(74,136,255,0.18)",
     borderRadius: 22,
   },
   brandMarkText: {
-    color: "#fff",
+    color: "#F5F7FB",
     fontSize: 22,
     fontWeight: "700",
   },
@@ -2322,14 +2322,14 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     borderWidth: 1,
     borderColor: BORDER,
-    backgroundColor: "rgba(15, 23, 42, 0.72)",
+    backgroundColor: "rgba(17,24,39,0.72)",
     padding: 20,
   },
   introBlock: {
     marginBottom: 22,
   },
   introEyebrow: {
-    color: "#94a3b8",
+    color: "#B8C2D9",
     fontSize: 11,
     fontWeight: "700",
     letterSpacing: 1.8,
@@ -2337,13 +2337,13 @@ const styles = StyleSheet.create({
   },
   introText: {
     marginTop: 10,
-    color: "#e2e8f0",
+    color: "#E8EEF8",
     fontSize: 15,
     lineHeight: 22,
   },
   resumeText: {
     marginTop: 10,
-    color: "#bae6fd",
+    color: "#D4E1FF",
     fontSize: 12,
     fontWeight: "600",
   },
@@ -2373,7 +2373,7 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   stepCounter: {
-    color: "#94a3b8",
+    color: "#B8C2D9",
     fontSize: 11,
     fontWeight: "700",
     letterSpacing: 1.6,
@@ -2398,26 +2398,26 @@ const styles = StyleSheet.create({
     transform: [{ scale: 1.01 }],
   },
   stepBullet: {
-    color: "#64748b",
+    color: "#7F8EAD",
     fontSize: 14,
     lineHeight: 18,
   },
   stepBulletActive: {
-    color: "#f8fafc",
+    color: "#F5F7FB",
   },
   stepTitle: {
-    color: "#94a3b8",
+    color: "#B8C2D9",
     fontSize: 13,
     fontWeight: "700",
   },
   stepTitleActive: {
-    color: "#f8fafc",
+    color: "#F5F7FB",
   },
   fieldGroup: {
     gap: 8,
   },
   fieldLabel: {
-    color: "#cbd5e1",
+    color: "#C7D2E5",
     fontSize: 13,
     fontWeight: "600",
   },
@@ -2428,12 +2428,12 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     borderWidth: 1,
     borderColor: BORDER,
-    backgroundColor: "rgba(2,6,23,0.5)",
+    backgroundColor: "rgba(10,15,31,0.5)",
     paddingHorizontal: 14,
     paddingVertical: 12,
   },
   inputShellError: {
-    borderColor: "rgba(244,63,94,0.4)",
+    borderColor: "rgba(255,255,255,0.4)",
   },
   input: {
     flex: 1,
@@ -2445,7 +2445,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     borderWidth: 1,
     borderColor: BORDER,
-    backgroundColor: "rgba(2,6,23,0.5)",
+    backgroundColor: "rgba(10,15,31,0.5)",
     paddingHorizontal: 14,
     paddingVertical: 12,
   },
@@ -2467,9 +2467,9 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   chipActive: {
-    borderColor: "rgba(125,211,252,0.7)",
-    backgroundColor: "rgba(56,189,248,0.24)",
-    shadowColor: "rgba(56,189,248,0.45)",
+    borderColor: "rgba(120,163,255,0.7)",
+    backgroundColor: "rgba(74,136,255,0.24)",
+    shadowColor: "rgba(74,136,255,0.45)",
     shadowOpacity: 0.3,
     shadowRadius: 14,
     shadowOffset: {
@@ -2483,15 +2483,15 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   chipText: {
-    color: "#cbd5e1",
+    color: "#C7D2E5",
     fontSize: 13,
     fontWeight: "600",
   },
   chipTextActive: {
-    color: "#e0f2fe",
+    color: "#E2EBFF",
   },
   errorText: {
-    color: "#fda4af",
+    color: "#D9E1F0",
     fontSize: 12,
   },
   helperText: {
@@ -2503,7 +2503,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     borderColor: BORDER,
-    backgroundColor: "rgba(2,6,23,0.92)",
+    backgroundColor: "rgba(10,15,31,0.92)",
     overflow: "hidden",
   },
   suggestionMetaText: {
@@ -2523,11 +2523,11 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
   },
   suggestionDot: {
-    backgroundColor: "#60a5fa",
+    backgroundColor: "#4A88FF",
     borderRadius: 999,
     height: 10,
     marginTop: 6,
-    shadowColor: "rgba(96,165,250,0.7)",
+    shadowColor: "rgba(74,136,255,0.7)",
     shadowOpacity: 0.6,
     shadowRadius: 12,
     width: 10,
@@ -2553,12 +2553,12 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   noticeError: {
-    borderColor: "rgba(244,63,94,0.2)",
-    backgroundColor: "rgba(244,63,94,0.12)",
+    borderColor: "rgba(255,255,255,0.2)",
+    backgroundColor: "rgba(255,255,255,0.12)",
   },
   noticeSuccess: {
-    borderColor: "rgba(52,211,153,0.2)",
-    backgroundColor: "rgba(52,211,153,0.12)",
+    borderColor: "rgba(74,136,255,0.2)",
+    backgroundColor: "rgba(74,136,255,0.12)",
   },
   noticeText: {
     color: theme.colors.text,
@@ -2568,8 +2568,8 @@ const styles = StyleSheet.create({
   noticeInline: {
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: "rgba(125,211,252,0.14)",
-    backgroundColor: "rgba(56,189,248,0.10)",
+    borderColor: "rgba(120,163,255,0.14)",
+    backgroundColor: "rgba(74,136,255,0.10)",
     paddingHorizontal: 16,
     paddingVertical: 14,
   },
@@ -2588,15 +2588,15 @@ const styles = StyleSheet.create({
     minHeight: 50,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: "rgba(125,211,252,0.32)",
-    backgroundColor: "rgba(56,189,248,0.14)",
+    borderColor: "rgba(120,163,255,0.32)",
+    backgroundColor: "rgba(74,136,255,0.14)",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 10,
   },
   locationAssistButtonText: {
-    color: "#f8fafc",
+    color: "#F5F7FB",
     fontSize: 14,
     fontWeight: "700",
   },
@@ -2605,7 +2605,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
-    backgroundColor: "rgba(2,6,23,0.42)",
+    backgroundColor: "rgba(10,15,31,0.42)",
     position: "relative",
   },
   mapOverlay: {
@@ -2616,10 +2616,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   mapOverlayText: {
-    color: "#f8fafc",
+    color: "#F5F7FB",
     fontSize: 12,
     fontWeight: "700",
-    backgroundColor: "rgba(2,6,23,0.72)",
+    backgroundColor: "rgba(10,15,31,0.72)",
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -2642,7 +2642,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: BORDER,
     overflow: "hidden",
-    backgroundColor: "rgba(15,23,42,0.92)",
+    backgroundColor: "rgba(17,24,39,0.92)",
   },
   storeImageSlotPrimary: {
     width: "100%",
@@ -2656,7 +2656,7 @@ const styles = StyleSheet.create({
   storeImagePreview: {
     width: "100%",
     height: 154,
-    backgroundColor: "#0f172a",
+    backgroundColor: "#111827",
   },
   storeImagePreviewPrimary: {
     height: 208,
@@ -2672,7 +2672,7 @@ const styles = StyleSheet.create({
     height: 208,
   },
   storeImagePlaceholderText: {
-    color: "#94a3b8",
+    color: "#B8C2D9",
     fontSize: 14,
     fontWeight: "700",
   },
@@ -2686,15 +2686,15 @@ const styles = StyleSheet.create({
     minHeight: 48,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: "rgba(125,211,252,0.32)",
-    backgroundColor: "rgba(56,189,248,0.14)",
+    borderColor: "rgba(120,163,255,0.32)",
+    backgroundColor: "rgba(74,136,255,0.14)",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 10,
   },
   addPhotosButtonText: {
-    color: "#f8fafc",
+    color: "#F5F7FB",
     fontSize: 14,
     fontWeight: "800",
   },
@@ -2704,13 +2704,13 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     minHeight: 42,
     borderRadius: 14,
-    backgroundColor: "rgba(56, 189, 248, 0.14)",
+    backgroundColor: "rgba(74,136,255,0.14)",
     borderWidth: 1,
-    borderColor: "rgba(56, 189, 248, 0.22)",
+    borderColor: "rgba(74,136,255,0.22)",
     paddingHorizontal: 10,
   },
   imageActionButtonText: {
-    color: "#e0f2fe",
+    color: "#E2EBFF",
     fontSize: 13,
     fontWeight: "800",
   },
@@ -2753,12 +2753,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0,
   },
   submitButtonText: {
-    color: "#020617",
+    color: "#0A0F1F",
     fontSize: 15,
     fontWeight: "800",
   },
   submitButtonTextDisabled: {
-    color: "#cbd5e1",
+    color: "#C7D2E5",
   },
   secondaryButton: {
     borderRadius: 18,
@@ -2770,7 +2770,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   secondaryButtonText: {
-    color: "#cbd5e1",
+    color: "#C7D2E5",
     fontSize: 14,
     fontWeight: "600",
   },
@@ -2779,12 +2779,12 @@ const styles = StyleSheet.create({
     opacity: 0.88,
   },
   footerText: {
-    color: "#94a3b8",
+    color: "#B8C2D9",
     fontSize: 13,
     textAlign: "center",
   },
   footerLink: {
-    color: "#dbeafe",
+    color: "#D9E4FF",
     fontWeight: "700",
   },
 });

@@ -29,9 +29,9 @@ import {
   useMobileSession,
 } from "@/services/mobile-session";
 import {
-  fetchStoreFullData,
   updateStoreWithBackend,
 } from "@/services/store-api";
+import { loadStoreRecord } from "@/services/store-data";
 
 const HEADER_IMAGE_LIMIT = 3;
 const DELIVERY_OPTIONS = [
@@ -114,43 +114,40 @@ export default function StoreEditScreen() {
       }
 
       setIsLoadingStore(true);
-      const result = await fetchStoreFullData(storeId);
+      const result = await loadStoreRecord(storeId);
 
       if (cancelled) {
         return;
       }
 
       if (!result.ok || !result.store) {
-        setNotice(result.error || "Could not load your store.");
+        setNotice(result.ok ? "Could not load your store." : result.error);
         setIsLoadingStore(false);
         return;
       }
 
       const store = result.store;
-      setStoreName(store.store_name || "");
+      setStoreName(store.storeName || "");
       setCategory(store.category || "");
       setAddress(store.address || "");
       setCountry(store.country || "Nigeria");
       setStateRegion(store.state || "");
-      setStorePhone(store.phone_number || "");
+      setStorePhone(store.phoneNumber || "");
       setDescription(store.description || "");
-      setDeliveryAvailable(Boolean(store.delivery_available));
+      setDeliveryAvailable(Boolean(store.deliveryAvailable));
       setHeaderImages(
-        Array.isArray(store.header_images) && store.header_images.length > 0
-          ? store.header_images.filter(Boolean).slice(0, HEADER_IMAGE_LIMIT)
-          : store.image_url
-            ? [store.image_url]
+        Array.isArray(store.headerImages) && store.headerImages.length > 0
+          ? store.headerImages.filter(Boolean).slice(0, HEADER_IMAGE_LIMIT)
+          : store.imageUrl
+            ? [store.imageUrl]
             : [],
       );
       setLocationCoordinates(
-        typeof store.latitude === "number" || typeof store.latitude === "string"
-          ? typeof store.longitude === "number" ||
-            typeof store.longitude === "string"
-            ? {
-                latitude: Number(store.latitude),
-                longitude: Number(store.longitude),
-              }
-            : null
+        typeof store.latitude === "number" && typeof store.longitude === "number"
+          ? {
+              latitude: store.latitude,
+              longitude: store.longitude,
+            }
           : null,
       );
       setIsLoadingStore(false);
@@ -541,7 +538,7 @@ const BORDER = "rgba(255,255,255,0.10)";
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: "transparent",
   },
   flex: {
     flex: 1,
@@ -581,14 +578,14 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   headerLabel: {
-    color: "#94a3b8",
+    color: "#B8C2D9",
     fontSize: 12,
     fontWeight: "700",
     letterSpacing: 1.8,
     textTransform: "uppercase",
   },
   panel: {
-    backgroundColor: "rgba(2, 6, 23, 0.82)",
+    backgroundColor: "rgba(10,15,31,0.82)",
     borderColor: BORDER,
     borderRadius: 28,
     borderWidth: 1,
@@ -600,7 +597,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   subtitle: {
-    color: "#cbd5e1",
+    color: "#C7D2E5",
     fontSize: 14,
     lineHeight: 21,
     marginTop: 10,
@@ -610,17 +607,17 @@ const styles = StyleSheet.create({
     marginTop: 18,
   },
   fieldLabel: {
-    color: "#cbd5e1",
+    color: "#C7D2E5",
     fontSize: 13,
     fontWeight: "600",
   },
   helperText: {
-    color: "#94a3b8",
+    color: "#B8C2D9",
     fontSize: 12,
     lineHeight: 18,
   },
   inputShell: {
-    backgroundColor: "rgba(2,6,23,0.5)",
+    backgroundColor: "rgba(10,15,31,0.5)",
     borderColor: BORDER,
     borderRadius: 18,
     borderWidth: 1,
@@ -651,8 +648,8 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   optionChipActive: {
-    backgroundColor: "rgba(52, 211, 153, 0.16)",
-    borderColor: "rgba(52, 211, 153, 0.28)",
+    backgroundColor: "rgba(74,136,255,0.16)",
+    borderColor: "rgba(74,136,255,0.28)",
   },
   optionChipText: {
     color: theme.colors.text,
@@ -660,7 +657,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   optionChipTextActive: {
-    color: "#d1fae5",
+    color: "#D9E4FF",
   },
   imageGrid: {
     flexDirection: "row",
@@ -673,7 +670,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: BORDER,
     overflow: "hidden",
-    backgroundColor: "rgba(15, 23, 42, 0.92)",
+    backgroundColor: "rgba(17,24,39,0.92)",
   },
   imageSlotPrimary: {
     width: "100%",
@@ -687,7 +684,7 @@ const styles = StyleSheet.create({
   imagePreview: {
     width: "100%",
     height: 154,
-    backgroundColor: "#0f172a",
+    backgroundColor: "#111827",
   },
   imagePreviewPrimary: {
     height: 208,
@@ -702,7 +699,7 @@ const styles = StyleSheet.create({
     height: 208,
   },
   imagePlaceholderText: {
-    color: "#94a3b8",
+    color: "#B8C2D9",
     fontSize: 14,
     fontWeight: "700",
   },
@@ -717,12 +714,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     minHeight: 42,
     borderRadius: 14,
-    backgroundColor: "rgba(56, 189, 248, 0.14)",
+    backgroundColor: "rgba(74,136,255,0.14)",
     borderWidth: 1,
-    borderColor: "rgba(56, 189, 248, 0.22)",
+    borderColor: "rgba(74,136,255,0.22)",
   },
   imageActionButtonText: {
-    color: "#e0f2fe",
+    color: "#E2EBFF",
     fontSize: 13,
     fontWeight: "800",
   },
@@ -756,7 +753,7 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     alignItems: "center",
-    backgroundColor: "#f8fafc",
+    backgroundColor: "#F5F7FB",
     borderRadius: 18,
     justifyContent: "center",
     marginTop: 22,
@@ -772,7 +769,7 @@ const styles = StyleSheet.create({
     marginTop: 14,
   },
   primaryButtonText: {
-    color: "#020617",
+    color: "#0A0F1F",
     fontSize: 15,
     fontWeight: "800",
   },

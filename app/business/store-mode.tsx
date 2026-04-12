@@ -105,7 +105,7 @@ export default function StoreModeScreen() {
         </View>
       ) : null}
       <LinearGradient
-        colors={["rgba(56,189,248,0.16)", "transparent"]}
+        colors={["rgba(74,136,255,0.16)", "transparent"]}
         start={{ x: 0.5, y: 0 }}
         end={{ x: 0.5, y: 0.28 }}
         style={styles.gradient}
@@ -153,7 +153,7 @@ export default function StoreModeScreen() {
               <LinearGradient
                 colors={
                   plan.isRecommended
-                    ? ["rgba(14,165,233,0.16)", "rgba(15,23,42,0.92)"]
+                    ? ["rgba(74,136,255,0.16)", "rgba(17,24,39,0.92)"]
                     : ["rgba(255,255,255,0.05)", "rgba(255,255,255,0.02)"]
                 }
                 start={{ x: 0, y: 0 }}
@@ -247,7 +247,7 @@ export default function StoreModeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#020617",
+    backgroundColor: "#0A0F1F",
   },
   loadingWrap: {
     position: "absolute",
@@ -258,7 +258,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 24,
-    backgroundColor: "#020617",
+    backgroundColor: "#0A0F1F",
     zIndex: 4,
   },
   loadingText: {
@@ -293,7 +293,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 32,
     fontWeight: "600",
-    color: "#FFFFFF",
+    color: "#F5F7FB",
     textAlign: "center",
     marginBottom: 12,
   },
@@ -312,7 +312,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   draftPillText: {
-    color: "#e2e8f0",
+    color: "#E8EEF8",
     fontSize: 12,
     fontWeight: "600",
     textAlign: "center",
@@ -320,12 +320,12 @@ const styles = StyleSheet.create({
   resumeButton: {
     marginTop: 14,
     borderRadius: 999,
-    backgroundColor: "#38bdf8",
+    backgroundColor: "#4A88FF",
     paddingHorizontal: 18,
     paddingVertical: 10,
   },
   resumeButtonText: {
-    color: "#082f49",
+    color: "#F5F7FB",
     fontSize: 13,
     fontWeight: "800",
   },
@@ -360,20 +360,20 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.1)",
   },
   planCardRecommended: {
-    borderColor: "rgba(14, 165, 233, 0.3)",
+    borderColor: "rgba(74,136,255,0.3)",
   },
   planCardDisabled: {
     opacity: 0.72,
   },
   recommendedBadge: {
     alignSelf: "flex-start",
-    backgroundColor: "rgba(14, 165, 233, 0.14)",
+    backgroundColor: "rgba(74,136,255,0.14)",
     borderRadius: 20,
     paddingHorizontal: 12,
     paddingVertical: 6,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: "rgba(14, 165, 233, 0.2)",
+    borderColor: "rgba(74,136,255,0.2)",
   },
   recommendedBadgeText: {
     fontSize: 10,
@@ -388,7 +388,7 @@ const styles = StyleSheet.create({
   planTitle: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#FFFFFF",
+    color: "#F5F7FB",
     marginBottom: 6,
   },
   planDescription: {
@@ -402,7 +402,7 @@ const styles = StyleSheet.create({
   price: {
     fontSize: 28,
     fontWeight: "600",
-    color: "#FFFFFF",
+    color: "#F5F7FB",
     marginBottom: 6,
   },
   dailyEquivalent: {
@@ -427,7 +427,7 @@ const styles = StyleSheet.create({
   },
   featureCheckmark: {
     fontSize: 14,
-    color: "#FFFFFF",
+    color: "#F5F7FB",
     fontWeight: "600",
     marginTop: 2,
   },
@@ -453,18 +453,18 @@ const styles = StyleSheet.create({
     color: "#E2E8F0",
   },
   buttonTextRecommended: {
-    color: "#FFFFFF",
+    color: "#F5F7FB",
   },
   buttonDisabled: {
     backgroundColor: "rgba(255,255,255,0.06)",
   },
   buttonTextDisabled: {
-    color: "#94a3b8",
+    color: "#B8C2D9",
   },
   buttonSupportingText: {
     fontSize: 12,
     fontWeight: "600",
-    color: "#94a3b8",
+    color: "#B8C2D9",
     textAlign: "center",
     marginTop: 8,
   },
@@ -476,12 +476,12 @@ const styles = StyleSheet.create({
     marginTop: 14,
   },
   planTrustText: {
-    color: "#94a3b8",
+    color: "#B8C2D9",
     fontSize: 12,
     fontWeight: "600",
   },
   planTrustDivider: {
-    color: "#475569",
+    color: "#667892",
     fontSize: 12,
   },
 });

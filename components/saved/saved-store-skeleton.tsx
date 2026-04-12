@@ -26,7 +26,7 @@ const SHIMMER = "rgba(255,255,255,0.06)";
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: "rgba(15, 23, 42, 0.72)",
+    backgroundColor: "rgba(17,24,39,0.72)",
     borderColor: "rgba(255,255,255,0.08)",
     borderRadius: 28,
     borderWidth: 1,

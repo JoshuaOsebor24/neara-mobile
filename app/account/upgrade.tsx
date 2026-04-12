@@ -127,7 +127,7 @@ export default function UpgradeScreen() {
             ) : null}
 
             <LinearGradient
-              colors={["rgba(14,165,233,0.12)", "rgba(15,23,42,0.92)"]}
+              colors={["rgba(74,136,255,0.12)", "rgba(17,24,39,0.92)"]}
               style={styles.pricingCard}
             >
               <View style={styles.pricingHeader}>
@@ -288,7 +288,7 @@ const BORDER = "rgba(255,255,255,0.10)";
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: "transparent",
   },
   loadingScreen: {
     flex: 1,
@@ -305,7 +305,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   loadingText: {
-    color: "#cbd5e1",
+    color: "#C7D2E5",
     fontSize: 14,
   },
   scrollContent: {
@@ -347,7 +347,7 @@ const styles = StyleSheet.create({
     borderRadius: 32,
     borderWidth: 1,
     borderColor: BORDER,
-    backgroundColor: "rgba(2, 6, 23, 0.82)",
+    backgroundColor: "rgba(10,15,31,0.82)",
     padding: 22,
     shadowColor: "#000",
     shadowOpacity: 0.35,
@@ -361,11 +361,11 @@ const styles = StyleSheet.create({
   heroPill: {
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: "rgba(125, 211, 252, 0.14)",
-    backgroundColor: "rgba(56, 189, 248, 0.10)",
+    borderColor: "rgba(120,163,255,0.14)",
+    backgroundColor: "rgba(74,136,255,0.10)",
     paddingHorizontal: 12,
     paddingVertical: 6,
-    color: "#bae6fd",
+    color: "#D4E1FF",
     fontSize: 11,
     fontWeight: "700",
     letterSpacing: 1.6,
@@ -382,7 +382,7 @@ const styles = StyleSheet.create({
   heroSubtitle: {
     marginTop: 12,
     maxWidth: 320,
-    color: "#cbd5e1",
+    color: "#C7D2E5",
     fontSize: 15,
     lineHeight: 22,
     textAlign: "center",
@@ -404,7 +404,7 @@ const styles = StyleSheet.create({
   },
   limitText: {
     marginTop: 6,
-    color: "#cbd5e1",
+    color: "#C7D2E5",
     fontSize: 14,
     lineHeight: 21,
   },
@@ -420,8 +420,8 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(16, 185, 129, 0.12)",
   },
   noticeError: {
-    borderColor: "rgba(244, 63, 94, 0.20)",
-    backgroundColor: "rgba(244, 63, 94, 0.12)",
+    borderColor: "rgba(255,255,255,0.20)",
+    backgroundColor: "rgba(255,255,255,0.12)",
   },
   noticeText: {
     color: theme.colors.text,
@@ -448,7 +448,7 @@ const styles = StyleSheet.create({
   },
   pricingSubtitle: {
     marginTop: 8,
-    color: "#cbd5e1",
+    color: "#C7D2E5",
     fontSize: 14,
     textAlign: "center",
   },
@@ -473,16 +473,16 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(56, 189, 248, 0.16)",
+    backgroundColor: "rgba(74,136,255,0.16)",
   },
   benefitIconText: {
-    color: "#e0f2fe",
+    color: "#E2EBFF",
     fontSize: 12,
     fontWeight: "700",
   },
   benefitText: {
     flex: 1,
-    color: "#f8fafc",
+    color: "#F5F7FB",
     fontSize: 14,
     lineHeight: 20,
   },
@@ -493,12 +493,12 @@ const styles = StyleSheet.create({
   primaryCta: {
     minHeight: 56,
     borderRadius: 18,
-    backgroundColor: "#fff",
+    backgroundColor: "#F5F7FB",
     alignItems: "center",
     justifyContent: "center",
   },
   primaryCtaText: {
-    color: "#020617",
+    color: "#0A0F1F",
     fontSize: 15,
     fontWeight: "800",
   },
@@ -510,7 +510,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   accentCtaText: {
-    color: "#082f49",
+    color: "#F5F7FB",
     fontSize: 15,
     fontWeight: "800",
   },

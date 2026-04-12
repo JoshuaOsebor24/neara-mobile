@@ -1,6 +1,6 @@
 import { useFocusEffect, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -32,6 +32,7 @@ export default function ChatsTab() {
   );
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const latestLoadIdRef = useRef(0);
 
   useEffect(() => {
     if (!session.isAuthenticated) {
@@ -49,10 +50,17 @@ export default function ChatsTab() {
       return;
     }
 
+    const loadId = latestLoadIdRef.current + 1;
+    latestLoadIdRef.current = loadId;
+
     setIsLoading(true);
     setErrorMessage("");
 
     const result = await fetchChatConversations(session.authToken, "user");
+
+    if (latestLoadIdRef.current !== loadId) {
+      return;
+    }
 
     if (!result.ok) {
       if (result.status === 401) {
@@ -73,6 +81,10 @@ export default function ChatsTab() {
   useFocusEffect(
     useCallback(() => {
       void loadConversations();
+
+      return () => {
+        latestLoadIdRef.current += 1;
+      };
     }, [loadConversations]),
   );
 
@@ -136,7 +148,7 @@ export default function ChatsTab() {
                   </View>
                 ) : (
                   <View style={styles.limitBadgeExhausted}>
-                    <Text style={[styles.limitBadgeText, { color: "#ef4444" }]}>
+                    <Text style={styles.limitBadgeText}>
                       Free message quota exhausted
                     </Text>
                   </View>
@@ -231,7 +243,7 @@ export default function ChatsTab() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: "transparent",
   },
   scrollContent: {
     paddingHorizontal: 16,
@@ -270,8 +282,8 @@ const styles = StyleSheet.create({
   },
   newChatButton: {
     alignItems: "center",
-    backgroundColor: "rgba(56, 189, 248, 0.12)",
-    borderColor: "rgba(56, 189, 248, 0.20)",
+    backgroundColor: "rgba(74,136,255,0.12)",
+    borderColor: "rgba(74,136,255,0.20)",
     borderRadius: 999,
     borderWidth: 1,
     justifyContent: "center",
@@ -280,7 +292,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   newChatButtonText: {
-    color: "#38bdf8",
+    color: "#4A88FF",
     fontSize: 14,
     fontWeight: "700",
   },
@@ -302,14 +314,14 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   panelSubtitle: {
-    color: "#94a3b8",
+    color: "#B8C2D9",
     fontSize: 13,
     marginTop: 4,
   },
   limitBadge: {
     alignSelf: "flex-start",
-    backgroundColor: "rgba(56, 189, 248, 0.12)",
-    borderColor: "rgba(56, 189, 248, 0.20)",
+    backgroundColor: "rgba(74,136,255,0.12)",
+    borderColor: "rgba(74,136,255,0.20)",
     borderRadius: 999,
     borderWidth: 1,
     marginTop: 8,
@@ -318,8 +330,8 @@ const styles = StyleSheet.create({
   },
   limitBadgeExhausted: {
     alignSelf: "flex-start",
-    backgroundColor: "rgba(239, 68, 68, 0.12)",
-    borderColor: "rgba(239, 68, 68, 0.20)",
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderColor: "rgba(214,229,255,0.18)",
     borderRadius: 999,
     borderWidth: 1,
     marginTop: 8,
@@ -327,7 +339,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   limitBadgeText: {
-    color: "#38bdf8",
+    color: "#4A88FF",
     fontSize: 12,
     fontWeight: "600",
   },
@@ -363,8 +375,8 @@ const styles = StyleSheet.create({
   },
   avatar: {
     alignItems: "center",
-    backgroundColor: "rgba(56, 189, 248, 0.12)",
-    borderColor: "rgba(56, 189, 248, 0.20)",
+    backgroundColor: "rgba(74,136,255,0.12)",
+    borderColor: "rgba(74,136,255,0.20)",
     borderRadius: 999,
     borderWidth: 1,
     height: 32,
@@ -372,7 +384,7 @@ const styles = StyleSheet.create({
     width: 32,
   },
   avatarText: {
-    color: "#38bdf8",
+    color: "#4A88FF",
     fontSize: 14,
     fontWeight: "700",
   },
@@ -384,7 +396,7 @@ const styles = StyleSheet.create({
   },
   badge: {
     alignItems: "center",
-    backgroundColor: "#ef4444",
+    backgroundColor: "#2F6BFF",
     borderRadius: 999,
     justifyContent: "center",
     minWidth: 20,
@@ -392,16 +404,16 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   badgeText: {
-    color: "#fff",
+    color: "#F5F7FB",
     fontSize: 11,
     fontWeight: "700",
   },
   timeText: {
-    color: "#94a3b8",
+    color: "#B8C2D9",
     fontSize: 12,
   },
   preview: {
-    color: "#cbd5e1",
+    color: "#C7D2E5",
     fontSize: 14,
     lineHeight: 20,
     marginTop: 12,

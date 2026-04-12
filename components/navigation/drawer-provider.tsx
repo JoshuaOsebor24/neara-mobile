@@ -1,4 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { LinearGradient } from "expo-linear-gradient";
 import { usePathname, useRouter, type Href } from "expo-router";
 import {
   createContext,
@@ -214,6 +215,12 @@ export function DrawerProvider({ children }: { children: ReactNode }) {
                   { paddingTop: Math.max(insets.top, 20) },
                 ]}
               >
+                <LinearGradient
+                  colors={theme.gradients.screen}
+                  pointerEvents="none"
+                  style={styles.drawerBackground}
+                />
+                <View pointerEvents="none" style={styles.drawerGlow} />
                 <View style={styles.drawerHeader}>
                   <View style={styles.brandPill}>
                     <Text style={styles.brandPillText}>Neara</Text>
@@ -256,7 +263,7 @@ export function DrawerProvider({ children }: { children: ReactNode }) {
                       >
                         <View style={styles.navIconWrap}>
                           <Ionicons
-                            color={active ? "#f8fafc" : "#e2e8f0"}
+                            color={active ? "#F5F7FB" : "#E8EEF8"}
                             name={item.icon}
                             size={18}
                           />
@@ -273,7 +280,7 @@ export function DrawerProvider({ children }: { children: ReactNode }) {
                           <View style={styles.unreadDot} />
                         ) : null}
                         <Ionicons
-                          color={active ? "#94a3b8" : "#64748b"}
+                          color={active ? "#B8C2D9" : "#7F8EAD"}
                           name="chevron-forward"
                           size={16}
                         />
@@ -294,14 +301,14 @@ export function DrawerProvider({ children }: { children: ReactNode }) {
                     >
                       <View style={styles.navIconWrap}>
                         <Ionicons
-                          color="#dbeafe"
+                          color="#D9E4FF"
                           name="swap-horizontal-outline"
                           size={18}
                         />
                       </View>
                       <Text style={styles.navLabel}>Switch to Store Mode</Text>
                       <Ionicons
-                        color="#64748b"
+                        color="#7F8EAD"
                         name="chevron-forward"
                         size={16}
                       />
@@ -344,32 +351,46 @@ const styles = StyleSheet.create({
   drawer: {
     flex: 1,
     borderRightWidth: 1,
-    borderRightColor: "rgba(255,255,255,0.1)",
-    backgroundColor: "rgba(2, 8, 23, 0.96)",
+    borderRightColor: theme.colors.borderStrong,
+    backgroundColor: theme.colors.surfaceOverlay,
     paddingHorizontal: 20,
     paddingBottom: 28,
-    shadowColor: "#000",
-    shadowOpacity: 0.48,
+    overflow: "hidden",
+    shadowColor: theme.colors.shadow,
+    shadowOpacity: 0.52,
     shadowRadius: 40,
     shadowOffset: { width: 12, height: 0 },
     elevation: 16,
   },
+  drawerBackground: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  drawerGlow: {
+    position: "absolute",
+    top: -90,
+    right: -110,
+    width: 240,
+    height: 240,
+    borderRadius: 999,
+    backgroundColor: theme.colors.glow,
+    opacity: 0.36,
+  },
   drawerHeader: {
     paddingBottom: 20,
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(255,255,255,0.08)",
+    borderBottomColor: theme.colors.borderSoft,
   },
   brandPill: {
     borderRadius: 999,
-    borderColor: "rgba(59,130,246,0.22)",
+    borderColor: "rgba(74,136,255,0.22)",
     borderWidth: 1,
-    backgroundColor: "rgba(59,130,246,0.12)",
+    backgroundColor: "rgba(74,136,255,0.12)",
     paddingHorizontal: 12,
     paddingVertical: 6,
     alignSelf: "flex-start",
   },
   brandPillText: {
-    color: "#dbeafe",
+    color: "#D9E4FF",
     fontSize: 11,
     fontWeight: "700",
     letterSpacing: 1.8,
@@ -392,7 +413,7 @@ const styles = StyleSheet.create({
   },
   identityMeta: {
     marginTop: 4,
-    color: "#64748b",
+    color: "#7F8EAD",
     fontSize: 14,
   },
   identityBadgeRow: {
@@ -404,8 +425,10 @@ const styles = StyleSheet.create({
   navList: {
     marginTop: 8,
     flex: 1,
-    backgroundColor: "rgba(255,255,255,0.02)",
-    borderRadius: 12,
+    backgroundColor: "rgba(17,24,39,0.72)",
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: theme.colors.borderSoft,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
@@ -415,10 +438,11 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(255,255,255,0.08)",
+    borderBottomColor: theme.colors.borderSoft,
   },
   navItemActive: {
-    backgroundColor: "transparent",
+    backgroundColor: "rgba(74,136,255,0.08)",
+    borderRadius: 14,
   },
   navItemPrimary: {
     marginTop: 0,
@@ -434,8 +458,8 @@ const styles = StyleSheet.create({
     height: 32,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.06)",
-    backgroundColor: "rgba(255,255,255,0.04)",
+    borderColor: theme.colors.borderSoft,
+    backgroundColor: "rgba(19,29,49,0.82)",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -446,25 +470,25 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   navLabelActive: {
-    color: "#ffffff",
+    color: "#F5F7FB",
   },
   unreadDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: "#ef4444",
+    backgroundColor: "#4A88FF",
     marginRight: 6,
   },
   bottomActionWrap: {
     borderTopWidth: 1,
-    borderTopColor: "rgba(255,255,255,0.08)",
+    borderTopColor: theme.colors.borderSoft,
     marginTop: 16,
     paddingTop: 16,
   },
   bottomActionButton: {
     alignItems: "center",
-    backgroundColor: "rgba(59,130,246,0.16)",
-    borderColor: "rgba(59,130,246,0.28)",
+    backgroundColor: "rgba(74,136,255,0.16)",
+    borderColor: "rgba(74,136,255,0.28)",
     borderRadius: 18,
     borderWidth: 1,
     flexDirection: "row",

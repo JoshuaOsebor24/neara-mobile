@@ -4,6 +4,7 @@
 // - `/me` returns the authenticated user's details
 const express = require("express");
 const bcrypt = require("bcrypt");
+const rateLimit = require("express-rate-limit");
 const authMiddleware = require("../middleware/authMiddleware");
 const { getJwtSecretOrThrow, signUserToken } = require("../config/jwt");
 const {
@@ -24,6 +25,24 @@ const ROLE_STORE_OWNER = "store_owner";
 const ROLE_ORDER = Object.freeze([ROLE_USER, ROLE_PRO, ROLE_STORE_OWNER]);
 const AUTH_BCRYPT_ROUNDS = 8;
 const EXISTING_ACCOUNT_MESSAGE = AUTH_MESSAGES.signup.emailExists;
+const authReadLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    message: "Too many authentication requests, please try again later.",
+  },
+});
+const authWriteLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 25,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    message: "Too many signup or login attempts, please try again later.",
+  },
+});
 
 function normalizeEmail(value) {
   return String(value || "").trim().toLowerCase();
@@ -462,7 +481,7 @@ async function grantAdminForConfiguredEmail(client, user) {
 }
 
 // Signup: validate input, ensure uniqueness, hash password, save user
-router.post("/signup", async (req, res) => {
+router.post("/signup", authWriteLimiter, async (req, res) => {
   const routeLabel = "auth/signup";
   const completedSteps = [];
   let currentStep = "signup start";
@@ -704,7 +723,7 @@ router.post("/signup", async (req, res) => {
 });
 
 // Login: validate credentials, compare hashed password, return JWT
-router.post("/login", async (req, res) => {
+router.post("/login", authWriteLimiter, async (req, res) => {
   let client;
   const startedAt = Date.now();
   let currentStep = "login request started";
@@ -929,7 +948,7 @@ router.patch("/roles/pro", authMiddleware, async (req, res) => {
   }
 });
 
-router.post("/register-owner", async (req, res) => {
+router.post("/register-owner", authWriteLimiter, async (req, res) => {
   let client;
   let transactionOpen = false;
   const routeLabel = "auth/register-owner";
@@ -1343,7 +1362,7 @@ router.post("/register-owner", async (req, res) => {
 });
 
 // Protected endpoint: return authenticated user's public profile
-router.get("/me", authMiddleware, async (req, res) => {
+router.get("/me", authReadLimiter, authMiddleware, async (req, res) => {
   return handleCurrentUserRequest(req, res, "auth/me");
 });
 

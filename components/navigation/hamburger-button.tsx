@@ -25,10 +25,10 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.1)",
-    backgroundColor: "rgba(16, 24, 40, 0.92)",
+    backgroundColor: "rgba(17,24,39,0.92)",
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#020617",
+    shadowColor: "#0A0F1F",
     shadowOffset: {
       width: 0,
       height: 12,

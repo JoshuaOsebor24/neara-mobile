@@ -1,5 +1,6 @@
 import { StyleSheet, Text, View, type ViewStyle } from "react-native";
 
+import { theme } from "@/constants/theme";
 import { NEARA_STORE_OWNER_BADGE_LABEL } from "@/services/role-access";
 
 export function StoreOwnerBadge({ style }: { style?: ViewStyle }) {
@@ -14,8 +15,8 @@ const styles = StyleSheet.create({
   badge: {
     alignItems: "center",
     alignSelf: "flex-start",
-    backgroundColor: "rgba(250, 204, 21, 0.14)",
-    borderColor: "rgba(250, 204, 21, 0.24)",
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderColor: theme.colors.border,
     borderRadius: 999,
     borderWidth: 1,
     justifyContent: "center",
@@ -23,7 +24,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   label: {
-    color: "#fde68a",
+    color: theme.colors.subduedText,
     fontSize: 10,
     fontWeight: "800",
     letterSpacing: 0.6,

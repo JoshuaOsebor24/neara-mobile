@@ -1,7 +1,9 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useRouter } from "expo-router";
+import Constants from "expo-constants";
 import { StatusBar } from "expo-status-bar";
+import * as WebBrowser from "expo-web-browser";
 import {
+  Alert,
   ScrollView,
   StyleSheet,
   Text,
@@ -14,15 +16,78 @@ import { BackPillButton } from "@/components/ui/back-pill-button";
 import { ScreenCard } from "@/components/ui/screen-card";
 import { theme } from "@/constants/theme";
 
+const HELP_CENTER_PORT = "5500";
+const HELP_CENTER_PATH = "/neara-help-center/index.html";
+
+function normalizeBaseUrl(value?: string | null) {
+  const normalized = String(value || "").trim().replace(/\/+$/, "");
+  return normalized || null;
+}
+
+function extractExpoHostCandidate() {
+  const constants = Constants as unknown as {
+    expoConfig?: { hostUri?: string | null } | null;
+    linkingUri?: string | null;
+    manifest?: { debuggerHost?: string | null } | null;
+    manifest2?: {
+      extra?: {
+        expoGo?: { debuggerHost?: string | null } | null;
+      } | null;
+    } | null;
+  };
+
+  const hostSource =
+    constants.expoConfig?.hostUri ||
+    constants.manifest2?.extra?.expoGo?.debuggerHost ||
+    constants.manifest?.debuggerHost ||
+    constants.linkingUri ||
+    "";
+
+  const normalizedHost = String(hostSource)
+    .trim()
+    .replace(/^exp:\/\//, "")
+    .replace(/^https?:\/\//, "")
+    .split("/")[0]
+    .split(":")[0];
+
+  return normalizedHost || null;
+}
+
+function getHelpCenterUrl() {
+  const explicitUrl = normalizeBaseUrl(process.env.EXPO_PUBLIC_HELP_CENTER_URL);
+  if (explicitUrl) {
+    return explicitUrl;
+  }
+
+  const expoHost = extractExpoHostCandidate();
+  if (expoHost) {
+    return `http://${expoHost}:${HELP_CENTER_PORT}${HELP_CENTER_PATH}`;
+  }
+
+  return `http://localhost:${HELP_CENTER_PORT}${HELP_CENTER_PATH}`;
+}
+
 const quickHelpItems = [
   { text: "How to chat with a store", icon: "chatbubble-outline" },
   { text: "How to save a store", icon: "bookmark-outline" },
   { text: "How to start a store", icon: "storefront-outline" },
   { text: "How to upgrade to Pro", icon: "flash-outline" },
-];
+] as const satisfies readonly {
+  icon: React.ComponentProps<typeof Ionicons>["name"];
+  text: string;
+}[];
 
 export default function HelpScreen() {
-  const router = useRouter();
+  const openHelpCenter = async () => {
+    try {
+      await WebBrowser.openBrowserAsync(getHelpCenterUrl());
+    } catch {
+      Alert.alert(
+        "Help Center unavailable",
+        "We could not open the Neara Help Center right now.",
+      );
+    }
+  };
 
   return (
     <SafeAreaView edges={["top"]} style={styles.safeArea}>
@@ -50,14 +115,12 @@ export default function HelpScreen() {
                     <TouchableOpacity
                       key={item.text}
                       activeOpacity={0.7}
-                      onPress={() => {
-                        // TODO: Navigate to specific help content
-                      }}
+                      onPress={openHelpCenter}
                       style={styles.quickHelpItem}
                     >
                       <View style={styles.quickHelpItemLeft}>
                         <Ionicons
-                          color="#38bdf8"
+                          color="#4A88FF"
                           name={item.icon}
                           size={18}
                           style={styles.quickHelpItemIcon}
@@ -67,13 +130,24 @@ export default function HelpScreen() {
                         </Text>
                       </View>
                       <Ionicons
-                        color="#64748b"
+                        color="#7F8EAD"
                         name="chevron-forward"
                         size={16}
                       />
                     </TouchableOpacity>
                   ))}
                 </View>
+
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={openHelpCenter}
+                  style={[styles.supportButton, styles.helpCenterButton]}
+                >
+                  <Ionicons color="#0A0F1F" name="open-outline" size={16} />
+                  <Text style={styles.helpCenterButtonText}>
+                    Open Help Center
+                  </Text>
+                </TouchableOpacity>
               </View>
 
               <View style={styles.sectionCard}>
@@ -84,7 +158,7 @@ export default function HelpScreen() {
 
                 <TouchableOpacity
                   activeOpacity={0.85}
-                  onPress={() => router.push("/upgrade")}
+                  onPress={openHelpCenter}
                   style={styles.supportButton}
                 >
                   <Text style={styles.supportButtonText}>Contact support</Text>
@@ -101,7 +175,7 @@ export default function HelpScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: "transparent",
   },
   scrollContent: {
     paddingHorizontal: 16,
@@ -118,7 +192,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   headerLabel: {
-    color: "#94a3b8",
+    color: "#B8C2D9",
     fontSize: 12,
     fontWeight: "700",
     letterSpacing: 2.2,
@@ -128,7 +202,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   eyebrow: {
-    color: "#bae6fd",
+    color: "#D4E1FF",
     fontSize: 11,
     fontWeight: "700",
     letterSpacing: 1.8,
@@ -168,7 +242,7 @@ const styles = StyleSheet.create({
   },
   quickHelpItem: {
     alignItems: "center",
-    backgroundColor: "rgba(2, 6, 23, 0.4)",
+    backgroundColor: "rgba(10,15,31,0.4)",
     borderColor: "rgba(255,255,255,0.08)",
     borderRadius: 18,
     borderWidth: 1,
@@ -187,14 +261,14 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   quickHelpItemText: {
-    color: "#f1f5f9",
+    color: theme.colors.text,
     fontSize: 14,
     fontWeight: "600",
   },
   supportButton: {
     alignItems: "center",
-    backgroundColor: "rgba(56, 189, 248, 0.12)",
-    borderColor: "rgba(56, 189, 248, 0.20)",
+    backgroundColor: "rgba(74,136,255,0.12)",
+    borderColor: "rgba(74,136,255,0.20)",
     borderRadius: 16,
     borderWidth: 1,
     justifyContent: "center",
@@ -202,8 +276,20 @@ const styles = StyleSheet.create({
     minHeight: 48,
     paddingHorizontal: 20,
   },
+  helpCenterButton: {
+    backgroundColor: "#4A88FF",
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 16,
+    borderColor: "rgba(120,163,255,0.28)",
+  },
+  helpCenterButtonText: {
+    color: "#F5F7FB",
+    fontSize: 14,
+    fontWeight: "800",
+  },
   supportButtonText: {
-    color: "#38bdf8",
+    color: "#4A88FF",
     fontSize: 14,
     fontWeight: "700",
   },

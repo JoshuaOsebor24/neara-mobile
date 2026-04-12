@@ -69,8 +69,8 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   errorCard: {
-    borderColor: "rgba(248,113,113,0.22)",
-    backgroundColor: "rgba(127,29,29,0.18)",
+    borderColor: "rgba(255,255,255,0.28)",
+    backgroundColor: "rgba(133, 54, 98, 0.22)",
   },
   statusTitle: {
     color: theme.colors.text,
@@ -88,6 +88,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    backgroundColor: "rgba(255,255,255,0.05)",
+    backgroundColor: "rgba(19,29,49,0.82)",
   },
 });

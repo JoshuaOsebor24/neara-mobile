@@ -2,8 +2,10 @@ import { BackPillButton } from "@/components/ui/back-pill-button";
 import { Button } from "@/components/ui/button";
 import {
   MAIN_CATEGORY_OPTIONS,
+  type MainCategoryOption,
   normalizeCommaSeparatedValues,
   TAG_OPTIONS,
+  type ProductTagOption,
 } from "@/constants/product-taxonomy";
 import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -29,9 +31,11 @@ import { useMobileSession } from "@/services/mobile-session";
 import {
   createProductWithBackend,
   updateProductWithBackend,
-  type BackendProduct,
 } from "@/services/product-api";
-import { fetchStoreFullData } from "@/services/store-api";
+import {
+  loadStoreDetailRecord,
+  type StoreProductRecord,
+} from "@/services/store-data";
 
 type SaveMode = "edit-next" | "start-new" | "update";
 
@@ -247,13 +251,19 @@ export default function AddStoreProductScreen() {
   }, [router, session.isAuthenticated, session.isStoreOwner]);
 
   useEffect(() => {
+    let cancelled = false;
+
     async function loadEditingProduct() {
       if (!isEditing || !preferredStoreId) {
         return;
       }
 
       setIsLoadingProduct(true);
-      const result = await fetchStoreFullData(preferredStoreId);
+      const result = await loadStoreDetailRecord(preferredStoreId);
+
+      if (cancelled) {
+        return;
+      }
 
       if (!result.ok) {
         setNotice({
@@ -264,9 +274,9 @@ export default function AddStoreProductScreen() {
         return;
       }
 
-      const matchedProduct = result.products.find((product) => {
-        return String(product.product_id ?? "") === editingProductId;
-      });
+      const matchedProduct = result.products.find(
+        (product) => product.id === editingProductId,
+      );
 
       if (!matchedProduct) {
         setNotice({
@@ -282,27 +292,24 @@ export default function AddStoreProductScreen() {
     }
 
     void loadEditingProduct();
+
+    return () => {
+      cancelled = true;
+    };
   }, [editingProductId, isEditing, preferredStoreId]);
 
   if (!session.isAuthenticated || !session.isStoreOwner) {
     return null;
   }
 
-  function hydrateFormFromProduct(product: BackendProduct, storeId: string) {
+  function hydrateFormFromProduct(product: StoreProductRecord, storeId: string) {
     const variantDrafts =
-      product.variants?.map((variant) => ({
+      product.variants.map((variant) => ({
         id: createVariantId(),
-        price:
-          variant.price !== null && variant.price !== undefined
-            ? String(variant.price)
-            : "",
-        quantity:
-          variant.stock_quantity !== null &&
-          variant.stock_quantity !== undefined
-            ? String(variant.stock_quantity)
-            : "",
-        variantName: variant.variant_name || "",
-      })) ?? [];
+        price: String(variant.price ?? ""),
+        quantity: String(variant.stockQuantity ?? ""),
+        variantName: variant.label || "",
+      }));
 
     const defaultVariant =
       variantDrafts.length === 1 && !variantDrafts[0].variantName
@@ -313,26 +320,32 @@ export default function AddStoreProductScreen() {
     const incomingTags = (Array.isArray(product.tags) ? product.tags : [])
       .map((item) => String(item || "").trim().toLowerCase())
       .filter(Boolean);
-    const knownTags = incomingTags.filter((item) => TAG_OPTIONS.includes(item));
-    const unknownTags = incomingTags.filter((item) => !TAG_OPTIONS.includes(item));
+    const knownTags = incomingTags.filter((item): item is ProductTagOption =>
+      TAG_OPTIONS.includes(item as ProductTagOption),
+    );
+    const unknownTags = incomingTags.filter(
+      (item) => !TAG_OPTIONS.includes(item as ProductTagOption),
+    );
 
     setSelectedStoreId(storeId);
-    setProductName(product.product_name || "");
+    setProductName(product.name || "");
     setPrice(defaultVariant?.price || "");
     setSelectedMainCategory(
-      MAIN_CATEGORY_OPTIONS.includes(normalizedCategory)
+      MAIN_CATEGORY_OPTIONS.includes(normalizedCategory as MainCategoryOption)
         ? normalizedCategory
         : normalizedCategory
           ? "Custom"
           : "",
     );
     setCustomMainCategory(
-      MAIN_CATEGORY_OPTIONS.includes(normalizedCategory) ? "" : normalizedCategory,
+      MAIN_CATEGORY_OPTIONS.includes(normalizedCategory as MainCategoryOption)
+        ? ""
+        : normalizedCategory,
     );
     setSelectedTags(knownTags);
     setCustomTags(unknownTags.join(", "));
     setDescription(product.description || "");
-    setImageUrl(product.image_url || "");
+    setImageUrl(product.image || "");
     setVariants(defaultVariant ? [] : variantDrafts);
   }
 
@@ -1028,12 +1041,12 @@ export default function AddStoreProductScreen() {
   );
 }
 
-const BORDER = "rgba(255,255,255,0.10)";
+const BORDER = theme.colors.borderStrong;
 
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: "transparent",
   },
   flex: {
     flex: 1,
@@ -1056,7 +1069,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     borderWidth: 1,
     borderColor: BORDER,
-    backgroundColor: "rgba(255,255,255,0.05)",
+    backgroundColor: theme.button.secondaryBackground,
     paddingHorizontal: 16,
     paddingVertical: 10,
   },
@@ -1078,15 +1091,15 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     borderWidth: 1,
     borderColor: BORDER,
-    backgroundColor: "rgba(255,255,255,0.05)",
+    backgroundColor: theme.colors.surfaceElevated,
     padding: 16,
   },
   infoNoticeCard: {
-    borderColor: "rgba(56,189,248,0.22)",
-    backgroundColor: "rgba(56,189,248,0.10)",
+    borderColor: theme.colors.borderStrong,
+    backgroundColor: "rgba(74,136,255,0.16)",
   },
   topNoticeEyebrow: {
-    color: "#cbd5e1",
+    color: theme.colors.subduedText,
     fontSize: 11,
     fontWeight: "700",
     letterSpacing: 1.8,
@@ -1094,7 +1107,7 @@ const styles = StyleSheet.create({
   },
   topNoticeText: {
     marginTop: 8,
-    color: "#e2e8f0",
+    color: theme.colors.subduedText,
     fontSize: 14,
     lineHeight: 21,
   },
@@ -1110,19 +1123,19 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: "rgba(52,211,153,0.28)",
-    backgroundColor: "rgba(52,211,153,0.12)",
+    borderColor: theme.colors.borderStrong,
+    backgroundColor: "rgba(74,136,255,0.16)",
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
   useLastButtonText: {
-    color: "#d1fae5",
+    color: theme.colors.subduedText,
     fontSize: 12,
     fontWeight: "700",
   },
   quickRepeatFooter: {
     marginTop: 10,
-    color: "#94a3b8",
+    color: theme.colors.mutedText,
     fontSize: 12,
   },
   formCard: {
@@ -1130,7 +1143,7 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     borderWidth: 1,
     borderColor: BORDER,
-    backgroundColor: "rgba(15, 23, 42, 0.72)",
+    backgroundColor: theme.colors.surfaceCard,
   },
   formCardHeader: {
     borderBottomWidth: 1,
@@ -1139,7 +1152,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
   },
   sectionEyebrow: {
-    color: "#94a3b8",
+    color: theme.colors.mutedText,
     fontSize: 11,
     fontWeight: "700",
     letterSpacing: 1.8,
@@ -1147,7 +1160,7 @@ const styles = StyleSheet.create({
   },
   sectionSubtitle: {
     marginTop: 8,
-    color: "#cbd5e1",
+    color: theme.colors.subduedText,
     fontSize: 14,
   },
   formBody: {
@@ -1162,15 +1175,15 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   noticeSuccess: {
-    borderColor: "rgba(52,211,153,0.22)",
-    backgroundColor: "rgba(52,211,153,0.12)",
+    borderColor: theme.colors.borderStrong,
+    backgroundColor: "rgba(74,136,255,0.16)",
   },
   noticeError: {
-    borderColor: "rgba(244,63,94,0.22)",
-    backgroundColor: "rgba(244,63,94,0.12)",
+    borderColor: theme.colors.borderStrong,
+    backgroundColor: theme.colors.surfaceElevated,
   },
   noticeText: {
-    color: "#f8fafc",
+    color: "#F5F7FB",
     fontSize: 14,
     lineHeight: 20,
   },
@@ -1178,7 +1191,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   fieldLabel: {
-    color: "#94a3b8",
+    color: theme.colors.mutedText,
     fontSize: 11,
     fontWeight: "700",
     letterSpacing: 1.8,
@@ -1192,13 +1205,13 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     borderWidth: 1,
     borderColor: BORDER,
-    backgroundColor: "rgba(2,6,23,0.52)",
+    backgroundColor: theme.colors.surfaceOverlay,
     paddingHorizontal: 14,
     paddingVertical: 12,
   },
   storeChipActive: {
-    borderColor: "rgba(56,189,248,0.32)",
-    backgroundColor: "rgba(56,189,248,0.12)",
+    borderColor: theme.colors.borderStrong,
+    backgroundColor: "rgba(74,136,255,0.16)",
   },
   storeChipTitle: {
     color: theme.colors.text,
@@ -1206,18 +1219,18 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   storeChipTitleActive: {
-    color: "#e0f2fe",
+    color: theme.colors.subduedText,
   },
   storeChipMeta: {
     marginTop: 4,
-    color: "#94a3b8",
+    color: theme.colors.mutedText,
     fontSize: 12,
   },
   selectedStoreCard: {
     borderRadius: 18,
     borderWidth: 1,
     borderColor: BORDER,
-    backgroundColor: "rgba(255,255,255,0.05)",
+    backgroundColor: theme.colors.surfaceElevated,
     padding: 14,
     gap: 8,
   },
@@ -1227,14 +1240,14 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   selectedStoreMeta: {
-    color: "#94a3b8",
+    color: theme.colors.mutedText,
     fontSize: 12,
   },
   input: {
     borderRadius: 18,
     borderWidth: 1,
     borderColor: BORDER,
-    backgroundColor: "rgba(2,6,23,0.58)",
+    backgroundColor: theme.colors.surfaceOverlay,
     paddingHorizontal: 16,
     paddingVertical: 14,
     color: theme.colors.text,
@@ -1246,12 +1259,12 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     borderWidth: 1,
     borderColor: BORDER,
-    backgroundColor: "rgba(2,6,23,0.58)",
+    backgroundColor: theme.colors.surfaceOverlay,
     paddingHorizontal: 16,
   },
   currencyMark: {
     marginRight: 8,
-    color: "#94a3b8",
+    color: theme.colors.mutedText,
     fontSize: 16,
     fontWeight: "700",
   },
@@ -1262,7 +1275,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   helperText: {
-    color: "#64748b",
+    color: theme.colors.mutedText,
     fontSize: 12,
     lineHeight: 18,
   },
@@ -1273,28 +1286,28 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     borderWidth: 1,
     borderColor: BORDER,
-    backgroundColor: "rgba(255,255,255,0.05)",
+    backgroundColor: theme.colors.surfaceElevated,
     paddingHorizontal: 14,
     paddingVertical: 9,
   },
   categoryChipActive: {
-    borderColor: "rgba(56,189,248,0.32)",
-    backgroundColor: "rgba(56,189,248,0.12)",
+    borderColor: theme.colors.borderStrong,
+    backgroundColor: "rgba(74,136,255,0.16)",
   },
   categoryChipText: {
-    color: "#cbd5e1",
+    color: theme.colors.subduedText,
     fontSize: 13,
     fontWeight: "600",
   },
   categoryChipTextActive: {
-    color: "#e0f2fe",
+    color: theme.colors.text,
   },
   textArea: {
     minHeight: 110,
     borderRadius: 18,
     borderWidth: 1,
     borderColor: BORDER,
-    backgroundColor: "rgba(2,6,23,0.58)",
+    backgroundColor: theme.colors.surfaceOverlay,
     paddingHorizontal: 16,
     paddingVertical: 14,
     color: theme.colors.text,
@@ -1305,7 +1318,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     borderColor: BORDER,
-    backgroundColor: "rgba(255,255,255,0.05)",
+    backgroundColor: theme.colors.surfaceElevated,
     padding: 16,
     gap: 14,
   },
@@ -1321,7 +1334,7 @@ const styles = StyleSheet.create({
   },
   imageSubtitle: {
     marginTop: 4,
-    color: "#94a3b8",
+    color: theme.colors.mutedText,
     fontSize: 12,
     lineHeight: 18,
   },
@@ -1329,13 +1342,13 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: "rgba(244,63,94,0.24)",
-    backgroundColor: "rgba(244,63,94,0.12)",
+    borderColor: theme.colors.borderStrong,
+    backgroundColor: theme.button.secondaryBackground,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
   removeImageButtonText: {
-    color: "#fecdd3",
+    color: theme.colors.subduedText,
     fontSize: 11,
     fontWeight: "700",
   },
@@ -1344,7 +1357,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     borderWidth: 1,
     borderColor: BORDER,
-    backgroundColor: "rgba(2,6,23,0.58)",
+    backgroundColor: theme.colors.surfaceOverlay,
     height: 192,
     alignItems: "center",
     justifyContent: "center",
@@ -1354,7 +1367,7 @@ const styles = StyleSheet.create({
     height: "100%",
   },
   imageEmptyText: {
-    color: "#64748b",
+    color: theme.colors.mutedText,
     fontSize: 14,
   },
   imageActionRow: {
@@ -1362,12 +1375,12 @@ const styles = StyleSheet.create({
   },
   primaryImageButton: {
     borderRadius: 18,
-    backgroundColor: "#fff",
+    backgroundColor: theme.colors.accent,
     paddingVertical: 14,
     alignItems: "center",
   },
   primaryImageButtonText: {
-    color: "#020617",
+    color: theme.colors.primaryTextOnAccent,
     fontSize: 14,
     fontWeight: "700",
   },
@@ -1375,7 +1388,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     borderWidth: 1,
     borderColor: BORDER,
-    backgroundColor: "rgba(255,255,255,0.05)",
+    backgroundColor: theme.button.secondaryBackground,
     paddingVertical: 14,
     alignItems: "center",
   },
@@ -1388,7 +1401,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     borderColor: BORDER,
-    backgroundColor: "rgba(255,255,255,0.05)",
+    backgroundColor: theme.colors.surfaceElevated,
     padding: 16,
     gap: 14,
   },
@@ -1404,7 +1417,7 @@ const styles = StyleSheet.create({
   },
   variantSubtitle: {
     marginTop: 4,
-    color: "#94a3b8",
+    color: theme.colors.mutedText,
     fontSize: 12,
     lineHeight: 18,
   },
@@ -1413,7 +1426,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     borderWidth: 1,
     borderColor: BORDER,
-    backgroundColor: "rgba(255,255,255,0.06)",
+    backgroundColor: theme.button.secondaryBackground,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
@@ -1426,11 +1439,11 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     borderColor: BORDER,
-    backgroundColor: "rgba(2,6,23,0.42)",
+    backgroundColor: theme.colors.surfaceOverlay,
     padding: 14,
   },
   variantEmptyText: {
-    color: "#94a3b8",
+    color: theme.colors.mutedText,
     fontSize: 13,
     lineHeight: 19,
   },
@@ -1441,7 +1454,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     borderWidth: 1,
     borderColor: BORDER,
-    backgroundColor: "rgba(2,6,23,0.42)",
+    backgroundColor: theme.colors.surfaceOverlay,
     padding: 14,
     gap: 12,
   },
@@ -1458,13 +1471,13 @@ const styles = StyleSheet.create({
   variantRemoveButton: {
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: "rgba(244,63,94,0.24)",
-    backgroundColor: "rgba(244,63,94,0.12)",
+    borderColor: theme.colors.borderStrong,
+    backgroundColor: theme.button.secondaryBackground,
     paddingHorizontal: 12,
     paddingVertical: 7,
   },
   variantRemoveButtonText: {
-    color: "#fecdd3",
+    color: theme.colors.subduedText,
     fontSize: 11,
     fontWeight: "700",
   },
@@ -1480,12 +1493,12 @@ const styles = StyleSheet.create({
   },
   primarySubmitButton: {
     borderRadius: 18,
-    backgroundColor: "#fff",
+    backgroundColor: theme.colors.accent,
     paddingVertical: 16,
     alignItems: "center",
   },
   primarySubmitButtonText: {
-    color: "#020617",
+    color: theme.colors.primaryTextOnAccent,
     fontSize: 14,
     fontWeight: "700",
   },
@@ -1493,7 +1506,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     borderWidth: 1,
     borderColor: BORDER,
-    backgroundColor: "rgba(255,255,255,0.05)",
+    backgroundColor: theme.button.secondaryBackground,
     paddingVertical: 16,
     alignItems: "center",
   },

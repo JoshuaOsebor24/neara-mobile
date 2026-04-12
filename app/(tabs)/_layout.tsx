@@ -1,7 +1,6 @@
 import { Stack } from 'expo-router';
 
 import { DrawerProvider } from '@/components/navigation/drawer-provider';
-import { theme } from '@/constants/theme';
 
 export default function TabLayout() {
   return (
@@ -10,7 +9,7 @@ export default function TabLayout() {
         screenOptions={{
           headerShown: false,
           contentStyle: {
-            backgroundColor: theme.colors.background,
+            backgroundColor: "transparent",
           },
           animation: 'none',
         }}>

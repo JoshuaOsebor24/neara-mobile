@@ -10,6 +10,7 @@ export const MAIN_CATEGORY_OPTIONS = [
   "Accessories",
   "Beauty",
 ] as const;
+export type MainCategoryOption = (typeof MAIN_CATEGORY_OPTIONS)[number];
 
 export const TAG_OPTIONS = [
   "orange",
@@ -31,6 +32,7 @@ export const TAG_OPTIONS = [
   "cleaning",
   "beauty",
 ] as const;
+export type ProductTagOption = (typeof TAG_OPTIONS)[number];
 
 export function normalizeCommaSeparatedValues(value: string) {
   return Array.from(

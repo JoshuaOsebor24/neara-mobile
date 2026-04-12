@@ -81,7 +81,7 @@ export function LockedMessagingScreen({
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: "transparent",
   },
   scrollContent: {
     flexGrow: 1,
@@ -100,7 +100,7 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   eyebrow: {
-    color: "#bae6fd",
+    color: "#D4E1FF",
     fontSize: 11,
     fontWeight: "700",
     letterSpacing: 1.8,
@@ -115,7 +115,7 @@ const styles = StyleSheet.create({
   },
   message: {
     marginTop: 12,
-    color: "#cbd5e1",
+    color: "#C7D2E5",
     fontSize: 14,
     lineHeight: 22,
   },
@@ -125,13 +125,13 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     borderRadius: 999,
-    backgroundColor: "#fff",
+    backgroundColor: theme.colors.accent,
     paddingHorizontal: 18,
     paddingVertical: 15,
     alignItems: "center",
   },
   primaryButtonText: {
-    color: "#020617",
+    color: theme.colors.primaryTextOnAccent,
     fontSize: 14,
     fontWeight: "700",
   },
@@ -139,7 +139,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.10)",
-    backgroundColor: "rgba(255,255,255,0.05)",
+    backgroundColor: theme.button.secondaryBackground,
     paddingHorizontal: 18,
     paddingVertical: 15,
     alignItems: "center",
@@ -151,7 +151,7 @@ const styles = StyleSheet.create({
   },
   trustText: {
     marginTop: 12,
-    color: "#94a3b8",
+    color: "#B8C2D9",
     fontSize: 12,
     textAlign: "center",
   },

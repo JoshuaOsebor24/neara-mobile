@@ -51,7 +51,7 @@ export default function StorePaymentScreen() {
     <SafeAreaView style={styles.safeArea}>
       <StatusBar style="light" />
       <LinearGradient
-        colors={["rgba(56,189,248,0.16)", "transparent", "rgba(2,6,23,1)"]}
+        colors={["rgba(74,136,255,0.16)", "transparent", "rgba(10,15,31,1)"]}
         start={{ x: 0.5, y: 0 }}
         end={{ x: 0.5, y: 1 }}
         style={StyleSheet.absoluteFillObject}
@@ -101,7 +101,7 @@ export default function StorePaymentScreen() {
               </Text>
 
               <LinearGradient
-                colors={["#f8fafc", "#e2e8f0"]}
+                colors={theme.gradients.primaryButton}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={[
@@ -149,12 +149,12 @@ export default function StorePaymentScreen() {
   );
 }
 
-const BORDER = "rgba(255,255,255,0.10)";
+const BORDER = theme.colors.borderStrong;
 
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#020617",
+    backgroundColor: "#0A0F1F",
   },
   scrollContent: {
     paddingHorizontal: 16,
@@ -171,7 +171,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   backButton: {
-    backgroundColor: "rgba(255,255,255,0.05)",
+    backgroundColor: theme.button.secondaryBackground,
     borderColor: BORDER,
     borderRadius: 999,
     borderWidth: 1,
@@ -184,21 +184,21 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   headerLabel: {
-    color: "#94a3b8",
+    color: "#B8C2D9",
     fontSize: 12,
     fontWeight: "700",
     letterSpacing: 1.8,
     textTransform: "uppercase",
   },
   panel: {
-    backgroundColor: "rgba(2, 6, 23, 0.82)",
+    backgroundColor: theme.colors.surfaceCard,
     borderColor: BORDER,
     borderRadius: 32,
     borderWidth: 1,
     padding: 22,
   },
   eyebrow: {
-    color: "#b0e7fe",
+    color: theme.colors.accentStrong,
     fontSize: 11,
     fontWeight: "700",
     letterSpacing: 1.8,
@@ -211,13 +211,13 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   subtitle: {
-    color: "#cbd5e1",
+    color: theme.colors.subduedText,
     fontSize: 14,
     lineHeight: 22,
     marginTop: 10,
   },
   mainCard: {
-    backgroundColor: "rgba(255,255,255,0.05)",
+    backgroundColor: theme.colors.surfaceElevated,
     borderColor: BORDER,
     borderRadius: 24,
     borderWidth: 1,
@@ -225,20 +225,20 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   planPrice: {
-    color: "#f8fafc",
+    color: "#F5F7FB",
     fontSize: 32,
     fontWeight: "700",
     textAlign: "center",
   },
   planDailyEquivalent: {
-    color: "#b0e7fe",
+    color: theme.colors.accentStrong,
     fontSize: 14,
     fontWeight: "700",
     marginTop: 8,
     textAlign: "center",
   },
   planDescription: {
-    color: "#cbd5e1",
+    color: theme.colors.subduedText,
     fontSize: 16,
     lineHeight: 24,
     marginTop: 16,
@@ -258,13 +258,13 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   noticeBullet: {
-    color: "#d7e4f2",
+    color: theme.colors.subduedText,
     fontSize: 14,
     lineHeight: 20,
     textAlign: "center",
   },
   ctaPrompt: {
-    color: "#94a3b8",
+    color: "#B8C2D9",
     fontSize: 14,
     fontWeight: "600",
     marginTop: 24,
@@ -285,7 +285,7 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   primaryButtonText: {
-    color: "#020617",
+    color: theme.colors.primaryTextOnAccent,
     fontSize: 16,
     fontWeight: "800",
   },
@@ -297,17 +297,17 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   trustText: {
-    color: "#94a3b8",
+    color: "#B8C2D9",
     fontSize: 12,
     fontWeight: "700",
   },
   trustDivider: {
-    color: "#475569",
+    color: theme.colors.mutedText,
     fontSize: 12,
   },
   successPill: {
-    backgroundColor: "rgba(34,197,94,0.12)",
-    borderColor: "rgba(74, 222, 128, 0.22)",
+    backgroundColor: "rgba(74,136,255,0.16)",
+    borderColor: theme.colors.borderStrong,
     borderRadius: 20,
     borderWidth: 1,
     marginTop: 18,
@@ -315,13 +315,13 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   successPillText: {
-    color: "#dcfce7",
+    color: "#E2EBFF",
     fontSize: 13,
     fontWeight: "600",
   },
   secondaryButton: {
     alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.05)",
+    backgroundColor: theme.button.secondaryBackground,
     borderColor: BORDER,
     borderRadius: 20,
     borderWidth: 1,
@@ -335,7 +335,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   sameAccountText: {
-    color: "#94a3b8",
+    color: "#B8C2D9",
     fontSize: 13,
     lineHeight: 19,
     marginTop: 18,

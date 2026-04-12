@@ -215,7 +215,7 @@ export function AuthScreen({
       buildSessionPatchFromAuthUser(result.user, result.token),
     );
 
-    await refreshMobileSessionFromBackend();
+    await refreshMobileSessionFromBackend({ force: true });
 
     setIsSubmitting(false);
     setNotice({
@@ -325,7 +325,7 @@ export function AuthScreen({
                         errors.email && styles.inputShellError,
                       ]}
                     >
-                      <Ionicons color="#64748b" name="mail-outline" size={18} />
+                      <Ionicons color="#7F8EAD" name="mail-outline" size={18} />
                       <TextInput
                         autoCapitalize="none"
                         keyboardType="email-address"
@@ -352,7 +352,7 @@ export function AuthScreen({
                       ]}
                     >
                       <Ionicons
-                        color="#64748b"
+                        color="#7F8EAD"
                         name="lock-closed-outline"
                         size={18}
                       />
@@ -374,7 +374,7 @@ export function AuthScreen({
                         onPress={() => setShowPassword((current) => !current)}
                       >
                         <Ionicons
-                          color="#94a3b8"
+                          color="#B8C2D9"
                           name={
                             showPassword ? "eye-off-outline" : "eye-outline"
                           }
@@ -428,7 +428,7 @@ export function AuthScreen({
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: "transparent",
   },
   keyboardAvoidingView: {
     flex: 1,
@@ -451,7 +451,7 @@ const styles = StyleSheet.create({
     width: 180,
     height: 180,
     borderRadius: 999,
-    backgroundColor: "rgba(56, 189, 248, 0.10)",
+    backgroundColor: theme.colors.glowSoft,
   },
   heroGlowSecondary: {
     position: "absolute",
@@ -460,7 +460,7 @@ const styles = StyleSheet.create({
     width: 140,
     height: 140,
     borderRadius: 999,
-    backgroundColor: "rgba(125, 211, 252, 0.08)",
+    backgroundColor: theme.colors.glowSoft,
   },
   cardStack: {
     gap: 18,
@@ -473,13 +473,13 @@ const styles = StyleSheet.create({
   brandBadge: {
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: "rgba(125,211,252,0.20)",
-    backgroundColor: "rgba(14, 165, 233, 0.10)",
+    borderColor: theme.colors.borderStrong,
+    backgroundColor: "rgba(74,136,255,0.16)",
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
   brandBadgeText: {
-    color: "#d8f3ff",
+    color: theme.colors.subduedText,
     fontSize: 11,
     fontWeight: "700",
     letterSpacing: 0.8,
@@ -490,8 +490,8 @@ const styles = StyleSheet.create({
     height: 72,
     borderRadius: 24,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
-    backgroundColor: "rgba(255,255,255,0.08)",
+    borderColor: theme.colors.borderStrong,
+    backgroundColor: theme.colors.surfaceElevated,
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
@@ -503,11 +503,11 @@ const styles = StyleSheet.create({
   },
   brandGlow: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(56,189,248,0.16)",
+    backgroundColor: theme.colors.glow,
     borderRadius: 24,
   },
   brandMarkText: {
-    color: "#fff",
+    color: theme.colors.text,
     fontSize: 24,
     fontWeight: "800",
   },
@@ -528,8 +528,8 @@ const styles = StyleSheet.create({
   formCard: {
     borderRadius: 30,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.09)",
-    backgroundColor: "rgba(16, 26, 46, 0.92)",
+    borderColor: theme.colors.borderStrong,
+    backgroundColor: theme.colors.surfaceCard,
     padding: 22,
     shadowColor: theme.colors.shadow,
     shadowOpacity: 0.34,
@@ -541,7 +541,7 @@ const styles = StyleSheet.create({
     marginBottom: 22,
   },
   introEyebrow: {
-    color: "#c7ecff",
+    color: theme.colors.accentStrong,
     fontSize: 11,
     fontWeight: "700",
     letterSpacing: 1.9,
@@ -549,7 +549,7 @@ const styles = StyleSheet.create({
   },
   introText: {
     marginTop: 10,
-    color: "#e5edf7",
+    color: theme.colors.subduedText,
     fontSize: 16,
     lineHeight: 24,
   },
@@ -565,13 +565,13 @@ const styles = StyleSheet.create({
     gap: 8,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-    backgroundColor: "rgba(255,255,255,0.04)",
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surfaceElevated,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
   trustPillText: {
-    color: "#d9e7f5",
+    color: theme.colors.subduedText,
     fontSize: 12,
     fontWeight: "700",
   },
@@ -582,7 +582,7 @@ const styles = StyleSheet.create({
     gap: 9,
   },
   fieldLabel: {
-    color: "#d1dae7",
+    color: theme.colors.subduedText,
     fontSize: 12,
     fontWeight: "700",
     letterSpacing: 0.3,
@@ -594,13 +594,13 @@ const styles = StyleSheet.create({
     gap: 12,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-    backgroundColor: "rgba(6, 12, 25, 0.84)",
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surfaceOverlay,
     paddingHorizontal: 16,
     paddingVertical: 14,
   },
   inputShellError: {
-    borderColor: "rgba(244,63,94,0.4)",
+    borderColor: theme.colors.borderStrong,
   },
   input: {
     flex: 1,
@@ -609,7 +609,7 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
   },
   errorText: {
-    color: "#fda4af",
+    color: theme.colors.subduedText,
     fontSize: 12,
   },
   notice: {
@@ -619,12 +619,12 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   noticeError: {
-    borderColor: "rgba(244,63,94,0.2)",
-    backgroundColor: "rgba(244,63,94,0.12)",
+    borderColor: theme.colors.borderStrong,
+    backgroundColor: theme.colors.surfaceElevated,
   },
   noticeSuccess: {
-    borderColor: "rgba(52,211,153,0.2)",
-    backgroundColor: "rgba(52,211,153,0.12)",
+    borderColor: theme.colors.borderStrong,
+    backgroundColor: "rgba(74,136,255,0.16)",
   },
   noticeText: {
     color: theme.colors.text,
@@ -644,24 +644,24 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   submitButtonDisabled: {
-    backgroundColor: "rgba(255,255,255,0.16)",
+    backgroundColor: theme.button.secondaryBackground,
   },
   submitButtonText: {
-    color: "#020617",
+    color: "#0A0F1F",
     fontSize: 16,
     fontWeight: "800",
   },
   submitButtonTextDisabled: {
-    color: "#cbd5e1",
+    color: theme.colors.mutedText,
   },
   footerText: {
-    color: "#94a3b8",
+    color: theme.colors.mutedText,
     fontSize: 14,
     textAlign: "center",
     lineHeight: 22,
   },
   footerLink: {
-    color: "#dbeafe",
+    color: theme.colors.accentStrong,
     fontWeight: "700",
   },
   loadingWrap: {

@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Neara Help Center</title>
+    <meta
+      name="description"
+      content="Learn how to use Neara, solve problems, and get the most out of the app."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="container header-inner">
+        <a class="brand" href="#top">
+          <span class="brand-mark">N</span>
+          <span class="brand-copy">
+            <strong>Neara</strong>
+            <span>Help Center</span>
+          </span>
+        </a>
+
+        <nav class="main-nav" aria-label="Primary">
+          <a href="#getting-started">Getting Started</a>
+          <a href="#store-owner-help">Store Owners</a>
+          <a href="#customer-help">Customers</a>
+          <a href="#troubleshooting">Troubleshooting</a>
+          <a href="#faq">FAQ</a>
+          <a href="#contact-support">Support</a>
+        </nav>
+
+        <a class="header-cta" href="#contact-support">Get Help</a>
+      </div>
+    </header>
+
+    <main id="top">
+      <section class="hero-section reveal">
+        <div class="hero-backdrop"></div>
+        <div class="container hero-grid">
+          <div class="hero-copy">
+            <p class="eyebrow">Support that feels built into the product</p>
+            <h1>Neara Help Center</h1>
+            <p class="hero-subtitle">
+              Clear guides for customers and store owners, practical fixes for
+              common issues, and fast ways to learn Neara with confidence.
+            </p>
+
+            <div class="hero-actions">
+              <a class="button button-primary" href="#getting-started"
+                >Start Learning</a
+              >
+              <a class="button button-secondary" href="#video-tutorials"
+                >Watch Tutorials</a
+              >
+            </div>
+
+            <label class="hero-search" for="help-search">
+              <span class="hero-search-icon" aria-hidden="true">⌕</span>
+              <input
+                id="help-search"
+                type="search"
+                placeholder="Search help topics, troubleshooting, videos, or FAQ"
+              />
+            </label>
+            <p class="search-empty" id="search-empty" hidden>
+              No matching help topics found. Try a simpler keyword like
+              “payment”, “map”, “store”, or “chat”.
+            </p>
+          </div>
+
+        </div>
+      </section>
+
+      <section class="what-is-section reveal" id="what-is-neara">
+        <div class="container">
+          <div class="section-heading">
+            <p class="eyebrow">What Neara does</p>
+            <h2 class="section-title section-title-what-is">What is Neara?</h2>
+            <p>
+              Neara helps customers find what they need faster and gives store
+              owners better tools to show, manage, and sell what they offer.
+            </p>
+          </div>
+
+          <div class="what-is-grid">
+            <article class="what-is-card">
+              <h3>For Customers</h3>
+              <ul class="what-is-list">
+                <li>Search for products and discover nearby stores quickly</li>
+                <li>Use filters to narrow results and compare options faster</li>
+                <li>View stores on the map and save the ones you like</li>
+                <li>Chat directly with stores to ask about price, stock, or delivery</li>
+              </ul>
+            </article>
+
+            <article class="what-is-card">
+              <h3>For Store Owners</h3>
+              <ul class="what-is-list">
+                <li>Get more nearby customers</li>
+                <li>Grow your visibility in your area</li>
+                <li>Turn interest into easier sales</li>
+                <li>Reach buyers who are ready to shop</li>
+              </ul>
+            </article>
+          </div>
+
+          <div class="what-is-actions">
+            <a class="button button-secondary" href="#video-tutorials"
+              >Watch how Neara works</a
+            >
+          </div>
+        </div>
+      </section>
+
+      <section class="quick-links-section reveal">
+        <div class="container">
+          <div class="section-heading">
+            <p class="eyebrow">Browse by section</p>
+            <h2 class="section-title section-title-nav">Quick Navigation</h2>
+            <p>
+              Jump straight to the help area you need and find the right guide
+              faster.
+            </p>
+          </div>
+
+          <div class="quick-links-grid">
+            <a class="quick-link-card search-target" href="#getting-started" data-keywords="getting started account setup onboarding">
+              <h3>Getting Started</h3>
+              <p>Set up your account, location, store, and first actions.</p>
+            </a>
+            <a class="quick-link-card search-target" href="#store-owner-help" data-keywords="store owner business products variants csv import">
+              <h3>Store Owner Help</h3>
+              <p>Manage store mode, products, imports, and store updates.</p>
+            </a>
+            <a class="quick-link-card search-target" href="#customer-help" data-keywords="customer search filters map save stores chat">
+              <h3>Customer Help</h3>
+              <p>Search, filter, save stores, and chat with sellers.</p>
+            </a>
+            <a class="quick-link-card search-target" href="#troubleshooting" data-keywords="troubleshooting errors payment notifications connection map">
+              <h3>Troubleshooting</h3>
+              <p>Fix common issues when things are not working as expected.</p>
+            </a>
+            <a class="quick-link-card search-target" href="#video-tutorials" data-keywords="video tutorials youtube walkthrough">
+              <h3>Video Tutorials</h3>
+              <p>Watch guided walkthroughs for common Neara workflows.</p>
+            </a>
+            <a class="quick-link-card search-target" href="#contact-support" data-keywords="support contact whatsapp email help">
+              <h3>Contact Support</h3>
+              <p>Reach out when you need help from the Neara team.</p>
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <section class="content-section section-getting-started reveal" id="getting-started">
+        <div class="container">
+          <div class="section-heading">
+            <p class="eyebrow">First steps</p>
+            <h2 class="section-title section-title-getting-started">Getting Started</h2>
+            <p>Use these guides to get comfortable with Neara from day one.</p>
+          </div>
+
+          <div class="help-grid">
+            <article class="help-card search-target" data-keywords="account signup create account onboarding">
+              <h3>Creating an account</h3>
+              <p>
+                Open Neara, choose Sign Up, enter your details, and verify your
+                number or email if prompted. Keep your details accurate so your
+                account is easier to recover later.
+              </p>
+            </article>
+            <article class="help-card" data-keywords="login sign in password access">
+              <h3>Logging in</h3>
+              <p>
+                Use the same phone number or email you registered with. If a
+                login attempt fails, double-check your password and your network
+                connection before trying again.
+              </p>
+            </article>
+            <article class="help-card" data-keywords="start store open shop business store owner">
+              <h3>Starting a store</h3>
+              <p>
+                Switch to store mode, complete the payment step if required, and
+                begin entering your store details. Your store is easier to find
+                when the name, category, and address are complete.
+              </p>
+            </article>
+            <article class="help-card" data-keywords="store setup complete profile business details">
+              <h3>Completing store setup</h3>
+              <p>
+                Add your store name, category, address, phone number, cover
+                image, and description. Complete profiles build trust and help
+                customers understand what you sell.
+              </p>
+            </article>
+            <article class="help-card" data-keywords="confirm location map pin address">
+              <h3>Confirming location</h3>
+              <p>
+                Allow location access when prompted and confirm your store pin
+                carefully. The map works best when the app can read your
+                location and your store coordinates are accurate.
+              </p>
+            </article>
+            <article class="help-card" data-keywords="add products inventory items upload">
+              <h3>Adding products</h3>
+              <p>
+                Add one product at a time with a clear name, image, price, and
+                useful category or tags. If you sell multiple sizes or versions,
+                add variants so shoppers can choose correctly.
+              </p>
+            </article>
+            <article class="help-card" data-keywords="chat stores customer messages">
+              <h3>Chatting with stores</h3>
+              <p>
+                Open a store, tap the chat button, and send a clear message
+                about the product you want. Including product name, quantity,
+                and preferred pickup or delivery details speeds things up.
+              </p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="content-section section-store-owner reveal" id="store-owner-help">
+        <div class="container">
+          <div class="section-heading">
+            <p class="eyebrow">For sellers</p>
+            <h2 class="section-title section-title-store-owner">Store Owner Help</h2>
+            <p>Everything you need to launch, manage, and maintain your store.</p>
+          </div>
+
+          <div class="help-grid">
+            <article class="help-card search-target" data-keywords="store mode payment subscription payment owner">
+              <h3>Store mode payment</h3>
+              <p>
+                Complete the required store mode payment before opening your
+                store setup tools. If payment confirmation delays, wait a moment
+                and refresh before trying again.
+              </p>
+            </article>
+            <article class="help-card" data-keywords="store details business info complete store">
+              <h3>Completing store details</h3>
+              <p>
+                Fill in your category, address, description, and contact number.
+                Customers are more likely to chat or visit when your profile
+                looks complete and credible.
+              </p>
+            </article>
+            <article class="help-card" data-keywords="add products product list stock inventory">
+              <h3>Adding products</h3>
+              <p>
+                Create products with strong titles and clean images. Keep prices
+                current and remove products that are no longer available to
+                reduce customer confusion.
+              </p>
+            </article>
+            <article class="help-card" data-keywords="variants size color packaging options">
+              <h3>Using variants</h3>
+              <p>
+                Variants help you list different sizes, pack counts, or options
+                under one product. Add a clear variant name and price for each
+                option so customers can compare quickly.
+              </p>
+            </article>
+            <article class="help-card" data-keywords="categories tags discoverability search">
+              <h3>Categories and tags</h3>
+              <p>
+                Choose categories that match what you actually sell. Add simple,
+                relevant tags so your products can appear in more useful search
+                results.
+              </p>
+            </article>
+            <article class="help-card" data-keywords="csv import bulk upload spreadsheet">
+              <h3>CSV product import</h3>
+              <p>
+                Use CSV import when adding many items at once. Check the column
+                format carefully, especially product names, prices, categories,
+                and variant fields, before uploading.
+              </p>
+            </article>
+            <article class="help-card" data-keywords="notifications alerts customer chats updates">
+              <h3>Notifications</h3>
+              <p>
+                Enable notifications so you do not miss customer chats, store
+                updates, and important account messages. Check your phone’s app
+                notification settings if alerts stop appearing.
+              </p>
+            </article>
+            <article class="help-card" data-keywords="edit store information profile changes">
+              <h3>Editing store information</h3>
+              <p>
+                Update your store profile any time your address, hours, phone
+                number, or product direction changes. Keeping details fresh
+                helps customers trust what they see.
+              </p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="content-section section-customer reveal" id="customer-help">
+        <div class="container">
+          <div class="section-heading">
+            <p class="eyebrow">For buyers</p>
+            <h2 class="section-title section-title-customer">Customer Help</h2>
+            <p>Find products, compare stores, and contact sellers with ease.</p>
+          </div>
+
+          <div class="help-grid">
+            <article class="help-card search-target" data-keywords="search products items discover">
+              <h3>Searching for products</h3>
+              <p>
+                Use short, specific search terms for better results. Product
+                names, categories, and popular keywords usually work better than
+                very long phrases.
+              </p>
+            </article>
+            <article class="help-card" data-keywords="filters sort categories search refine">
+              <h3>Using filters</h3>
+              <p>
+                Apply filters to narrow results by category, tags, or available
+                options. Filters are useful when the first search returns too
+                many results.
+              </p>
+            </article>
+            <article class="help-card" data-keywords="map stores near me location map preview">
+              <h3>Viewing stores on map</h3>
+              <p>
+                Open the map to see nearby stores and select markers for a quick
+                preview. Make sure location access is enabled if you want more
+                accurate nearby results.
+              </p>
+            </article>
+            <article class="help-card" data-keywords="save stores favorites wishlist">
+              <h3>Saving stores</h3>
+              <p>
+                Save stores you want to revisit often. This makes it easier to
+                return later without searching again.
+              </p>
+            </article>
+            <article class="help-card" data-keywords="chat stores seller inquiry messages">
+              <h3>Chatting with stores</h3>
+              <p>
+                Use chat to ask about price, stock, pickup, delivery, or product
+                variations. Clear questions usually get faster and more helpful
+                replies.
+              </p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="content-section section-troubleshooting reveal" id="troubleshooting">
+        <div class="container">
+          <div class="section-heading">
+            <p class="eyebrow">Fix common issues</p>
+            <h2 class="section-title section-title-troubleshooting">Troubleshooting</h2>
+            <p>Quick checks for the problems users ask about most often.</p>
+          </div>
+
+          <div class="help-grid">
+            <article class="help-card search-target" data-keywords="map not loading location blank map">
+              <h3>Map not loading</h3>
+              <p>
+                Confirm you have internet access and allow location access if
+                Neara asks for it. If the map stays blank, close and reopen the
+                app, then try again.
+              </p>
+            </article>
+            <article class="help-card" data-keywords="store not appearing search map listing">
+              <h3>Store not appearing</h3>
+              <p>
+                Check that the store details are complete, the category is set,
+                and the location pin is correct. Newly updated stores may also
+                take a short moment to reflect fully.
+              </p>
+            </article>
+            <article class="help-card" data-keywords="cannot add products upload save failed">
+              <h3>Can’t add products</h3>
+              <p>
+                Make sure required fields like product name and price are filled.
+                If uploads fail, check your connection and try again with a
+                smaller image file.
+              </p>
+            </article>
+            <article class="help-card" data-keywords="payment issue store mode transaction failed">
+              <h3>Payment issues</h3>
+              <p>
+                Confirm your payment method has enough balance and that the
+                transaction completed successfully. If money was debited without
+                confirmation, contact support with the payment reference.
+              </p>
+            </article>
+            <article class="help-card" data-keywords="notifications not showing alerts messages">
+              <h3>Notifications not showing</h3>
+              <p>
+                Check both Neara notification settings and your phone system
+                settings. Low power or battery saver modes can also delay
+                message alerts.
+              </p>
+            </article>
+            <article class="help-card" data-keywords="app not connecting network connection error">
+              <h3>App not connecting</h3>
+              <p>
+                Switch between Wi-Fi and mobile data to test your network. If
+                other apps work but Neara does not, try reopening the app and
+                signing in again.
+              </p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="content-section section-videos reveal" id="video-tutorials">
+        <div class="container">
+          <div class="section-heading">
+            <p class="eyebrow">Watch and learn</p>
+            <h2 class="section-title section-title-videos">Video Tutorials</h2>
+            <p>Short videos for common tasks and product workflows.</p>
+          </div>
+
+          <div class="video-grid">
+            <article class="video-card search-target" data-keywords="video tutorial account signup login">
+              <div class="video-thumb">
+                <span class="play-badge">▶</span>
+                <span class="video-label">New user setup</span>
+              </div>
+              <h3>How to create your Neara account</h3>
+              <p>
+                A quick walkthrough for signing up, verifying your account, and
+                logging in for the first time.
+              </p>
+              <a href="https://youtube.com/" target="_blank" rel="noreferrer"
+                >Watch on YouTube</a
+              >
+            </article>
+            <article class="video-card search-target" data-keywords="video tutorial store setup profile">
+              <div class="video-thumb">
+                <span class="play-badge">▶</span>
+                <span class="video-label">Store onboarding</span>
+              </div>
+              <h3>How to set up your store profile</h3>
+              <p>
+                Learn how to complete store details, add your location, and
+                publish a more trustworthy store page.
+              </p>
+              <a href="https://youtube.com/" target="_blank" rel="noreferrer"
+                >Watch on YouTube</a
+              >
+            </article>
+            <article class="video-card search-target" data-keywords="video tutorial products variants inventory">
+              <div class="video-thumb">
+                <span class="play-badge">▶</span>
+                <span class="video-label">Catalog setup</span>
+              </div>
+              <h3>How to add products and variants</h3>
+              <p>
+                See how to list items properly and organize multiple sizes,
+                options, or pack variants.
+              </p>
+              <a href="https://youtube.com/" target="_blank" rel="noreferrer"
+                >Watch on YouTube</a
+              >
+            </article>
+            <article class="video-card search-target" data-keywords="video tutorial customer search chat map">
+              <div class="video-thumb">
+                <span class="play-badge">▶</span>
+                <span class="video-label">Customer flow</span>
+              </div>
+              <h3>How customers search and chat with stores</h3>
+              <p>
+                Learn how to find products, refine results, and start a store
+                conversation confidently.
+              </p>
+              <a href="https://youtube.com/" target="_blank" rel="noreferrer"
+                >Watch on YouTube</a
+              >
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="content-section section-faq reveal" id="faq">
+        <div class="container">
+          <div class="section-heading">
+            <p class="eyebrow">Answers at a glance</p>
+            <h2 class="section-title section-title-faq">Frequently Asked Questions</h2>
+            <p>Quick answers to common questions from new and active users.</p>
+          </div>
+
+          <div class="faq-list">
+            <details class="faq-item search-target" data-keywords="location access map nearby stores">
+              <summary>Do I need location access to use Neara?</summary>
+              <div class="faq-content">
+                <p>
+                  Not always, but location access improves map results, nearby
+                  stores, and store pin confirmation. Without it, some map-based
+                  experiences may be limited.
+                </p>
+              </div>
+            </details>
+            <details class="faq-item search-target" data-keywords="store easier to find category tags location">
+              <summary>How do I make my store easier to find?</summary>
+              <div class="faq-content">
+                <p>
+                  Use a clear store name, correct category, complete address, good
+                  product names, relevant tags, and an accurate map location.
+                </p>
+              </div>
+            </details>
+            <details class="faq-item search-target" data-keywords="products showing search tags category">
+              <summary>Why are my products not showing in search?</summary>
+              <div class="faq-content">
+                <p>
+                  Check that the product name, category, and tags are filled in
+                  properly and that the product was saved successfully.
+                </p>
+              </div>
+            </details>
+            <details class="faq-item search-target" data-keywords="edit store details change address phone number">
+              <summary>Can I edit my store details later?</summary>
+              <div class="faq-content">
+                <p>
+                  Yes. You can update store information whenever your address,
+                  phone number, description, or product direction changes.
+                </p>
+              </div>
+            </details>
+            <details class="faq-item search-target" data-keywords="support screenshots device version broken issue">
+              <summary>What should I send support if something breaks?</summary>
+              <div class="faq-content">
+                <p>
+                  Share your account contact, device type, app version if known,
+                  screenshots if possible, and a short explanation of what you
+                  were trying to do.
+                </p>
+              </div>
+            </details>
+          </div>
+        </div>
+      </section>
+
+      <section class="content-section contact-section section-support reveal" id="contact-support">
+        <div class="container contact-card">
+          <div class="section-heading section-heading-left">
+            <p class="eyebrow">Need more help?</p>
+            <h2 class="section-title section-title-support">Contact Support</h2>
+            <p>
+              If you still need help, reach out and our team can guide you
+              through the issue.
+            </p>
+          </div>
+
+          <div class="contact-grid">
+            <div class="contact-item search-target" data-keywords="support email contact">
+              <span>Support email</span>
+              <a href="mailto:support@neara.app">support@neara.app</a>
+            </div>
+            <div class="contact-item search-target" data-keywords="support whatsapp contact">
+              <span>Support WhatsApp</span>
+              <a href="https://wa.me/2340000000000">+234 000 000 0000</a>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="container footer-inner">
+        <p>Neara Help Center</p>
+        <a href="#top">Back to top</a>
+      </div>
+    </footer>
+
+    <script src="script.js"></script>
+  </body>
+</html>

@@ -154,7 +154,7 @@ export default function SavedTab() {
             {showEmptyState ? (
               <View style={styles.emptyStateWrap}>
                 <Ionicons
-                  color="rgba(56, 189, 248, 0.6)"
+                  color="rgba(74,136,255,0.6)"
                   name="bookmark-outline"
                   size={48}
                   style={styles.emptyStateIcon}
@@ -232,7 +232,7 @@ export default function SavedTab() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: "transparent",
   },
   scrollContent: {
     paddingBottom: 44,
@@ -283,12 +283,12 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   noticeError: {
-    backgroundColor: "rgba(127, 29, 29, 0.28)",
-    borderColor: "rgba(251, 113, 133, 0.18)",
+    backgroundColor: "rgba(17,24,39,0.28)",
+    borderColor: "rgba(255,255,255,0.18)",
   },
   noticeSuccess: {
     backgroundColor: "rgba(6, 78, 59, 0.3)",
-    borderColor: "rgba(52, 211, 153, 0.16)",
+    borderColor: "rgba(74,136,255,0.16)",
   },
   noticeText: {
     color: theme.colors.text,
@@ -321,8 +321,8 @@ const styles = StyleSheet.create({
   },
   exploreButton: {
     alignItems: "center",
-    backgroundColor: "rgba(56, 189, 248, 0.12)",
-    borderColor: "rgba(56, 189, 248, 0.20)",
+    backgroundColor: "rgba(74,136,255,0.12)",
+    borderColor: "rgba(74,136,255,0.20)",
     borderRadius: 999,
     borderWidth: 1,
     justifyContent: "center",
@@ -332,7 +332,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   exploreButtonText: {
-    color: "#38bdf8",
+    color: "#4A88FF",
     fontSize: 16,
     fontWeight: "600",
   },

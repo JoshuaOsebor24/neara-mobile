@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
+import { theme } from "@/constants/theme";
 import { clearFlashFeedback, useFlashFeedback } from "@/services/flash-feedback";
 
 export function FlashFeedback() {
@@ -53,15 +54,15 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   successCard: {
-    backgroundColor: "rgba(6,95,70,0.96)",
-    borderColor: "rgba(110,231,183,0.30)",
+    backgroundColor: "rgba(14, 24, 45, 0.96)",
+    borderColor: "rgba(96,143,255,0.28)",
   },
   errorCard: {
-    backgroundColor: "rgba(127,29,29,0.96)",
-    borderColor: "rgba(252,165,165,0.28)",
+    backgroundColor: "rgba(17, 24, 39, 0.96)",
+    borderColor: theme.colors.borderStrong,
   },
   text: {
-    color: "#fff",
+    color: theme.colors.text,
     fontSize: 14,
     fontWeight: "700",
     textAlign: "center",

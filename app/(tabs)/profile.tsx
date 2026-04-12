@@ -39,13 +39,9 @@ export default function ProfileTab() {
     }
 
     setIsRefreshing(true);
-    await refreshMobileSessionFromBackend();
+    await refreshMobileSessionFromBackend({ force: true });
     setIsRefreshing(false);
   }, [session.authToken]);
-
-  useEffect(() => {
-    void refreshProfileData();
-  }, [refreshProfileData]);
 
   useFocusEffect(
     useCallback(() => {
@@ -187,7 +183,7 @@ export default function ProfileTab() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: "transparent",
   },
   scrollContent: {
     paddingHorizontal: 16,
@@ -215,7 +211,7 @@ const styles = StyleSheet.create({
     marginBottom: 28,
   },
   headerBrand: {
-    color: "#94a3b8",
+    color: "#B8C2D9",
     fontSize: 12,
     letterSpacing: 2.2,
     textTransform: "uppercase",
@@ -230,8 +226,8 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   noticeCard: {
-    backgroundColor: "rgba(255,255,255,0.05)",
-    borderColor: "rgba(255,255,255,0.10)",
+    backgroundColor: theme.colors.surfaceCard,
+    borderColor: theme.colors.borderStrong,
     borderRadius: 16,
     borderWidth: 1,
     marginTop: 24,
@@ -239,12 +235,12 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   noticeText: {
-    color: "#cbd5e1",
+    color: "#C7D2E5",
     fontSize: 14,
   },
   identityCard: {
-    backgroundColor: "rgba(255,255,255,0.03)",
-    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border,
     borderRadius: 16,
     borderWidth: 1,
     marginTop: 16,
@@ -262,7 +258,7 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   identitySubtitle: {
-    color: "#cbd5e1",
+    color: "#C7D2E5",
     fontSize: 14,
     marginTop: 6,
   },
@@ -292,7 +288,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   infoLabel: {
-    color: "#94a3b8",
+    color: "#B8C2D9",
     fontSize: 12,
     letterSpacing: 1.2,
     textTransform: "uppercase",
@@ -310,21 +306,21 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   infoSubtext: {
-    color: "#cbd5e1",
+    color: "#C7D2E5",
     fontSize: 14,
     lineHeight: 20,
     marginTop: 2,
   },
   upgradeCard: {
-    backgroundColor: "rgba(56, 189, 248, 0.14)",
-    borderColor: "rgba(56, 189, 248, 0.24)",
+    backgroundColor: "rgba(74,136,255,0.14)",
+    borderColor: "rgba(74,136,255,0.24)",
     borderRadius: 16,
     borderWidth: 1,
     marginTop: 20,
     padding: 20,
   },
   upgradeEyebrow: {
-    color: "#bae6fd",
+    color: "#D4E1FF",
     fontSize: 12,
     fontWeight: "600",
     letterSpacing: 2,
@@ -346,12 +342,12 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   upgradeSubtitle: {
-    color: "#e2e8f0",
+    color: "#E8EEF8",
     fontSize: 14,
     marginTop: 4,
   },
   upgradeArrow: {
-    color: "#e0f2fe",
+    color: "#E2EBFF",
     fontSize: 14,
     fontWeight: "600",
   },

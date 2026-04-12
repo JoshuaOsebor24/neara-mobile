@@ -15,7 +15,7 @@ export default function StoreLockedChatsScreen() {
         return;
       }
 
-      void refreshMobileSessionFromBackend();
+      void refreshMobileSessionFromBackend({ force: true });
     }, [session.authToken]),
   );
 

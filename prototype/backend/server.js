@@ -13,6 +13,13 @@ const ensureSchema = require("./config/ensureSchema");
 
 // Initialize app
 const app = express();
+let server = null;
+let shuttingDown = false;
+let isReady = false;
+let nextRequestId = 0;
+const SERVER_LOG_PREFIX = "[server]";
+const REQUEST_LOG_PREFIX = "[http]";
+const DIAGNOSTIC_LOG_PREFIX = "[diag]";
 if (appConfig.trustedProxy) {
   app.set("trust proxy", 1);
 }
@@ -54,7 +61,7 @@ DATABASE CONNECTION
 --------------------------------
 */
 const logDbStartupCheck = async () => {
-  const timeoutMs = 3000;
+  const timeoutMs = runtime.healthTimeoutMs;
   const timeout = new Promise((_, reject) =>
     setTimeout(() => reject(new Error("startup DB check timeout")), timeoutMs),
   );
@@ -62,6 +69,130 @@ const logDbStartupCheck = async () => {
   await Promise.race([pool.query("SELECT 1"), timeout]);
   console.log("PostgreSQL reachable via DATABASE_URL");
 };
+
+function formatErrorPayload(error) {
+  return {
+    code: error?.code,
+    message: error?.message || String(error),
+    name: error?.name,
+    stack: error?.stack,
+  };
+}
+
+function getMemorySnapshot() {
+  const memory = process.memoryUsage();
+
+  return {
+    external_mb: Number((memory.external / 1024 / 1024).toFixed(2)),
+    heap_total_mb: Number((memory.heapTotal / 1024 / 1024).toFixed(2)),
+    heap_used_mb: Number((memory.heapUsed / 1024 / 1024).toFixed(2)),
+    rss_mb: Number((memory.rss / 1024 / 1024).toFixed(2)),
+  };
+}
+
+async function buildHealthPayload() {
+  const healthTimeoutMs = runtime.healthTimeoutMs;
+  const startedAt = Date.now();
+
+  try {
+    await Promise.race([
+      pool.query("SELECT 1"),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("health DB check timeout")), healthTimeoutMs),
+      ),
+    ]);
+
+    return {
+      database: {
+        latency_ms: Date.now() - startedAt,
+        status: "ok",
+      },
+      memory: getMemorySnapshot(),
+      pid: process.pid,
+      pool: typeof pool.getDiagnostics === "function" ? pool.getDiagnostics() : null,
+      readiness: isReady ? "ready" : "starting",
+      status: "ok",
+      timestamp: new Date().toISOString(),
+      uptime_s: Number(process.uptime().toFixed(1)),
+    };
+  } catch (error) {
+    return {
+      database: {
+        error: error?.message || String(error),
+        latency_ms: Date.now() - startedAt,
+        status: "error",
+      },
+      memory: getMemorySnapshot(),
+      pid: process.pid,
+      pool: typeof pool.getDiagnostics === "function" ? pool.getDiagnostics() : null,
+      readiness: isReady ? "ready" : "starting",
+      status: "degraded",
+      timestamp: new Date().toISOString(),
+      uptime_s: Number(process.uptime().toFixed(1)),
+    };
+  }
+}
+
+async function gracefulShutdown(reason, exitCode = 0, error = null) {
+  if (shuttingDown) {
+    return;
+  }
+
+  shuttingDown = true;
+  console.error(`${SERVER_LOG_PREFIX}[shutdown]`, {
+    error: error ? formatErrorPayload(error) : null,
+    reason,
+  });
+
+  const forceExitTimeout = setTimeout(() => {
+    console.error(`${SERVER_LOG_PREFIX}[shutdown-timeout]`, { reason });
+    process.exit(exitCode);
+  }, 10000);
+  forceExitTimeout.unref?.();
+
+  try {
+    if (server) {
+      await new Promise((resolve) => {
+        server.close(() => resolve());
+      });
+    }
+
+    await pool.end();
+  } catch (shutdownError) {
+    console.error(`${SERVER_LOG_PREFIX}[shutdown-error]`, formatErrorPayload(shutdownError));
+  } finally {
+    clearTimeout(forceExitTimeout);
+    process.exit(exitCode);
+  }
+}
+
+setInterval(() => {
+  console.info(`${DIAGNOSTIC_LOG_PREFIX}[memory]`, {
+    memory: getMemorySnapshot(),
+    pid: process.pid,
+    pool: typeof pool.getDiagnostics === "function" ? pool.getDiagnostics() : null,
+    uptime_s: Number(process.uptime().toFixed(1)),
+  });
+}, runtime.diagnosticsIntervalMs).unref?.();
+
+process.on("uncaughtException", (error) => {
+  console.error(`${SERVER_LOG_PREFIX}[uncaughtException]`, formatErrorPayload(error));
+  void gracefulShutdown("uncaughtException", 1, error);
+});
+
+process.on("unhandledRejection", (reason) => {
+  const error = reason instanceof Error ? reason : new Error(String(reason || "Unknown rejection"));
+  console.error(`${SERVER_LOG_PREFIX}[unhandledRejection]`, formatErrorPayload(error));
+  void gracefulShutdown("unhandledRejection", 1, error);
+});
+
+process.on("SIGINT", () => {
+  void gracefulShutdown("SIGINT", 0);
+});
+
+process.on("SIGTERM", () => {
+  void gracefulShutdown("SIGTERM", 0);
+});
 
 /*
 --------------------------------
@@ -80,12 +211,82 @@ app.use((req, res, next) => {
 });
 
 // Parse request bodies
-app.use(express.json({ limit: "25mb" }));
-app.use(express.urlencoded({ extended: true, limit: "25mb" }));
+app.use(express.json({ limit: `${appConfig.bodyLimitMb}mb` }));
+app.use(express.urlencoded({ extended: true, limit: `${appConfig.bodyLimitMb}mb` }));
+
+app.use((req, res, next) => {
+  nextRequestId += 1;
+  req.requestId = `${process.pid}-${nextRequestId}`;
+  res.setHeader("X-Request-Id", req.requestId);
+
+  if (shuttingDown) {
+    return res.status(503).json({
+      message: "Server is shutting down",
+      request_id: req.requestId,
+    });
+  }
+
+  res.setTimeout(appConfig.requestTimeoutMs, () => {
+    console.error(`${REQUEST_LOG_PREFIX}[timeout]`, {
+      method: req.method,
+      request_id: req.requestId,
+      timeout_ms: appConfig.requestTimeoutMs,
+      url: req.originalUrl,
+    });
+
+    if (!res.headersSent) {
+      res.status(503).json({
+        message: "Request timed out",
+        request_id: req.requestId,
+      });
+    }
+
+    req.destroy(new Error("Request timed out"));
+  });
+
+  next();
+});
 
 // Request logger
 app.use((req, res, next) => {
-  console.log(`${req.method} ${req.url}`);
+  const startedAt = Date.now();
+  const startedIso = new Date().toISOString();
+
+    console.info(`${REQUEST_LOG_PREFIX}[start]`, {
+      ip: req.ip,
+      method: req.method,
+      request_id: req.requestId,
+      timestamp: startedIso,
+      url: req.originalUrl,
+    });
+
+  res.on("finish", () => {
+    console.info(`${REQUEST_LOG_PREFIX}[end]`, {
+      duration_ms: Date.now() - startedAt,
+      ip: req.ip,
+      method: req.method,
+      request_id: req.requestId,
+      status: res.statusCode,
+      timestamp: new Date().toISOString(),
+      url: req.originalUrl,
+    });
+  });
+
+  res.on("close", () => {
+    if (res.writableEnded) {
+      return;
+    }
+
+    console.warn(`${REQUEST_LOG_PREFIX}[aborted]`, {
+      duration_ms: Date.now() - startedAt,
+      ip: req.ip,
+      method: req.method,
+      request_id: req.requestId,
+      timestamp: new Date().toISOString(),
+      url: req.originalUrl,
+    });
+  });
+
   next();
 });
 
@@ -146,18 +347,32 @@ app.get("/", (req, res) => {
 });
 
 app.get("/health", async (req, res) => {
-  try {
-    await pool.query("SELECT 1");
-    res.json({
-      payment_provider: payment.provider,
-      status: "ok",
-    });
-  } catch (_error) {
-    res.status(500).json({
-      message: "Health check failed",
-      status: "error",
-    });
-  }
+  const payload = await buildHealthPayload();
+  const statusCode = payload.status === "ok" ? 200 : 500;
+
+  res.status(statusCode).json({
+    ...payload,
+    payment_provider: payment.provider,
+  });
+});
+
+app.get("/health/live", (req, res) => {
+  res.status(200).json({
+    pid: process.pid,
+    status: "live",
+    timestamp: new Date().toISOString(),
+    uptime_s: Number(process.uptime().toFixed(1)),
+  });
+});
+
+app.get("/health/ready", async (req, res) => {
+  const payload = await buildHealthPayload();
+  const statusCode = payload.status === "ok" && isReady && !shuttingDown ? 200 : 503;
+
+  res.status(statusCode).json({
+    ...payload,
+    status: statusCode === 200 ? "ready" : "not_ready",
+  });
 });
 
 // Database check
@@ -196,7 +411,12 @@ GLOBAL ERROR HANDLER
 */
 
 app.use((err, req, res, next) => {
-  console.error("Server error:", err);
+  console.error("Server error:", {
+    error: formatErrorPayload(err),
+    method: req.method,
+    request_id: req.requestId,
+    url: req.originalUrl,
+  });
 
   if (err?.type === "entity.too.large") {
     return res.status(413).json({
@@ -254,9 +474,14 @@ async function startServer() {
 
     await logDbStartupCheck();
 
-    app.listen(PORT, HOST, () => {
+    server = app.listen(PORT, HOST, () => {
+      isReady = true;
       console.log(`Server running on http://${HOST}:${PORT}`);
     });
+    server.headersTimeout = appConfig.headersTimeoutMs;
+    server.keepAliveTimeout = appConfig.keepAliveTimeoutMs;
+    server.maxRequestsPerSocket = appConfig.maxRequestsPerSocket;
+    server.requestTimeout = appConfig.requestTimeoutMs;
   } catch (error) {
     console.error("Server startup failed", {
       message: error?.message || String(error),

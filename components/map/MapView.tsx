@@ -20,7 +20,7 @@ import {
   type LocationPermissionState,
   type UserCoordinates,
 } from "@/services/location";
-import type { BackendStore } from "@/services/store-api";
+import type { StoreListItem } from "@/services/store-data";
 
 function buildRegion(coordinates: UserCoordinates): Region {
   const latitudeDelta = 0.008;
@@ -111,13 +111,14 @@ export function NearaMapView({
   onSelectStore?: (storeId: string) => void;
   permissionStatus: LocationPermissionState;
   selectedStoreId?: string | null;
-  stores?: BackendStore[];
+  stores?: StoreListItem[];
   style?: ViewStyle;
 }) {
   const mapRef = useRef<RNMapView | null>(null);
   const [userInteracted, setUserInteracted] = useState(false);
   const hasMountedRef = useRef(false);
   const hasSettledInitialRegionRef = useRef(false);
+  const lastAppliedStoreFitKeyRef = useRef("");
   const programmaticMoveRef = useRef(false);
   const mapInteractionActiveRef = useRef(false);
   const mapMoveEndTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -132,6 +133,59 @@ export function NearaMapView({
 
     return buildRegion(focusedCoordinates);
   }, [focusedCoordinates]);
+  const renderableStores = useMemo(
+    () =>
+      (stores ?? [])
+        .map((store) => {
+          const latitude =
+            typeof store.latitude === "number"
+              ? store.latitude
+              : store.latitude !== null && store.latitude !== undefined
+                ? Number(store.latitude)
+                : null;
+          const longitude =
+            typeof store.longitude === "number"
+              ? store.longitude
+              : store.longitude !== null && store.longitude !== undefined
+                ? Number(store.longitude)
+                : null;
+
+          if (
+            store.id === null ||
+            store.id === undefined ||
+            !Number.isFinite(latitude) ||
+            !Number.isFinite(longitude)
+          ) {
+            return null;
+          }
+
+          return {
+            id: String(store.id),
+            latitude: Number(latitude),
+            longitude: Number(longitude),
+          };
+        })
+        .filter(
+          (
+            value,
+          ): value is {
+            id: string;
+            latitude: number;
+            longitude: number;
+          } =>
+            value !== null,
+        ),
+    [stores],
+  );
+  const validStoreCoordinates = useMemo(
+    () =>
+      renderableStores.map(({ id, latitude, longitude }) => ({
+        id,
+        latitude,
+        longitude,
+      })),
+    [renderableStores],
+  );
   const status = useMemo(
     () =>
       buildStatusContent({
@@ -170,6 +224,57 @@ export function NearaMapView({
   }, [mapRecenterKey, region]);
 
   useEffect(() => {
+    if (
+      !hasMountedRef.current ||
+      userInteracted ||
+      focusedRegion ||
+      validStoreCoordinates.length === 0
+    ) {
+      return;
+    }
+
+    const nextFitKey = validStoreCoordinates
+      .map((store) => `${store.id}:${store.latitude.toFixed(5)}:${store.longitude.toFixed(5)}`)
+      .join("|");
+
+    if (!nextFitKey || lastAppliedStoreFitKeyRef.current === nextFitKey) {
+      return;
+    }
+
+    lastAppliedStoreFitKeyRef.current = nextFitKey;
+    programmaticMoveRef.current = true;
+
+    requestAnimationFrame(() => {
+      if (!mapRef.current) {
+        return;
+      }
+
+      if (validStoreCoordinates.length === 1) {
+        mapRef.current.animateToRegion(
+          {
+            latitude: validStoreCoordinates[0].latitude - 0.003,
+            latitudeDelta: 0.012,
+            longitude: validStoreCoordinates[0].longitude,
+            longitudeDelta: 0.012,
+          },
+          360,
+        );
+        return;
+      }
+
+      mapRef.current.fitToCoordinates(validStoreCoordinates, {
+        animated: true,
+        edgePadding: {
+          bottom: 160,
+          left: 48,
+          right: 48,
+          top: 96,
+        },
+      });
+    });
+  }, [focusedRegion, userInteracted, validStoreCoordinates]);
+
+  useEffect(() => {
     hasMountedRef.current = true;
 
     return () => {
@@ -181,15 +286,7 @@ export function NearaMapView({
     };
   }, []);
 
-  const signalMapMoveStart = (source: "drag" | "region") => {
-    if (!hasSettledInitialRegionRef.current && source === "region") {
-      return;
-    }
-
-    if (source === "drag") {
-      hasSettledInitialRegionRef.current = true;
-    }
-
+  const signalMapMoveStart = () => {
     if (programmaticMoveRef.current) {
       return;
     }
@@ -208,18 +305,7 @@ export function NearaMapView({
     onMapMoveStart?.();
   };
 
-  const signalMapMoveEnd = () => {
-    if (!hasSettledInitialRegionRef.current) {
-      hasSettledInitialRegionRef.current = true;
-      programmaticMoveRef.current = false;
-      return;
-    }
-
-    if (programmaticMoveRef.current) {
-      programmaticMoveRef.current = false;
-      return;
-    }
-
+  const scheduleMapMoveEnd = (delayMs = 140) => {
     if (mapMoveEndTimeoutRef.current) {
       clearTimeout(mapMoveEndTimeoutRef.current);
     }
@@ -233,7 +319,22 @@ export function NearaMapView({
 
       mapInteractionActiveRef.current = false;
       onMapMoveEnd?.();
-    }, 140);
+    }, delayMs);
+  };
+
+  const signalMapMoveEnd = () => {
+    if (!hasSettledInitialRegionRef.current) {
+      hasSettledInitialRegionRef.current = true;
+      programmaticMoveRef.current = false;
+      return;
+    }
+
+    if (programmaticMoveRef.current) {
+      programmaticMoveRef.current = false;
+      return;
+    }
+
+    scheduleMapMoveEnd();
   };
 
   return (
@@ -248,18 +349,12 @@ export function NearaMapView({
         rotateEnabled={!disableGestures}
         pitchEnabled={!disableGestures}
         zoomTapEnabled={!disableGestures}
-        onRegionChange={
-          disableGestures
-            ? undefined
-            : () => {
-                signalMapMoveStart("region");
-              }
-        }
         onPanDrag={
           disableGestures
             ? undefined
             : () => {
-                signalMapMoveStart("drag");
+                hasSettledInitialRegionRef.current = true;
+                signalMapMoveStart();
               }
         }
         onRegionChangeComplete={
@@ -279,41 +374,17 @@ export function NearaMapView({
         toolbarEnabled={false}
         style={styles.map}
       >
-        {(stores ?? []).map((store) => {
-          const latitude =
-            typeof store.latitude === "number"
-              ? store.latitude
-              : store.latitude !== null && store.latitude !== undefined
-                ? Number(store.latitude)
-                : null;
-          const longitude =
-            typeof store.longitude === "number"
-              ? store.longitude
-              : store.longitude !== null && store.longitude !== undefined
-                ? Number(store.longitude)
-                : null;
-
-          if (
-            store.id === null ||
-            store.id === undefined ||
-            !Number.isFinite(latitude) ||
-            !Number.isFinite(longitude)
-          ) {
-            return null;
-          }
-
-          const markerLatitude = Number(latitude);
-          const markerLongitude = Number(longitude);
-          const isSelected = String(store.id) === String(selectedStoreId || "");
+        {renderableStores.map(({ id, latitude, longitude }) => {
+          const isSelected = id === String(selectedStoreId || "");
 
           return (
             <Marker
-              key={String(store.id)}
+              key={id}
               coordinate={{
-                latitude: markerLatitude,
-                longitude: markerLongitude,
+                latitude,
+                longitude,
               }}
-              onPress={() => onSelectStore?.(String(store.id))}
+              onPress={() => onSelectStore?.(id)}
               tracksViewChanges={false}
             >
               <View style={styles.storeMarkerWrap}>
@@ -384,7 +455,7 @@ export { NearaMapView as MapView };
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: "#0d1729",
+    backgroundColor: theme.colors.background,
     height: "100%",
     overflow: "hidden",
     width: "100%",
@@ -404,7 +475,7 @@ const styles = StyleSheet.create({
     top: 84,
   },
   statusCard: {
-    backgroundColor: "rgba(9, 15, 29, 0.9)",
+    backgroundColor: "rgba(10,15,31,0.9)",
     borderColor: "rgba(255,255,255,0.08)",
     borderRadius: 24,
     borderWidth: 1,
@@ -413,7 +484,7 @@ const styles = StyleSheet.create({
     paddingVertical: 18,
   },
   statusCardWarning: {
-    borderColor: "rgba(251,113,133,0.22)",
+    borderColor: "rgba(255,255,255,0.22)",
   },
   statusTitle: {
     color: theme.colors.text,
@@ -421,7 +492,7 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   statusDescription: {
-    color: "#c3d1e6",
+    color: theme.colors.subduedText,
     fontSize: 13,
     lineHeight: 19,
   },
@@ -440,7 +511,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     alignSelf: "flex-start",
     backgroundColor: "rgba(255,255,255,0.06)",
-    borderColor: "rgba(125, 211, 252, 0.18)",
+    borderColor: "rgba(120,163,255,0.18)",
     borderRadius: 999,
     borderWidth: 1,
     justifyContent: "center",
@@ -448,7 +519,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
   },
   actionButtonText: {
-    color: "#d8efff",
+    color: theme.colors.subduedText,
     fontSize: 13,
     fontWeight: "700",
   },
@@ -461,7 +532,7 @@ const styles = StyleSheet.create({
   },
   storeMarkerHead: {
     alignItems: "center",
-    backgroundColor: "rgba(14, 22, 39, 0.98)",
+    backgroundColor: "rgba(11, 18, 33, 0.98)",
     borderColor: "rgba(255,255,255,0.88)",
     borderRadius: 18,
     borderWidth: 2,
@@ -474,29 +545,29 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
   },
   storeMarkerHeadSelected: {
-    backgroundColor: "#1e3a8a",
-    borderColor: "#dbeafe",
+    backgroundColor: "#1F56E5",
+    borderColor: "#D9E4FF",
     transform: [{ scale: 1.08 }],
   },
   storeMarkerCore: {
-    backgroundColor: "#94a3b8",
+    backgroundColor: "#B8C2D9",
     borderRadius: 7,
     height: 14,
     width: 14,
   },
   storeMarkerCoreSelected: {
-    backgroundColor: "#f8fbff",
+    backgroundColor: "#F7FAFF",
   },
   storeMarkerTail: {
     borderLeftColor: "transparent",
     borderLeftWidth: 8,
     borderRightColor: "transparent",
     borderRightWidth: 8,
-    borderTopColor: "rgba(14, 22, 39, 0.98)",
+    borderTopColor: "rgba(11, 18, 33, 0.98)",
     borderTopWidth: 14,
     marginTop: -2,
   },
   storeMarkerTailSelected: {
-    borderTopColor: "#1e3a8a",
+    borderTopColor: "#1F56E5",
   },
 });

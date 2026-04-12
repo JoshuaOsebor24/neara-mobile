@@ -122,9 +122,9 @@ export default function PromoteStorePage() {
       <SafeAreaView edges={["top"]} style={styles.safeArea}>
         <LinearGradient
           colors={[
-            "rgba(34, 197, 94, 0.16)",
+            "rgba(74,136,255,0.16)",
             "transparent",
-            "rgba(2, 6, 23, 1)",
+            "rgba(10,15,31,1)",
           ]}
           start={{ x: 0.5, y: 0 }}
           end={{ x: 0.5, y: 1 }}
@@ -145,7 +145,7 @@ export default function PromoteStorePage() {
   return (
     <SafeAreaView edges={["top"]} style={styles.safeArea}>
       <LinearGradient
-        colors={["rgba(34, 197, 94, 0.16)", "transparent", "rgba(2, 6, 23, 1)"]}
+        colors={["rgba(74,136,255,0.16)", "transparent", "rgba(10,15,31,1)"]}
         start={{ x: 0.5, y: 0 }}
         end={{ x: 0.5, y: 1 }}
         style={styles.container}
@@ -203,15 +203,15 @@ export default function PromoteStorePage() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#020617",
+    backgroundColor: "#0A0F1F",
   },
   container: {
     flex: 1,
-    backgroundColor: "#020617",
+    backgroundColor: "#0A0F1F",
   },
   background: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "#020617",
+    backgroundColor: "#0A0F1F",
   },
   loadingWrap: {
     flex: 1,
@@ -220,7 +220,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
   loadingText: {
-    color: "#cbd5e1",
+    color: "#C7D2E5",
     fontSize: 14,
     textAlign: "center",
   },
@@ -247,7 +247,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   backButtonText: {
-    color: "#ffffff",
+    color: "#F5F7FB",
     fontSize: 14,
     fontWeight: "600",
   },
@@ -255,7 +255,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600",
     letterSpacing: 0.18 * 12,
-    color: "#94a3b8",
+    color: "#B8C2D9",
     textTransform: "uppercase",
   },
   mainContent: {
@@ -282,7 +282,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   storePillText: {
-    color: "#e2e8f0",
+    color: "#E8EEF8",
     fontSize: 12,
     fontWeight: "600",
   },
@@ -296,13 +296,13 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 32,
     fontWeight: "600",
-    color: "#ffffff",
+    color: "#F5F7FB",
     marginTop: 16,
     textAlign: "center",
   },
   subtitle: {
     fontSize: 14,
-    color: "#cbd5e1",
+    color: "#C7D2E5",
     marginTop: 12,
     textAlign: "center",
     lineHeight: 21,
@@ -324,11 +324,11 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#ffffff",
+    color: "#F5F7FB",
   },
   cardDescription: {
     fontSize: 13,
-    color: "#cbd5e1",
+    color: "#C7D2E5",
     marginTop: 4,
     lineHeight: 18,
   },
@@ -344,13 +344,13 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "600",
     letterSpacing: 0.16 * 10,
-    color: "#bae6fd",
+    color: "#D4E1FF",
     textTransform: "uppercase",
   },
   price: {
     fontSize: 28,
     fontWeight: "600",
-    color: "#ffffff",
+    color: "#F5F7FB",
     marginTop: 20,
   },
   featuresList: {
@@ -373,12 +373,12 @@ const styles = StyleSheet.create({
   },
   checkmarkText: {
     fontSize: 12,
-    color: "#cbd5e1",
+    color: "#C7D2E5",
     fontWeight: "600",
   },
   featureText: {
     fontSize: 13,
-    color: "#e2e8f0",
+    color: "#E8EEF8",
     flex: 1,
     lineHeight: 18,
   },
@@ -390,7 +390,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   actionButtonPrimary: {
-    backgroundColor: "#0ea5e9",
+    backgroundColor: "#2F6BFF",
   },
   actionButtonSecondary: {
     borderWidth: 1,
@@ -403,9 +403,9 @@ const styles = StyleSheet.create({
   actionButtonText: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#ffffff",
+    color: "#F5F7FB",
   },
   actionButtonTextPrimary: {
-    color: "#020617",
+    color: "#0A0F1F",
   },
 });

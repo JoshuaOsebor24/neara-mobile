@@ -58,11 +58,11 @@ function getToneStyles(tone: RequestTone) {
       cardBorder: "rgba(16, 185, 129, 0.22)",
       cardWash: "rgba(11, 47, 41, 0.34)",
       chipBackground: "rgba(13, 84, 77, 0.6)",
-      chipBorder: "rgba(52, 211, 153, 0.18)",
-      chipText: "#d1fae5",
+      chipBorder: "rgba(74,136,255,0.18)",
+      chipText: "#D9E4FF",
       eyebrow: "#9ae6c4",
       iconBackground: "rgba(13, 84, 77, 0.48)",
-      iconBorder: "rgba(52, 211, 153, 0.18)",
+      iconBorder: "rgba(74,136,255,0.18)",
     };
   }
 
@@ -80,14 +80,14 @@ function getToneStyles(tone: RequestTone) {
   }
 
   return {
-    cardBorder: "rgba(56, 189, 248, 0.16)",
+    cardBorder: "rgba(74,136,255,0.16)",
     cardWash: "rgba(10, 36, 62, 0.18)",
     chipBackground: "rgba(9, 44, 84, 0.42)",
-    chipBorder: "rgba(56, 189, 248, 0.12)",
+    chipBorder: "rgba(74,136,255,0.12)",
     chipText: "#d8e7f7",
     eyebrow: "#c0d9ee",
     iconBackground: "rgba(9, 44, 84, 0.34)",
-    iconBorder: "rgba(56, 189, 248, 0.12)",
+    iconBorder: "rgba(74,136,255,0.12)",
   };
 }
 
@@ -329,7 +329,7 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "transparent",
     borderRadius: 34,
-    shadowColor: "#38bdf8",
+    shadowColor: "#4A88FF",
     shadowOffset: { height: 12, width: 0 },
     shadowOpacity: 0.12,
     shadowRadius: 40,
@@ -351,7 +351,7 @@ const styles = StyleSheet.create({
     maxWidth: 320,
   },
   heroSubtitle: {
-    color: "#c3d1e6",
+    color: theme.colors.subduedText,
     fontSize: 16,
     lineHeight: 24,
     marginTop: 16,
@@ -402,7 +402,7 @@ const styles = StyleSheet.create({
     lineHeight: 32,
   },
   choiceDescription: {
-    color: "#c3d1e6",
+    color: theme.colors.subduedText,
     fontSize: 17,
     lineHeight: 24,
     marginTop: 12,
@@ -452,7 +452,7 @@ const styles = StyleSheet.create({
     width: 72,
   },
   customMessageEyebrow: {
-    color: "#cbd5e1",
+    color: "#C7D2E5",
     fontSize: 11,
     fontWeight: "800",
     letterSpacing: 3,

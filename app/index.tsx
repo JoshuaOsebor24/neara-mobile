@@ -1,6 +1,7 @@
 import { Redirect } from "expo-router";
 import { Text, View } from "react-native";
 
+import { AppBackground } from "@/components/ui/app-background";
 import { theme } from "@/constants/theme";
 import { useMobileSession, useMobileSessionHydrated } from "@/services/mobile-session";
 
@@ -15,9 +16,10 @@ export default function IndexScreen() {
           flex: 1,
           alignItems: "center",
           justifyContent: "center",
-          backgroundColor: theme.colors.background,
+          backgroundColor: "transparent",
         }}
       >
+        <AppBackground />
         <Text
           style={{
             color: theme.colors.text,
