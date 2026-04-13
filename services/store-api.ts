@@ -1,4 +1,4 @@
-import { requestMobileApi } from "@/services/api";
+import { requestMobileApi, requestMobileApiNoCache } from "@/services/api";
 
 const STORE_RESPONSE_CACHE_TTL_MS = 30_000;
 const STORE_DETAIL_CACHE_TTL_MS = 20_000;
@@ -403,7 +403,7 @@ export async function fetchStoreFullData(storeId: string) {
   }
 
   const request = (async () => {
-    const result = await requestMobileApi<StoreFullResponse>(`/stores/${normalizedStoreId}/full`, {
+    const result = await requestMobileApiNoCache<StoreFullResponse>(`/stores/${normalizedStoreId}/full`, {
       method: "GET",
     });
 

@@ -1,12 +1,10 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import * as ImagePicker from "expo-image-picker";
-import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
-  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -22,6 +20,8 @@ import {
   StoreLocationPicker,
   type StoreCoordinates,
 } from "@/components/map/store-location-picker";
+import { AppImage } from "@/components/ui/app-image";
+import { Button } from "@/components/ui/button";
 import { theme } from "@/constants/theme";
 import {
   buildSessionPatchFromAuthUser,
@@ -1777,14 +1777,14 @@ export default function SignupScreen() {
                                 ]}
                               >
                                 {image ? (
-                                  <Image
-                                    resizeMode="cover"
-                                    source={{ uri: image }}
+                                  <AppImage
+                                    contentFit="cover"
                                     style={[
                                       styles.storeImagePreview,
                                       index === 0 &&
                                         styles.storeImagePreviewPrimary,
                                     ]}
+                                    uri={image}
                                   />
                                 ) : (
                                   <View
@@ -2165,9 +2165,17 @@ export default function SignupScreen() {
                   </View>
                 ) : null}
 
-                <TouchableOpacity
-                  activeOpacity={0.85}
+                <Button
                   disabled={primaryActionDisabled}
+                  label={
+                    isSubmitting
+                      ? "Creating account..."
+                      : selectedStorePlan
+                        ? ownerStep < 2
+                          ? "Continue setup"
+                          : "Confirm & finish setup"
+                        : "Create account"
+                  }
                   onPress={
                     selectedStorePlan
                       ? ownerStep < 2
@@ -2175,51 +2183,20 @@ export default function SignupScreen() {
                         : handleSubmit
                       : handleSubmit
                   }
-                  style={[
-                    styles.submitButton,
-                    primaryActionDisabled && styles.submitButtonDisabled,
-                  ]}
-                >
-                  <LinearGradient
-                    colors={
-                      primaryActionDisabled
-                        ? ["rgba(255,255,255,0.16)", "rgba(255,255,255,0.12)"]
-                        : ["#4A88FF", "#2F6BFF", "#1F56E5"]
-                    }
-                    end={{ x: 1, y: 0.5 }}
-                    start={{ x: 0, y: 0.5 }}
-                    style={styles.submitButtonGradient}
-                  >
-                    <Text
-                      style={[
-                        styles.submitButtonText,
-                        primaryActionDisabled &&
-                          styles.submitButtonTextDisabled,
-                      ]}
-                    >
-                      {isSubmitting
-                        ? "Creating account..."
-                        : selectedStorePlan
-                          ? ownerStep < 2
-                            ? "Continue setup →"
-                            : "Confirm & finish setup"
-                          : "Create account"}
-                    </Text>
-                  </LinearGradient>
-                </TouchableOpacity>
+                  style={styles.submitButton}
+                />
 
                 {selectedStorePlan && ownerStep > 0 ? (
-                  <TouchableOpacity
-                    activeOpacity={0.85}
+                  <Button
+                    label={
+                      ownerStep === 1
+                        ? "Back to owner account"
+                        : "Back to store details"
+                    }
                     onPress={handleBackToPreviousStep}
                     style={styles.secondaryButton}
-                  >
-                    <Text style={styles.secondaryButtonText}>
-                      {ownerStep === 1
-                        ? "Back to owner account"
-                        : "Back to store details"}
-                    </Text>
-                  </TouchableOpacity>
+                    variant="secondary"
+                  />
                 ) : null}
               </View>
             </View>

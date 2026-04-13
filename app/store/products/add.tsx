@@ -13,7 +13,6 @@ import { StatusBar } from "expo-status-bar";
 import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
-  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -25,6 +24,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { AppImage } from "@/components/ui/app-image";
 import { theme } from "@/constants/theme";
 import { showFlashFeedback } from "@/services/flash-feedback";
 import { useMobileSession } from "@/services/mobile-session";
@@ -952,9 +952,10 @@ export default function AddStoreProductScreen() {
 
                   <View style={styles.imagePreview}>
                     {imageUrl ? (
-                      <Image
-                        source={{ uri: imageUrl }}
+                      <AppImage
+                        contentFit="cover"
                         style={styles.previewImage}
+                        uri={imageUrl}
                       />
                     ) : (
                       <Text style={styles.imageEmptyText}>

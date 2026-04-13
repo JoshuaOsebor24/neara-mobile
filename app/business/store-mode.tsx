@@ -7,11 +7,11 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from "react-native";
 
 import { BackPillButton } from "@/components/ui/back-pill-button";
+import { Button } from "@/components/ui/button";
 
 interface StorePlan {
   id: "basic" | "pro";
@@ -134,15 +134,13 @@ export default function StoreModeScreen() {
             </View>
           ) : null}
           {session.isAuthenticated && hasOwnerDraft && !session.isStoreOwner ? (
-            <TouchableOpacity
-              activeOpacity={0.85}
+            <Button
+              label="Continue Store Setup"
               onPress={() =>
                 router.push(`/store-payment?storePlan=${draftPlan}`)
               }
               style={styles.resumeButton}
-            >
-              <Text style={styles.resumeButtonText}>Continue Store Setup</Text>
-            </TouchableOpacity>
+            />
           ) : null}
         </View>
 
@@ -204,25 +202,16 @@ export default function StoreModeScreen() {
                   ))}
                 </View>
 
-                <TouchableOpacity
+                <Button
+                  disabled={plan.disabled}
+                  label={plan.buttonLabel}
+                  onPress={() => handleChoosePlan(plan.id)}
                   style={[
                     styles.button,
-                    plan.isRecommended && styles.buttonRecommended,
                     plan.disabled && styles.buttonDisabled,
                   ]}
-                  disabled={plan.disabled}
-                  onPress={() => handleChoosePlan(plan.id)}
-                >
-                  <Text
-                    style={[
-                      styles.buttonText,
-                      plan.isRecommended && styles.buttonTextRecommended,
-                      plan.disabled && styles.buttonTextDisabled,
-                    ]}
-                  >
-                    {plan.buttonLabel}
-                  </Text>
-                </TouchableOpacity>
+                  variant={plan.isRecommended ? "primary" : "secondary"}
+                />
                 {plan.id === "basic" ? (
                   <Text style={styles.buttonSupportingText}>
                     Instant setup after payment

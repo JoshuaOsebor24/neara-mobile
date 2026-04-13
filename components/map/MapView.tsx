@@ -41,6 +41,129 @@ const DEFAULT_REGION: Region = {
   longitudeDelta: 0.016,
 };
 
+const MARKER_COLLISION_DISTANCE_METERS = 80;
+const MARKER_SPREAD_RADIUS_METERS = 28;
+
+function toRadians(value: number) {
+  return (value * Math.PI) / 180;
+}
+
+function distanceBetweenCoordinatesMeters(
+  left: { latitude: number; longitude: number },
+  right: { latitude: number; longitude: number },
+) {
+  const earthRadiusMeters = 6_371_000;
+  const deltaLatitude = toRadians(right.latitude - left.latitude);
+  const deltaLongitude = toRadians(right.longitude - left.longitude);
+  const leftLatitude = toRadians(left.latitude);
+  const rightLatitude = toRadians(right.latitude);
+  const a =
+    Math.sin(deltaLatitude / 2) * Math.sin(deltaLatitude / 2) +
+    Math.cos(leftLatitude) *
+      Math.cos(rightLatitude) *
+      Math.sin(deltaLongitude / 2) *
+      Math.sin(deltaLongitude / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return earthRadiusMeters * c;
+}
+
+function offsetCoordinateByMeters(
+  coordinate: { latitude: number; longitude: number },
+  offsetMeters: { east: number; north: number },
+) {
+  const latitudeDelta = offsetMeters.north / 111_320;
+  const longitudeScale = Math.cos(toRadians(coordinate.latitude));
+  const longitudeDelta =
+    Math.abs(longitudeScale) > 0.000001
+      ? offsetMeters.east / (111_320 * longitudeScale)
+      : 0;
+
+  return {
+    latitude: coordinate.latitude + latitudeDelta,
+    longitude: coordinate.longitude + longitudeDelta,
+  };
+}
+
+function buildDisplayStores(
+  stores: {
+    id: string;
+    latitude: number;
+    longitude: number;
+  }[],
+) {
+  const groups: {
+    center: { latitude: number; longitude: number };
+    stores: {
+      id: string;
+      latitude: number;
+      longitude: number;
+    }[];
+  }[] = [];
+
+  stores.forEach((store) => {
+    const matchingGroup = groups.find((group) =>
+      distanceBetweenCoordinatesMeters(group.center, store) <=
+      MARKER_COLLISION_DISTANCE_METERS,
+    );
+
+    if (!matchingGroup) {
+      groups.push({
+        center: {
+          latitude: store.latitude,
+          longitude: store.longitude,
+        },
+        stores: [store],
+      });
+      return;
+    }
+
+    matchingGroup.stores.push(store);
+    const latitudeTotal = matchingGroup.stores.reduce(
+      (sum, item) => sum + item.latitude,
+      0,
+    );
+    const longitudeTotal = matchingGroup.stores.reduce(
+      (sum, item) => sum + item.longitude,
+      0,
+    );
+    matchingGroup.center = {
+      latitude: latitudeTotal / matchingGroup.stores.length,
+      longitude: longitudeTotal / matchingGroup.stores.length,
+    };
+  });
+
+  return groups.flatMap((group) => {
+    if (group.stores.length <= 1) {
+      return group.stores.map((store) => ({
+        ...store,
+        displayLatitude: store.latitude,
+        displayLongitude: store.longitude,
+      }));
+    }
+
+    const orderedStores = [...group.stores].sort((left, right) =>
+      left.id.localeCompare(right.id),
+    );
+    const radiusMeters =
+      MARKER_SPREAD_RADIUS_METERS + Math.max(0, orderedStores.length - 2) * 6;
+
+    return orderedStores.map((store, index) => {
+      const angle = (Math.PI * 2 * index) / orderedStores.length - Math.PI / 2;
+      const displayCoordinate = offsetCoordinateByMeters(group.center, {
+        east: Math.cos(angle) * radiusMeters,
+        north: Math.sin(angle) * radiusMeters,
+      });
+
+      return {
+        ...store,
+        displayLatitude: displayCoordinate.latitude,
+        displayLongitude: displayCoordinate.longitude,
+      };
+    });
+  });
+}
+
 function buildStatusContent({
   errorMessage,
   isLoading,
@@ -135,7 +258,8 @@ export function NearaMapView({
   }, [focusedCoordinates]);
   const renderableStores = useMemo(
     () =>
-      (stores ?? [])
+      buildDisplayStores(
+        (stores ?? [])
         .map((store) => {
           const latitude =
             typeof store.latitude === "number"
@@ -175,14 +299,15 @@ export function NearaMapView({
           } =>
             value !== null,
         ),
+      ),
     [stores],
   );
   const validStoreCoordinates = useMemo(
     () =>
-      renderableStores.map(({ id, latitude, longitude }) => ({
+      renderableStores.map(({ id, displayLatitude, displayLongitude }) => ({
         id,
-        latitude,
-        longitude,
+        latitude: displayLatitude,
+        longitude: displayLongitude,
       })),
     [renderableStores],
   );
@@ -374,15 +499,15 @@ export function NearaMapView({
         toolbarEnabled={false}
         style={styles.map}
       >
-        {renderableStores.map(({ id, latitude, longitude }) => {
+        {renderableStores.map(({ id, displayLatitude, displayLongitude }) => {
           const isSelected = id === String(selectedStoreId || "");
 
           return (
             <Marker
               key={id}
               coordinate={{
-                latitude,
-                longitude,
+                latitude: displayLatitude,
+                longitude: displayLongitude,
               }}
               onPress={() => onSelectStore?.(id)}
               tracksViewChanges={false}

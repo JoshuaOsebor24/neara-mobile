@@ -4,7 +4,6 @@ import { StatusBar } from "expo-status-bar";
 import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
-  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -19,6 +18,7 @@ import {
   StoreLocationPicker,
   type StoreCoordinates,
 } from "@/components/map/store-location-picker";
+import { AppImage } from "@/components/ui/app-image";
 import { BackPillButton } from "@/components/ui/back-pill-button";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
@@ -436,13 +436,13 @@ export default function StoreEditScreen() {
                     ]}
                   >
                     {image ? (
-                      <Image
-                        resizeMode="cover"
-                        source={{ uri: image }}
+                      <AppImage
+                        contentFit="cover"
                         style={[
                           styles.imagePreview,
                           index === 0 && styles.imagePreviewPrimary,
                         ]}
+                        uri={image}
                       />
                     ) : (
                       <View

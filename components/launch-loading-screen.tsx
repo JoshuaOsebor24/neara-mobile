@@ -2,14 +2,29 @@ import { Image, StyleSheet, Text, View } from "react-native";
 
 import { theme } from "@/constants/theme";
 
+const LOGO_SOURCE = require("../assets/images/icon-transparent.png");
+
 export function LaunchLoadingScreen() {
   return (
     <View style={styles.container}>
-      <Image
-        source={require("../assets/images/splash-icon.png")}
-        style={styles.logo}
-        resizeMode="contain"
-      />
+      <View style={styles.logoWrap}>
+        <Image
+          blurRadius={1}
+          resizeMode="contain"
+          source={LOGO_SOURCE}
+          style={styles.logoBorderOuter}
+        />
+        <Image
+          resizeMode="contain"
+          source={LOGO_SOURCE}
+          style={styles.logoBorderInner}
+        />
+        <Image
+          resizeMode="contain"
+          source={LOGO_SOURCE}
+          style={styles.logo}
+        />
+      </View>
       <Text style={styles.label}>Neara</Text>
     </View>
   );
@@ -22,10 +37,33 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  logoWrap: {
+    width: 140,
+    height: 140,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 4,
+  },
   logo: {
     width: 124,
     height: 124,
-    marginBottom: 4,
+    zIndex: 3,
+  },
+  logoBorderOuter: {
+    position: "absolute",
+    width: 130,
+    height: 130,
+    opacity: 0.74,
+    tintColor: "#FFFFFF",
+    zIndex: 1,
+  },
+  logoBorderInner: {
+    position: "absolute",
+    width: 128,
+    height: 128,
+    opacity: 0.92,
+    tintColor: "#FCFCFD",
+    zIndex: 2,
   },
   label: {
     color: theme.colors.text,

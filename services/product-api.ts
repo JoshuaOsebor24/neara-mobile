@@ -1,5 +1,6 @@
 import {
   requestMobileApi,
+  requestMobileApiNoCache,
   requestMobileApiFormData,
 } from "@/services/api";
 import { invalidateStoreCache } from "@/services/store-api";
@@ -104,31 +105,43 @@ export function invalidateStoreProductCache(storeId?: string | number | null) {
   inflightStoreProductsRequests.delete(normalizedStoreId);
 }
 
-export async function fetchStoreProducts(storeId: string) {
+export async function fetchStoreProducts(
+  storeId: string,
+  options?: {
+    forceRefresh?: boolean;
+  },
+) {
   cleanupStoreProductsCache();
   const normalizedStoreId = String(storeId);
+  const forceRefresh = Boolean(options?.forceRefresh);
+
+  if (forceRefresh) {
+    storeProductsCache.delete(normalizedStoreId);
+    inflightStoreProductsRequests.delete(normalizedStoreId);
+  }
+
   const cached = storeProductsCache.get(normalizedStoreId);
 
-  if (cached && cached.expiresAt > Date.now()) {
+  if (!forceRefresh && cached && cached.expiresAt > Date.now()) {
     return cached.value;
   }
 
   const inflight = inflightStoreProductsRequests.get(normalizedStoreId);
 
-  if (inflight) {
+  if (!forceRefresh && inflight) {
     return inflight;
   }
 
   const request = (async () => {
     const query = new URLSearchParams();
     query.set("store_id", normalizedStoreId);
-    const result = await requestMobileApi<ProductListResponse>("/products", {
+    const result = await requestMobileApiNoCache<ProductListResponse>("/products", {
       method: "GET",
       query,
     });
 
     if (!result.ok) {
-      const legacyResult = await requestMobileApi<LegacyProductListResponse>(`/products/${normalizedStoreId}`, {
+      const legacyResult = await requestMobileApiNoCache<LegacyProductListResponse>(`/products/${normalizedStoreId}`, {
         method: "GET",
       });
 

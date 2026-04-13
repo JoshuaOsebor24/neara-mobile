@@ -78,6 +78,14 @@ function normalizeOptionalText(value: unknown) {
   return normalized || null;
 }
 
+function normalizeIdentifier(value: unknown) {
+  if (value === null || value === undefined) {
+    return "";
+  }
+
+  return String(value).trim();
+}
+
 function parseOptionalNumber(value: number | string | null | undefined) {
   if (typeof value === "number" && Number.isFinite(value)) {
     return value;
@@ -321,7 +329,7 @@ export function normalizeStoreProductRecord(
   },
   fallbackCategory = "",
 ) {
-  const id = normalizeText(product.product_id);
+  const id = normalizeIdentifier(product.product_id);
   const name = normalizeText(product.product_name);
 
   if (!id || !name) {
@@ -341,7 +349,7 @@ export function normalizeStoreProductRecord(
     variants:
       product.variants?.map((variant) => ({
         id:
-          normalizeText(variant.variant_id) ||
+          normalizeIdentifier(variant.variant_id) ||
           createVariantKey(product.product_id, variant.variant_name),
         inStock: Boolean(variant.in_stock),
         label: normalizeText(variant.variant_name),
@@ -440,6 +448,36 @@ export async function loadStoreDetailRecord(storeId: string) {
     products: normalizedProducts,
     status: storeResult.status,
     store: normalizedStore,
+  };
+}
+
+export async function loadStoreProductsRecord(
+  storeId: string,
+  options?: {
+    forceRefresh?: boolean;
+  },
+) {
+  const result = await fetchStoreProducts(String(storeId), options);
+
+  if (!result.ok) {
+    return {
+      error: result.error,
+      ok: false as const,
+      products: [] as StoreProductRecord[],
+      status: result.status,
+    };
+  }
+
+  const products = result.products
+    .map((product) =>
+      normalizeStoreProductRecord(String(storeId), product),
+    )
+    .filter((product): product is StoreProductRecord => product !== null);
+
+  return {
+    ok: true as const,
+    products,
+    status: result.status,
   };
 }
 

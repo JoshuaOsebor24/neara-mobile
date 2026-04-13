@@ -4,7 +4,6 @@ import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
-  Image,
   KeyboardAvoidingView,
   PanResponder,
   Platform,
@@ -24,11 +23,13 @@ import {
 import { NearaMapView } from "@/components/map/MapView";
 import { useDrawer } from "@/components/navigation/drawer-provider";
 import { SavedStoreSkeleton } from "@/components/saved/saved-store-skeleton";
+import { AppImage } from "@/components/ui/app-image";
 import { PremiumBadge } from "@/components/ui/premium-badge";
 import { SearchInput } from "@/components/ui/search-input";
 import { StoreOwnerBadge } from "@/components/ui/store-owner-badge";
 import { theme } from "@/constants/theme";
 import { useLocation } from "@/hooks/useLocation";
+import { prefetchImageUris } from "@/services/image-cache";
 import { parseCoordinate } from "@/services/map-links";
 import { useMobileSession } from "@/services/mobile-session";
 import {
@@ -404,6 +405,22 @@ export default function HomeScreen() {
     };
   }, [selectedStoreId, storeMarkers]);
 
+  useEffect(() => {
+    void prefetchImageUris([
+      selectedMapStore?.image,
+      ...groupedPreviewResults.slice(0, 6).map((item) => item.image),
+      ...recentStores.slice(0, 6).map((store) => store.image_url),
+      ...nearbyStores.slice(0, 6).map((store) => store.image),
+      ...browseStores.slice(0, 6).map((store) => store.image),
+    ]);
+  }, [
+    browseStores,
+    groupedPreviewResults,
+    nearbyStores,
+    recentStores,
+    selectedMapStore,
+  ]);
+
   const syncSheetFlags = useCallback(
     (offset: number, options?: { manualCollapsed?: boolean }) => {
       const manualCollapsed =
@@ -672,9 +689,10 @@ export default function HomeScreen() {
             <View style={styles.mapPreviewCard}>
               <View style={styles.mapPreviewMediaWrap}>
                 {selectedMapStore.image ? (
-                  <Image
-                    source={{ uri: selectedMapStore.image }}
+                  <AppImage
+                    contentFit="cover"
                     style={styles.mapPreviewImage}
+                    uri={selectedMapStore.image}
                   />
                 ) : (
                   <View style={styles.mapPreviewImageFallback}>
@@ -810,6 +828,7 @@ export default function HomeScreen() {
                 keyboardShouldPersistTaps="handled"
                 keyboardDismissMode="on-drag"
                 contentContainerStyle={styles.searchOverlayRecentList}
+                removeClippedSubviews
                 showsVerticalScrollIndicator={false}
               >
                 {overlaySearchQuery.trim().length >= 2 && previewError ? (
@@ -838,9 +857,10 @@ export default function HomeScreen() {
                       style={styles.previewCard}
                     >
                       {item.image ? (
-                        <Image
-                          source={{ uri: item.image }}
+                        <AppImage
+                          contentFit="cover"
                           style={styles.previewImage}
+                          uri={item.image}
                         />
                       ) : (
                         <View style={styles.previewImageFallback}>
@@ -924,9 +944,10 @@ export default function HomeScreen() {
                       style={styles.storeRowCard}
                     >
                       {store.image_url ? (
-                        <Image
-                          source={{ uri: store.image_url }}
+                        <AppImage
+                          contentFit="cover"
                           style={styles.storeRowImage}
+                          uri={store.image_url}
                         />
                       ) : (
                         <View style={styles.storeRowImageFallback}>
@@ -1036,6 +1057,7 @@ export default function HomeScreen() {
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
+                removeClippedSubviews
                 scrollEnabled
                 style={styles.sheetScroll}
               >
@@ -1057,11 +1079,12 @@ export default function HomeScreen() {
                         activeOpacity={0.85}
                         onPress={() => router.push(`/store/${store.store_id}`)}
                         style={styles.recentVisualCard}
-                      >
-                        {store.image_url ? (
-                          <Image
-                            source={{ uri: store.image_url }}
+                    >
+                      {store.image_url ? (
+                          <AppImage
+                            contentFit="cover"
                             style={styles.recentVisualImage}
+                            uri={store.image_url}
                           />
                         ) : (
                           <View style={styles.recentVisualFallback}>
@@ -1132,11 +1155,12 @@ export default function HomeScreen() {
                             ? styles.storeRowCardSelected
                             : null,
                         ]}
-                      >
-                        {store.image ? (
-                          <Image
-                            source={{ uri: store.image }}
+                    >
+                      {store.image ? (
+                          <AppImage
+                            contentFit="cover"
                             style={styles.storeRowImage}
+                            uri={store.image}
                           />
                         ) : (
                           <View style={styles.storeRowImageFallback}>
@@ -1214,11 +1238,12 @@ export default function HomeScreen() {
                             ? styles.storeRowCardSelected
                             : null,
                         ]}
-                      >
-                        {store.image ? (
-                          <Image
-                            source={{ uri: store.image }}
+                    >
+                      {store.image ? (
+                          <AppImage
+                            contentFit="cover"
                             style={styles.storeRowImage}
+                            uri={store.image}
                           />
                         ) : (
                           <View style={styles.storeRowImageFallback}>

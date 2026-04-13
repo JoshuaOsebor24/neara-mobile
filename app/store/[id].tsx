@@ -1,12 +1,10 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
-  Image,
-  ImageBackground,
   LayoutAnimation,
   Linking,
   Modal,
@@ -22,6 +20,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { AppImage, AppImageBackground } from "@/components/ui/app-image";
 import { BackPillButton } from "@/components/ui/back-pill-button";
 import { RemoteProductImage } from "@/components/ui/remote-product-image";
 import { SearchInput } from "@/components/ui/search-input";
@@ -32,6 +31,7 @@ import {
   SkeletonCard,
 } from "@/components/ux-state";
 import { theme } from "@/constants/theme";
+import { prefetchImageUris } from "@/services/image-cache";
 import { buildDirectionsUrl, parseCoordinate } from "@/services/map-links";
 import { useMobileSession } from "@/services/mobile-session";
 import { deleteProductWithBackend } from "@/services/product-api";
@@ -43,7 +43,8 @@ import {
 } from "@/services/saved-stores";
 import { updateStoreWithBackend } from "@/services/store-api";
 import {
-  loadStoreDetailRecord,
+  loadStoreProductsRecord,
+  loadStoreRecord,
   toSavedStorePayload,
 } from "@/services/store-data";
 
@@ -459,7 +460,9 @@ export default function StoreScreen() {
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
   const [isSaveSubmitting, setIsSaveSubmitting] = useState(false);
   const [isStoreLoading, setIsStoreLoading] = useState(true);
+  const [isProductsLoading, setIsProductsLoading] = useState(true);
   const [storeError, setStoreError] = useState("");
+  const [productsError, setProductsError] = useState("");
   const [ownerNotice, setOwnerNotice] = useState("");
   const [deletingProductId, setDeletingProductId] = useState<string | null>(
     null,
@@ -474,83 +477,123 @@ export default function StoreScreen() {
   const [editDelivery, setEditDelivery] = useState(false);
   const [editContact, setEditContact] = useState("");
   const savedStores = useSavedStores();
-  const storeId = id || session.primaryStoreId || "";
+  const routeStoreId = Array.isArray(id) ? id[0] || "" : id || "";
+  const storeId = routeStoreId;
   const latestStoreLoadIdRef = useRef(0);
-  const lastResolvedStoreIdRef = useRef("");
+  const latestProductsLoadIdRef = useRef(0);
 
-  useEffect(() => {
-    async function loadStoreData() {
-      const loadId = latestStoreLoadIdRef.current + 1;
-      latestStoreLoadIdRef.current = loadId;
+  const loadStoreData = useCallback(async () => {
+    const loadId = latestStoreLoadIdRef.current + 1;
+    latestStoreLoadIdRef.current = loadId;
 
-      if (!storeId) {
-        setStoreError("Store not found.");
-        setRemoteStore(null);
-        setRemoteProducts([]);
-        setIsStoreLoading(false);
-        return;
-      }
-
-      setIsStoreLoading(true);
-      setStoreError("");
-
-      const result = await loadStoreDetailRecord(String(storeId));
-
-      if (latestStoreLoadIdRef.current !== loadId) {
-        return;
-      }
-
-      if (!result.ok) {
-        setStoreError(result.error || "We couldn’t load this store right now.");
-        setIsStoreLoading(false);
-
-        if (lastResolvedStoreIdRef.current !== String(storeId)) {
-          setRemoteStore(null);
-          setRemoteProducts([]);
-        }
-
-        return;
-      }
-
-      const nextStorePhotos = result.store
-        ? normalizeStorePhotos(
-            result.store.headerImages,
-            result.store.imageUrl || "",
-          )
-        : [];
-
-      const nextStore = result.store
-        ? {
-            address: result.store.address || "",
-            category: result.store.category || "",
-            description: result.store.description || "",
-            deliveryAvailable: result.store.deliveryAvailable,
-            deliveryFee: "Delivery information unavailable",
-            deliveryTime: "",
-            heroImage: nextStorePhotos[0] || "",
-            id: String(result.store.id),
-            isOpen: true,
-            latitude: result.store.latitude,
-            longitude: result.store.longitude,
-            phoneNumber: result.store.phoneNumber || "",
-            photos: nextStorePhotos,
-            storeName: result.store.storeName || "",
-          }
-        : null;
-
-      const nextProducts = result.products;
-
-      setRemoteStore(nextStore);
-      setRemoteProducts(nextProducts);
-      lastResolvedStoreIdRef.current = String(storeId);
+    if (!storeId) {
+      setStoreError("Store not found.");
+      setRemoteStore(null);
       setIsStoreLoading(false);
+      return;
     }
 
+    setIsStoreLoading(true);
+    setStoreError("");
+
+    const result = await loadStoreRecord(String(storeId));
+
+    if (latestStoreLoadIdRef.current !== loadId) {
+      return;
+    }
+
+    if (!result.ok || !result.store) {
+      setStoreError(result.error || "We couldn’t load this store right now.");
+      setIsStoreLoading(false);
+      setRemoteStore(null);
+      return;
+    }
+
+    const nextStorePhotos = normalizeStorePhotos(
+      result.store.headerImages,
+      result.store.imageUrl || "",
+    );
+    const nextStore = {
+      address: result.store.address || "",
+      category: result.store.category || "",
+      description: result.store.description || "",
+      deliveryAvailable: result.store.deliveryAvailable,
+      deliveryFee: "Delivery information unavailable",
+      deliveryTime: "",
+      heroImage: nextStorePhotos[0] || "",
+      id: String(result.store.id),
+      isOpen: true,
+      latitude: result.store.latitude,
+      longitude: result.store.longitude,
+      phoneNumber: result.store.phoneNumber || "",
+      photos: nextStorePhotos,
+      storeName: result.store.storeName || "",
+    };
+
+    setRemoteStore(nextStore);
+    setIsStoreLoading(false);
+  }, [storeId]);
+
+  const loadProductsData = useCallback(async () => {
+    const loadId = latestProductsLoadIdRef.current + 1;
+    latestProductsLoadIdRef.current = loadId;
+
+    if (!storeId) {
+      setProductsError("");
+      setRemoteProducts([]);
+      setIsProductsLoading(false);
+      return;
+    }
+
+    setIsProductsLoading(true);
+    setProductsError("");
+
+    const result = await loadStoreProductsRecord(String(storeId), {
+      forceRefresh: true,
+    });
+
+    if (latestProductsLoadIdRef.current !== loadId) {
+      return;
+    }
+
+    if (!result.ok) {
+      setProductsError(result.error || "We couldn’t load products right now.");
+      setRemoteProducts([]);
+      setIsProductsLoading(false);
+      return;
+    }
+
+    setRemoteProducts(result.products);
+    setIsProductsLoading(false);
+  }, [storeId]);
+
+  useEffect(() => {
     void loadStoreData();
 
     return () => {
       latestStoreLoadIdRef.current += 1;
     };
+  }, [loadStoreData]);
+
+  useEffect(() => {
+    void loadProductsData();
+
+    return () => {
+      latestProductsLoadIdRef.current += 1;
+    };
+  }, [loadProductsData]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadProductsData();
+    }, [loadProductsData]),
+  );
+
+  useEffect(() => {
+    setSearchTerm("");
+    setActiveFilters([]);
+    setExpandedImageUrl(null);
+    setOwnerNotice("");
   }, [storeId]);
 
   const categories = useMemo(() => {
@@ -698,6 +741,21 @@ export default function StoreScreen() {
     session.isStoreOwner &&
     session.primaryStoreId === String(storeId) &&
     preview === "customer";
+  const hasActiveProductFilters =
+    activeFilters.length > 0 || searchTerm.trim().length > 0;
+  const renderedProducts = filteredProducts;
+  const renderedProductCount = renderedProducts.length;
+  const totalProductCount = remoteProducts.length;
+  const showNoMatchingProductsState =
+    !isProductsLoading &&
+    !productsError &&
+    totalProductCount > 0 &&
+    renderedProductCount === 0;
+  const showNoProductsState =
+    !isProductsLoading && !productsError && totalProductCount === 0;
+  const productCountText = hasActiveProductFilters
+    ? `${renderedProductCount} of ${totalProductCount} items`
+    : `${totalProductCount} items`;
 
   const openChat = (product?: ProductGroup, variant?: ProductVariant) => {
     if (isOwnerViewingStore || isPreviewingOwnStore) {
@@ -931,6 +989,15 @@ export default function StoreScreen() {
   ]);
 
   useEffect(() => {
+    void prefetchImageUris([
+      resolvedStore.heroImage,
+      expandedImageUrl,
+      ...resolvedStore.photos.slice(0, STORE_PHOTO_LIMIT),
+      ...filteredProducts.slice(0, 8).map((product) => product.image),
+    ]);
+  }, [expandedImageUrl, filteredProducts, resolvedStore.heroImage, resolvedStore.photos]);
+
+  useEffect(() => {
     if (isEditingInfo) {
       setEditAddress(resolvedStore.address);
       setEditDelivery(resolvedStore.deliveryAvailable);
@@ -951,6 +1018,7 @@ export default function StoreScreen() {
         <ScrollView
           bounces={false}
           contentContainerStyle={styles.contentContainer}
+          removeClippedSubviews
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.pageShell}>
@@ -970,10 +1038,29 @@ export default function StoreScreen() {
             </View>
           </View>
         </ScrollView>
+      ) : storeError && !remoteStore ? (
+        <ScrollView
+          bounces={false}
+          contentContainerStyle={styles.contentContainer}
+          removeClippedSubviews
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.pageShell}>
+            <View style={styles.topBar}>
+              <BackPillButton fallbackHref="/(tabs)/home" />
+              <Text style={styles.topBarLabel}>Neara</Text>
+            </View>
+            <ErrorCard
+              title="Could not load this store"
+              detail={storeError}
+            />
+          </View>
+        </ScrollView>
       ) : (
         <ScrollView
           bounces={false}
           contentContainerStyle={styles.contentContainer}
+          removeClippedSubviews
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.pageShell}>
@@ -984,14 +1071,11 @@ export default function StoreScreen() {
             </View>
 
             <View style={styles.heroCard}>
-              <ImageBackground
+              <AppImageBackground
+                contentFit="cover"
                 imageStyle={styles.heroBackgroundImage}
-                source={
-                  resolvedStore.heroImage
-                    ? { uri: resolvedStore.heroImage }
-                    : undefined
-                }
                 style={styles.heroBackground}
+                uri={resolvedStore.heroImage}
               >
                 <View style={styles.heroOverlay} />
                 <LinearGradient
@@ -1282,13 +1366,13 @@ export default function StoreScreen() {
                             }
                             style={styles.primaryPhotoCard}
                           >
-                            <Image
-                              resizeMode="cover"
-                              source={{ uri: resolvedStore.photos[0] }}
+                            <AppImage
+                              contentFit="cover"
                               style={[
                                 styles.headerPhoto,
                                 styles.headerPhotoLarge,
                               ]}
+                              uri={resolvedStore.photos[0]}
                             />
                           </TouchableOpacity>
 
@@ -1303,13 +1387,13 @@ export default function StoreScreen() {
                                     onPress={() => setExpandedImageUrl(photo)}
                                     style={styles.secondaryPhotoCard}
                                   >
-                                    <Image
-                                      resizeMode="cover"
-                                      source={{ uri: photo }}
+                                    <AppImage
+                                      contentFit="cover"
                                       style={[
                                         styles.headerPhoto,
                                         styles.headerPhotoSmall,
                                       ]}
+                                      uri={photo}
                                     />
                                   </TouchableOpacity>
                                 ))}
@@ -1332,7 +1416,7 @@ export default function StoreScreen() {
                     </View>
                   </View>
                 </View>
-              </ImageBackground>
+              </AppImageBackground>
             </View>
 
             <View style={styles.searchSection}>
@@ -1382,7 +1466,7 @@ export default function StoreScreen() {
                 <View style={styles.sectionHeaderText}>
                   <Text style={styles.sectionTitle}>Products</Text>
                   <Text style={styles.sectionSubtitle}>
-                    {filteredProducts.length} items
+                    {productCountText}
                   </Text>
                 </View>
                 <View style={styles.sectionHeaderActions}>
@@ -1432,18 +1516,18 @@ export default function StoreScreen() {
                     <Text style={styles.ownerNoticeText}>{ownerNotice}</Text>
                   </View>
                 ) : null}
-                {isStoreLoading ? (
+                {isProductsLoading ? (
                   <View style={styles.skeletonStack}>
                     <SkeletonCard height={132} />
                     <SkeletonCard height={132} />
                   </View>
-                ) : storeError ? (
+                ) : productsError ? (
                   <ErrorCard
-                    title="Could not load this store"
-                    detail={storeError}
+                    title="Could not load products"
+                    detail={productsError}
                   />
-                ) : filteredProducts.length > 0 ? (
-                  filteredProducts.map((product, index) => (
+                ) : renderedProductCount > 0 ? (
+                  renderedProducts.map((product, index) => (
                     <ProductCard
                       deletingProductId={deletingProductId}
                       askDisabled={isOwnerViewingStore || isPreviewingOwnStore}
@@ -1456,20 +1540,17 @@ export default function StoreScreen() {
                       product={product}
                     />
                   ))
-                ) : (
+                ) : showNoMatchingProductsState ? (
                   <EmptyCard
-                    title={
-                      remoteProducts.length === 0
-                        ? "No products yet"
-                        : "No products found"
-                    }
-                    detail={
-                      remoteProducts.length === 0
-                        ? "This store has not added any products yet. Start a chat to ask what is currently available."
-                        : "Try a different search term or remove a filter."
-                    }
+                    title="No products found"
+                    detail="Try a different search term or remove a filter."
                   />
-                )}
+                ) : showNoProductsState ? (
+                  <EmptyCard
+                    title="No products yet"
+                    detail="This store has not added any products yet. Start a chat to ask what is currently available."
+                  />
+                ) : null}
               </View>
             </View>
 
@@ -1636,10 +1717,10 @@ export default function StoreScreen() {
             </TouchableOpacity>
 
             {expandedImageUrl ? (
-              <Image
-                resizeMode="contain"
-                source={{ uri: expandedImageUrl }}
+              <AppImage
+                contentFit="contain"
                 style={styles.imageModalImage}
+                uri={expandedImageUrl}
               />
             ) : null}
           </View>

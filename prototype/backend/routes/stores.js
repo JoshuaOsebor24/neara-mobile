@@ -101,6 +101,35 @@ function normalizeCoordinateQueryParam(value) {
   return Number.isFinite(numeric) ? numeric : null;
 }
 
+function normalizeCoordinateValue(value) {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (value === null || value === "") {
+    return null;
+  }
+
+  const numeric = Number.parseFloat(String(value));
+
+  if (!Number.isFinite(numeric)) {
+    return NaN;
+  }
+
+  return numeric;
+}
+
+function hasValidCoordinateRange(latitude, longitude) {
+  return (
+    Number.isFinite(latitude) &&
+    Number.isFinite(longitude) &&
+    latitude >= -90 &&
+    latitude <= 90 &&
+    longitude >= -180 &&
+    longitude <= 180
+  );
+}
+
 function buildPublicStoreCacheKey(prefix, req) {
   return `${prefix}:${req.originalUrl}`;
 }
@@ -230,8 +259,10 @@ router.post("/", storeWriteLimiter, authMiddleware, async (req, res) => {
     const normalizedCategory = normalizeNullableText(category);
     const normalizedAddress = normalizeNullableText(address);
     const normalizedPhoneNumber = normalizeNullableText(phone_number);
-    const hasLatitude = latitude !== undefined && latitude !== null && String(latitude).trim() !== "";
-    const hasLongitude = longitude !== undefined && longitude !== null && String(longitude).trim() !== "";
+    const normalizedLatitude = normalizeCoordinateValue(latitude);
+    const normalizedLongitude = normalizeCoordinateValue(longitude);
+    const hasLatitude = normalizedLatitude !== undefined && normalizedLatitude !== null;
+    const hasLongitude = normalizedLongitude !== undefined && normalizedLongitude !== null;
 
     if (!normalizedStoreName) {
       return sendError(res, 400, "Store name is required", {
@@ -254,6 +285,16 @@ router.post("/", storeWriteLimiter, authMiddleware, async (req, res) => {
     if (hasLatitude !== hasLongitude) {
       return sendError(res, 400, "Latitude and longitude must be provided together", {
         message: "Latitude and longitude must be provided together",
+      });
+    }
+
+    if (
+      hasLatitude &&
+      hasLongitude &&
+      !hasValidCoordinateRange(normalizedLatitude, normalizedLongitude)
+    ) {
+      return sendError(res, 400, "Store coordinates are invalid", {
+        message: "Store coordinates are invalid",
       });
     }
 
@@ -296,8 +337,8 @@ router.post("/", storeWriteLimiter, authMiddleware, async (req, res) => {
         state || null,
         country || null,
         Boolean(delivery_available),
-        latitude || null,
-        longitude || null,
+        normalizedLatitude ?? null,
+        normalizedLongitude ?? null,
         normalizedPhoneNumber,
         primaryStoreImage,
         serializeHeaderImages(normalizedHeaderImages),
@@ -707,6 +748,10 @@ router.put("/:id", storeWriteLimiter, authMiddleware, async (req, res) => {
     const store = storeResult.rows[0];
     const currentHeaderImages = normalizeHeaderImages(store.header_images, store.image_url);
     const normalizedImageUrl = image_url !== undefined ? normalizeNullableText(image_url) : undefined;
+    const normalizedLatitude = normalizeCoordinateValue(latitude);
+    const normalizedLongitude = normalizeCoordinateValue(longitude);
+    const hasLatitude = normalizedLatitude !== undefined && normalizedLatitude !== null;
+    const hasLongitude = normalizedLongitude !== undefined && normalizedLongitude !== null;
     let nextHeaderImages = currentHeaderImages;
 
     if (header_images !== undefined) {
@@ -721,6 +766,22 @@ router.put("/:id", storeWriteLimiter, authMiddleware, async (req, res) => {
     if (Number(store.owner_id) !== ownerId) {
       return res.status(403).json({
         message: "You are not allowed to update this store",
+      });
+    }
+
+    if (hasLatitude !== hasLongitude) {
+      return sendError(res, 400, "Latitude and longitude must be provided together", {
+        message: "Latitude and longitude must be provided together",
+      });
+    }
+
+    if (
+      hasLatitude &&
+      hasLongitude &&
+      !hasValidCoordinateRange(normalizedLatitude, normalizedLongitude)
+    ) {
+      return sendError(res, 400, "Store coordinates are invalid", {
+        message: "Store coordinates are invalid",
       });
     }
 
@@ -747,8 +808,8 @@ router.put("/:id", storeWriteLimiter, authMiddleware, async (req, res) => {
         state !== undefined ? state : store.state,
         country !== undefined ? country : store.country,
         delivery_available !== undefined ? Boolean(delivery_available) : Boolean(store.delivery_available),
-        latitude || store.latitude,
-        longitude || store.longitude,
+        normalizedLatitude !== undefined ? normalizedLatitude : store.latitude,
+        normalizedLongitude !== undefined ? normalizedLongitude : store.longitude,
         phone_number || store.phone_number,
         primaryStoreImage,
         serializeHeaderImages(nextHeaderImages),

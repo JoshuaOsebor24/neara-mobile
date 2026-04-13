@@ -1,43 +1,27 @@
-import { useEffect, useMemo, useState } from "react";
-import {
-  Image,
-  type ImageErrorEventData,
-  type ImageProps,
-  type NativeSyntheticEvent,
-} from "react-native";
+import { memo, type ComponentProps } from "react";
+
+import { AppImage } from "@/components/ui/app-image";
 
 const PRODUCT_PLACEHOLDER = require("../../assets/images/product-placeholder.png");
 
-type RemoteProductImageProps = Omit<ImageProps, "source"> & {
+type RemoteProductImageProps = Omit<ComponentProps<typeof AppImage>, "fallbackSource" | "uri"> & {
   uri?: string | null;
 };
 
-export function RemoteProductImage({
-  onError,
+function RemoteProductImageComponent({
+  contentFit = "cover",
   uri,
   ...props
 }: RemoteProductImageProps) {
-  const normalizedUri = uri?.trim() || "";
-  const [hasError, setHasError] = useState(false);
-
-  useEffect(() => {
-    setHasError(false);
-  }, [normalizedUri]);
-
-  const source = useMemo(() => {
-    if (!normalizedUri || hasError) {
-      return PRODUCT_PLACEHOLDER;
-    }
-
-    return { uri: normalizedUri };
-  }, [hasError, normalizedUri]);
-
-  const handleError = (
-    event: NativeSyntheticEvent<ImageErrorEventData>,
-  ) => {
-    setHasError(true);
-    onError?.(event);
-  };
-
-  return <Image {...props} onError={handleError} source={source} />;
+  return (
+    <AppImage
+      {...props}
+      contentFit={contentFit}
+      fallbackSource={PRODUCT_PLACEHOLDER}
+      placeholder={PRODUCT_PLACEHOLDER}
+      uri={uri}
+    />
+  );
 }
+
+export const RemoteProductImage = memo(RemoteProductImageComponent);

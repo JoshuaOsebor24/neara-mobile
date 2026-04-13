@@ -40,7 +40,7 @@ export const theme = {
   },
   radius: {
     pill: 999,
-    button: 18,
+    button: 20,
     card: 22,
     cardLarge: 30,
     cardXLarge: 34,
@@ -69,7 +69,7 @@ export const theme = {
   controls: {
     pillButtonHeight: 52,
     inputHeight: 56,
-    actionButtonMinHeight: 52,
+    actionButtonMinHeight: 58,
     cardPadding: 20,
   },
   form: {
@@ -82,10 +82,15 @@ export const theme = {
   },
   button: {
     primaryBackground: "#2F6BFF",
+    primaryBorder: "rgba(200,224,255,0.34)",
+    primaryHighlight: "rgba(255,255,255,0.14)",
+    primaryShadow: "rgba(35,92,255,0.38)",
+    primaryDisabledBackground: "rgba(62,92,150,0.48)",
     primaryText: "#F5F7FB",
     secondaryBackground: "rgba(19,29,49,0.82)",
     secondaryBorder: "rgba(191,212,255,0.18)",
-    radius: 18,
+    secondaryHighlight: "rgba(255,255,255,0.06)",
+    radius: 20,
   },
   shadows: {
     card: {
@@ -110,7 +115,12 @@ export const theme = {
       "rgba(52, 103, 255, 0.06)",
       "transparent",
     ] as const,
-    primaryButton: ["#4A88FF", "#2F6BFF", "#1F56E5"] as const,
+    primaryButton: ["#75A5FF", "#3E78FF", "#214FD8"] as const,
+    primaryButtonDisabled: [
+      "rgba(120,149,210,0.52)",
+      "rgba(80,108,168,0.48)",
+      "rgba(56,73,113,0.46)",
+    ] as const,
     surface: ["rgba(255,255,255,0.14)", "rgba(255,255,255,0.08)"] as const,
   },
 } as const;

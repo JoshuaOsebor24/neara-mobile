@@ -7,11 +7,11 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from "react-native";
 
 import { BackPillButton } from "@/components/ui/back-pill-button";
+import { Button } from "@/components/ui/button";
 import { theme } from "@/constants/theme";
 import {
   updateMobileSession,
@@ -100,26 +100,12 @@ export default function StorePaymentScreen() {
                 Start getting customers today
               </Text>
 
-              <LinearGradient
-                colors={theme.gradients.primaryButton}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={[
-                  styles.primaryButton,
-                  isSubmitting && styles.primaryButtonDisabled,
-                ]}
-              >
-                <TouchableOpacity
-                  activeOpacity={0.85}
-                  disabled={isSubmitting}
-                  onPress={() => void handleContinue()}
-                  style={styles.primaryButtonTouchable}
-                >
-                  <Text style={styles.primaryButtonText}>
-                    {isSubmitting ? "Processing..." : "Pay ₦1,000"}
-                  </Text>
-                </TouchableOpacity>
-              </LinearGradient>
+              <Button
+                disabled={isSubmitting}
+                label={isSubmitting ? "Processing..." : "Pay ₦1,000"}
+                onPress={() => void handleContinue()}
+                style={styles.primaryButton}
+              />
             </View>
 
             <View style={styles.trustRow}>
@@ -128,13 +114,12 @@ export default function StorePaymentScreen() {
               <Text style={styles.trustText}>Cancel anytime</Text>
             </View>
 
-            <TouchableOpacity
-              activeOpacity={0.85}
+            <Button
+              label="Back to pricing"
               onPress={() => navigateBackOrFallback(router, "/store-mode")}
               style={styles.secondaryButton}
-            >
-              <Text style={styles.secondaryButtonText}>Back to pricing</Text>
-            </TouchableOpacity>
+              variant="secondary"
+            />
 
             {session.isAuthenticated ? (
               <Text style={styles.sameAccountText}>

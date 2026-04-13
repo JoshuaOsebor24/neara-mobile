@@ -5,7 +5,12 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const rateLimit = require("express-rate-limit");
-const { app: appConfig, cors: envCors, payment, runtime } = require("./config/env");
+const {
+  app: appConfig,
+  cors: envCors,
+  payment,
+  runtime,
+} = require("./config/env");
 
 // DB pool from config
 const pool = require("./config/db");
@@ -20,6 +25,7 @@ let nextRequestId = 0;
 const SERVER_LOG_PREFIX = "[server]";
 const REQUEST_LOG_PREFIX = "[http]";
 const DIAGNOSTIC_LOG_PREFIX = "[diag]";
+
 if (appConfig.trustedProxy) {
   app.set("trust proxy", 1);
 }
@@ -27,11 +33,14 @@ if (appConfig.trustedProxy) {
 const allowedDevOrigins = new Set([
   "http://localhost:3000",
   "http://localhost:3001",
+  "http://localhost:8081",
+  "http://localhost:8082",
+  "http://localhost:8083",
 ]);
 const allowedConfiguredOrigins = new Set(envCors.allowedOrigins);
 
 function isAllowedLanOrigin(origin) {
-  return /^http:\/\/(?:192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}):(3000|3001)$/.test(
+  return /^http:\/\/(?:192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}):(\d+)$/.test(
     origin,
   );
 }
@@ -44,7 +53,8 @@ const corsOptions = {
     if (
       !origin ||
       allowedConfiguredOrigins.has(origin) ||
-      (!runtime.isProduction && (allowedDevOrigins.has(origin) || isAllowedLanOrigin(origin)))
+      (!runtime.isProduction &&
+        (allowedDevOrigins.has(origin) || isAllowedLanOrigin(origin)))
     ) {
       callback(null, true);
       return;
@@ -54,7 +64,6 @@ const corsOptions = {
   },
   optionsSuccessStatus: 204,
 };
-
 /*
 --------------------------------
 DATABASE CONNECTION
@@ -98,7 +107,10 @@ async function buildHealthPayload() {
     await Promise.race([
       pool.query("SELECT 1"),
       new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("health DB check timeout")), healthTimeoutMs),
+        setTimeout(
+          () => reject(new Error("health DB check timeout")),
+          healthTimeoutMs,
+        ),
       ),
     ]);
 
@@ -109,7 +121,10 @@ async function buildHealthPayload() {
       },
       memory: getMemorySnapshot(),
       pid: process.pid,
-      pool: typeof pool.getDiagnostics === "function" ? pool.getDiagnostics() : null,
+      pool:
+        typeof pool.getDiagnostics === "function"
+          ? pool.getDiagnostics()
+          : null,
       readiness: isReady ? "ready" : "starting",
       status: "ok",
       timestamp: new Date().toISOString(),
@@ -124,7 +139,10 @@ async function buildHealthPayload() {
       },
       memory: getMemorySnapshot(),
       pid: process.pid,
-      pool: typeof pool.getDiagnostics === "function" ? pool.getDiagnostics() : null,
+      pool:
+        typeof pool.getDiagnostics === "function"
+          ? pool.getDiagnostics()
+          : null,
       readiness: isReady ? "ready" : "starting",
       status: "degraded",
       timestamp: new Date().toISOString(),
@@ -159,7 +177,10 @@ async function gracefulShutdown(reason, exitCode = 0, error = null) {
 
     await pool.end();
   } catch (shutdownError) {
-    console.error(`${SERVER_LOG_PREFIX}[shutdown-error]`, formatErrorPayload(shutdownError));
+    console.error(
+      `${SERVER_LOG_PREFIX}[shutdown-error]`,
+      formatErrorPayload(shutdownError),
+    );
   } finally {
     clearTimeout(forceExitTimeout);
     process.exit(exitCode);
@@ -170,19 +191,37 @@ setInterval(() => {
   console.info(`${DIAGNOSTIC_LOG_PREFIX}[memory]`, {
     memory: getMemorySnapshot(),
     pid: process.pid,
-    pool: typeof pool.getDiagnostics === "function" ? pool.getDiagnostics() : null,
+    pool:
+      typeof pool.getDiagnostics === "function" ? pool.getDiagnostics() : null,
     uptime_s: Number(process.uptime().toFixed(1)),
   });
-}, runtime.diagnosticsIntervalMs).unref?.();
+}, runtime.diagnosticsIntervalMs);
+
+// Prevent event loop from exiting - keep server alive
+const keepAlive = setInterval(() => {
+  // This interval keeps Node.js alive
+}, 60000);
+
+// Also keep stdin open to prevent exit when terminal closes
+process.stdin.resume();
 
 process.on("uncaughtException", (error) => {
-  console.error(`${SERVER_LOG_PREFIX}[uncaughtException]`, formatErrorPayload(error));
+  console.error(
+    `${SERVER_LOG_PREFIX}[uncaughtException]`,
+    formatErrorPayload(error),
+  );
   void gracefulShutdown("uncaughtException", 1, error);
 });
 
 process.on("unhandledRejection", (reason) => {
-  const error = reason instanceof Error ? reason : new Error(String(reason || "Unknown rejection"));
-  console.error(`${SERVER_LOG_PREFIX}[unhandledRejection]`, formatErrorPayload(error));
+  const error =
+    reason instanceof Error
+      ? reason
+      : new Error(String(reason || "Unknown rejection"));
+  console.error(
+    `${SERVER_LOG_PREFIX}[unhandledRejection]`,
+    formatErrorPayload(error),
+  );
   void gracefulShutdown("unhandledRejection", 1, error);
 });
 
@@ -209,10 +248,11 @@ app.use((req, res, next) => {
 
   next();
 });
-
 // Parse request bodies
 app.use(express.json({ limit: `${appConfig.bodyLimitMb}mb` }));
-app.use(express.urlencoded({ extended: true, limit: `${appConfig.bodyLimitMb}mb` }));
+app.use(
+  express.urlencoded({ extended: true, limit: `${appConfig.bodyLimitMb}mb` }),
+);
 
 app.use((req, res, next) => {
   nextRequestId += 1;
@@ -252,13 +292,13 @@ app.use((req, res, next) => {
   const startedAt = Date.now();
   const startedIso = new Date().toISOString();
 
-    console.info(`${REQUEST_LOG_PREFIX}[start]`, {
-      ip: req.ip,
-      method: req.method,
-      request_id: req.requestId,
-      timestamp: startedIso,
-      url: req.originalUrl,
-    });
+  console.info(`${REQUEST_LOG_PREFIX}[start]`, {
+    ip: req.ip,
+    method: req.method,
+    request_id: req.requestId,
+    timestamp: startedIso,
+    url: req.originalUrl,
+  });
 
   res.on("finish", () => {
     console.info(`${REQUEST_LOG_PREFIX}[end]`, {
@@ -323,7 +363,7 @@ const notificationsRoutes = require("./routes/notifications");
 
 app.use("/auth", authRoutes);
 app.get("/me", authMiddleware, (req, res) =>
-  authRoutes.handleCurrentUserRequest(req, res, "me")
+  authRoutes.handleCurrentUserRequest(req, res, "me"),
 );
 app.use("/saved-stores", savedStoresRoutes);
 app.use("/stores", storesRoutes);
@@ -367,7 +407,8 @@ app.get("/health/live", (req, res) => {
 
 app.get("/health/ready", async (req, res) => {
   const payload = await buildHealthPayload();
-  const statusCode = payload.status === "ok" && isReady && !shuttingDown ? 200 : 503;
+  const statusCode =
+    payload.status === "ok" && isReady && !shuttingDown ? 200 : 503;
 
   res.status(statusCode).json({
     ...payload,
@@ -420,7 +461,8 @@ app.use((err, req, res, next) => {
 
   if (err?.type === "entity.too.large") {
     return res.status(413).json({
-      message: "The uploaded image is too large. Choose a smaller store image and try again.",
+      message:
+        "The uploaded image is too large. Choose a smaller store image and try again.",
     });
   }
 
@@ -447,7 +489,10 @@ function validateRequiredEnv() {
     missing.push("CORS_ALLOWED_ORIGINS");
   }
 
-  if (payment.provider === "paystack" && !String(process.env.PAYSTACK_SECRET_KEY || "").trim()) {
+  if (
+    payment.provider === "paystack" &&
+    !String(process.env.PAYSTACK_SECRET_KEY || "").trim()
+  ) {
     missing.push("PAYSTACK_SECRET_KEY");
   }
 
@@ -466,17 +511,139 @@ function validateRequiredEnv() {
   }
 }
 
+async function isExistingBackendHealthy() {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 1500);
+  const probeHost =
+    HOST === "0.0.0.0" || HOST === "::" ? "127.0.0.1" : HOST;
+
+  try {
+    const response = await fetch(
+      `http://${probeHost}:${PORT}/health/live`,
+      {
+        method: "GET",
+        signal: controller.signal,
+      },
+    );
+
+    return response.ok;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function isPortInUse(port, host) {
+  const net = require("net");
+  const probeHost =
+    host === "0.0.0.0" || host === "::" ? "127.0.0.1" : host;
+
+  return await new Promise((resolve) => {
+    const socket = net.createConnection({ host: probeHost, port });
+
+    socket.once("connect", () => {
+      socket.destroy();
+      resolve(true);
+    });
+
+    socket.once("error", () => {
+      resolve(false);
+    });
+
+    socket.setTimeout(1000, () => {
+      socket.destroy();
+      resolve(false);
+    });
+  });
+}
+
+async function retryAsync(label, task, options = {}) {
+  const attempts = Number.isFinite(options.attempts) ? options.attempts : 3;
+  const delayMs = Number.isFinite(options.delayMs) ? options.delayMs : 1500;
+  let lastError = null;
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return await task();
+    } catch (error) {
+      lastError = error;
+      console.warn(`${SERVER_LOG_PREFIX}[startup-retry]`, {
+        attempt,
+        error: formatErrorPayload(error),
+        label,
+      });
+
+      if (attempt >= attempts) {
+        break;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, delayMs * attempt));
+    }
+  }
+
+  throw lastError;
+}
+
 async function startServer() {
   try {
     validateRequiredEnv();
-    await ensureSchema();
+    await retryAsync("ensureSchema", () => ensureSchema(), {
+      attempts: 4,
+      delayMs: 2000,
+    });
     console.log("Database schema verified");
 
-    await logDbStartupCheck();
+    await retryAsync("startupDbCheck", () => logDbStartupCheck(), {
+      attempts: 4,
+      delayMs: 1500,
+    });
 
-    server = app.listen(PORT, HOST, () => {
-      isReady = true;
-      console.log(`Server running on http://${HOST}:${PORT}`);
+    const portAlreadyInUse = await isPortInUse(PORT, HOST);
+    if (portAlreadyInUse) {
+      const alreadyRunning = await isExistingBackendHealthy();
+
+      if (alreadyRunning) {
+        console.warn(`${SERVER_LOG_PREFIX}[already-running]`, {
+          host: HOST,
+          port: PORT,
+        });
+        process.exit(0);
+        return;
+      }
+    }
+
+    server = app.listen(PORT, HOST);
+    await new Promise((resolve, reject) => {
+      server.once("listening", resolve);
+      server.once("error", reject);
+    });
+
+    isReady = true;
+    console.log(`Server running on http://${HOST}:${PORT}`);
+    console.log('PID:', process.pid);
+    
+    // Prevent process from exiting - keep event loop alive
+    setImmediate(() => {
+      // This prevents the process from exiting when stdin is closed
+      process.stdin.resume();
+    });
+    server.on("error", async (error) => {
+      if (error?.code === "EADDRINUSE") {
+        const alreadyRunning = await isExistingBackendHealthy();
+
+        if (alreadyRunning) {
+          console.warn(`${SERVER_LOG_PREFIX}[already-running]`, {
+            host: HOST,
+            port: PORT,
+          });
+          process.exit(0);
+          return;
+        }
+      }
+
+      console.error("Server listen error:", error);
+      process.exit(1);
     });
     server.headersTimeout = appConfig.headersTimeoutMs;
     server.keepAliveTimeout = appConfig.keepAliveTimeoutMs;

@@ -2,7 +2,6 @@ import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 import {
-  Image,
   ScrollView,
   StyleSheet,
   Text,
@@ -11,6 +10,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { AppImage } from "@/components/ui/app-image";
 import { BackPillButton } from "@/components/ui/back-pill-button";
 import { theme } from "@/constants/theme";
 import { useMobileSession } from "@/services/mobile-session";
@@ -129,9 +129,10 @@ export default function CartScreen() {
                     style={styles.storeCard}
                   >
                     {store.image_url ? (
-                      <Image
-                        source={{ uri: store.image_url }}
+                      <AppImage
+                        contentFit="cover"
                         style={styles.storeImage}
+                        uri={store.image_url}
                       />
                     ) : (
                       <View style={styles.storeImageFallback}>

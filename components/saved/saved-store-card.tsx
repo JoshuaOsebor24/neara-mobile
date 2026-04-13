@@ -1,5 +1,7 @@
-import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { memo } from "react";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
+import { AppImage } from "@/components/ui/app-image";
 import { theme } from "@/constants/theme";
 import type { SavedStoreRecord } from "@/services/saved-stores";
 
@@ -29,7 +31,7 @@ function buildInitialLabel(value: string, fallback = "S") {
   return trimmed ? trimmed.charAt(0).toUpperCase() : fallback;
 }
 
-export function SavedStoreCard({
+function SavedStoreCardComponent({
   isRemoving,
   onOpen,
   onUnsave,
@@ -45,7 +47,11 @@ export function SavedStoreCard({
       <TouchableOpacity activeOpacity={0.88} onPress={onOpen} style={styles.linkRow}>
         <View style={styles.imageWrap}>
           {store.image_url ? (
-            <Image source={{ uri: store.image_url }} style={styles.storeImage} />
+            <AppImage
+              contentFit="cover"
+              style={styles.storeImage}
+              uri={store.image_url}
+            />
           ) : (
             <View style={styles.storeImageFallback}>
               <Text style={styles.storeImageFallbackText}>
@@ -82,6 +88,8 @@ export function SavedStoreCard({
     </View>
   );
 }
+
+export const SavedStoreCard = memo(SavedStoreCardComponent);
 
 const styles = StyleSheet.create({
   card: {

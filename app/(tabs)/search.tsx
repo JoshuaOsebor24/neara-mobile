@@ -15,6 +15,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { BackPillButton } from "@/components/ui/back-pill-button";
 import { RemoteProductImage } from "@/components/ui/remote-product-image";
 import { theme } from "@/constants/theme";
+import { prefetchImageUris } from "@/services/image-cache";
 import {
   loadSearchResults,
   normalizeQuery,
@@ -91,6 +92,10 @@ export default function SearchTab() {
       clearTimeout(timeout);
     };
   }, [query]);
+
+  useEffect(() => {
+    void prefetchImageUris(remoteResults.slice(0, 8).map((item) => item.image));
+  }, [remoteResults]);
 
   const results = remoteResults;
 
@@ -269,13 +274,18 @@ export default function SearchTab() {
           ) : (
             <FlatList
               data={results}
-              renderItem={renderResultCard}
-              keyExtractor={(item) => item.key}
               ListEmptyComponent={ListEmptyComponent}
               contentContainerStyle={styles.resultsList}
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
+              initialNumToRender={6}
               keyboardDismissMode="on-drag"
+              keyboardShouldPersistTaps="handled"
+              keyExtractor={(item) => item.key}
+              maxToRenderPerBatch={6}
+              removeClippedSubviews
+              renderItem={renderResultCard}
+              showsVerticalScrollIndicator={false}
+              updateCellsBatchingPeriod={50}
+              windowSize={7}
             />
           )}
         </View>

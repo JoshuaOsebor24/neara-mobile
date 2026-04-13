@@ -234,6 +234,7 @@ type RequestOptions = {
   path: string;
   query?: URLSearchParams;
   token?: string | null;
+  bypassCache?: boolean;
 };
 
 async function executeMobileApiRequest<T>({
@@ -244,9 +245,18 @@ async function executeMobileApiRequest<T>({
   path,
   query,
   token,
+  bypassCache = false,
 }: RequestOptions): Promise<MobileApiResult<T>> {
   const requestPath = normalizeApiPath(path);
-  const queryString = query && query.toString() ? `?${query.toString()}` : "";
+  
+  // Add cache busting timestamp when bypassing cache
+  let finalQuery = query;
+  if (bypassCache) {
+    finalQuery = new URLSearchParams(query || {});
+    finalQuery.append('_t', String(Date.now()));
+  }
+  
+  const queryString = finalQuery && finalQuery.toString() ? `?${finalQuery.toString()}` : "";
   const candidates = getOrderedCandidates(requestPath, getMobileApiBaseCandidates());
   let lastNetworkError = "We couldn't reach the Neara server. Please try again.";
 
@@ -264,23 +274,30 @@ async function executeMobileApiRequest<T>({
       const timeout = setTimeout(() => controller.abort(), timeoutMs);
       const url = `${apiBase}${requestPath}${queryString}`;
 
-      try {
-        const response = await fetch(url, {
-          method,
-          headers: {
+        try {
+        const requestHeaders: Record<string, string> = {
             Accept: "application/json",
             ...(isJsonBody ? { "Content-Type": "application/json" } : {}),
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
             ...headers,
-          },
-          body:
-            body === undefined
-              ? undefined
-              : isJsonBody
-                ? JSON.stringify(body)
-                : (body as BodyInit),
-          signal: controller.signal,
-        });
+          };
+
+          if (bypassCache) {
+            requestHeaders["Cache-Control"] = "no-cache";
+            requestHeaders["Pragma"] = "no-cache";
+          }
+
+          const response = await fetch(url, {
+            method,
+            headers: requestHeaders,
+            body:
+              body === undefined
+                ? undefined
+                : isJsonBody
+                  ? JSON.stringify(body)
+                  : (body as BodyInit),
+            signal: controller.signal,
+          });
 
         clearTimeout(timeout);
 
@@ -301,7 +318,20 @@ async function executeMobileApiRequest<T>({
           rememberSuccessfulBaseUrl(requestPath, apiBase);
         }
 
-        if (!response.ok) {
+        // Handle 304 Not Modified first - it's a redirection status not 2xx
+        if (response.status === 304 && parsed.data === null) {
+          return {
+            data: null,
+            error: "Response not available. Please try again.",
+            ok: false as const,
+            status: 304,
+            url,
+          };
+        }
+
+        const isSuccessStatus = response.status >= 200 && response.status < 300;
+
+        if (!isSuccessStatus) {
           if (attemptIndex + 1 < maxAttempts && isRetryableStatus(response.status)) {
             continue;
           }
@@ -321,8 +351,18 @@ async function executeMobileApiRequest<T>({
           };
         }
 
+        if (parsed.data === null) {
+          return {
+            data: null,
+            error: "Neara returned unreadable data. Please try again.",
+            ok: false as const,
+            status: response.status,
+            url,
+          };
+        }
+
         return {
-          data: (parsed.data ?? {}) as T,
+          data: parsed.data as T,
           ok: true as const,
           status: response.status,
           url,
@@ -354,7 +394,7 @@ export function getMobileApiBaseCandidates() {
   const preferredEnvBase =
     apiEnv === "production" ? productionBase || explicitBase : developmentBase || explicitBase;
 
-  return Array.from(
+  const candidates = Array.from(
     new Set(
       [
         preferredEnvBase,
@@ -370,6 +410,8 @@ export function getMobileApiBaseCandidates() {
       ].filter(Boolean),
     ),
   ) as string[];
+
+  return candidates;
 }
 
 export async function requestMobileApi<T>(
@@ -405,6 +447,62 @@ export async function requestMobileApi<T>(
       path: requestPath,
       query,
       token,
+      bypassCache: false,
+    });
+  })();
+
+  if (method === "GET") {
+    inflightGetRequests.set(dedupeKey, {
+      expiresAt: Date.now() + GET_DEDUPE_WINDOW_MS,
+      promise: requestPromise as Promise<MobileApiResult<unknown>>,
+    });
+
+    void requestPromise.finally(() => {
+      const entry = inflightGetRequests.get(dedupeKey);
+
+      if (entry?.promise === requestPromise) {
+        inflightGetRequests.delete(dedupeKey);
+      }
+    });
+  }
+
+  return requestPromise;
+}
+
+export async function requestMobileApiNoCache<T>(
+  path: string,
+  options: {
+    body?: JsonValue;
+    headers?: Record<string, string>;
+    method?: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
+    query?: URLSearchParams;
+    token?: string | null;
+  } = {},
+): Promise<MobileApiResult<T>> {
+  const { body, headers = {}, method = "GET", query, token } = options;
+  const requestPath = normalizeApiPath(path);
+  const queryString = query && query.toString() ? `?${query.toString()}` : "";
+  const dedupeKey = buildDedupeKey(method, requestPath, queryString, token);
+
+  if (method === "GET") {
+    cleanupInflightGetRequests();
+    const inflight = inflightGetRequests.get(dedupeKey);
+
+    if (inflight) {
+      return inflight.promise as Promise<MobileApiResult<T>>;
+    }
+  }
+
+  const requestPromise: Promise<MobileApiResult<T>> = (async () => {
+    return executeMobileApiRequest<T>({
+      body,
+      headers,
+      isJsonBody: true,
+      method,
+      path: requestPath,
+      query,
+      token,
+      bypassCache: true,
     });
   })();
 
