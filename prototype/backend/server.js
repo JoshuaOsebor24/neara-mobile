@@ -407,7 +407,7 @@ HEALTH CHECK ROUTES
 
 // Simple backend check
 app.get("/", (req, res) => {
-  res.send("Backend running");
+  res.send("Neara backend is live 🚀");
 });
 
 app.get("/health", (req, res) => {
@@ -623,24 +623,14 @@ async function retryAsync(label, task, options = {}) {
 async function startServer() {
   try {
     validateRequiredEnv();
-    await retryAsync("ensureSchema", () => ensureSchema(), {
-      attempts: 4,
-      delayMs: 2000,
-    });
-    console.log("Database schema verified");
 
-    await retryAsync("startupDbCheck", () => logDbStartupCheck(), {
-      attempts: 4,
-      delayMs: 1500,
-    });
-
+    // Start listening immediately so Railway healthcheck passes before DB is ready
     server = app.listen(PORT, HOST);
     await new Promise((resolve, reject) => {
       server.once("listening", resolve);
       server.once("error", reject);
     });
 
-    isReady = true;
     console.log(`Server running on http://${HOST}:${PORT}`);
     console.log("PID:", process.pid);
     console.log(`${SERVER_LOG_PREFIX}[cors-policy]`, {
@@ -651,11 +641,6 @@ async function startServer() {
       allowsLocalhostOrigins: !runtime.isProduction,
     });
 
-    // Prevent process from exiting - keep event loop alive
-    setImmediate(() => {
-      // This prevents the process from exiting when stdin is closed
-      process.stdin.resume();
-    });
     server.on("error", async (error) => {
       if (error?.code === "EADDRINUSE") {
         const alreadyRunning = await isExistingBackendHealthy();
@@ -678,6 +663,25 @@ async function startServer() {
     server.keepAliveTimeout = appConfig.keepAliveTimeoutMs;
     server.maxRequestsPerSocket = appConfig.maxRequestsPerSocket;
     server.requestTimeout = appConfig.requestTimeoutMs;
+
+    // Connect to DB after server is already listening
+    await retryAsync("ensureSchema", () => ensureSchema(), {
+      attempts: 4,
+      delayMs: 2000,
+    });
+    console.log("Database schema verified");
+
+    await retryAsync("startupDbCheck", () => logDbStartupCheck(), {
+      attempts: 4,
+      delayMs: 1500,
+    });
+
+    isReady = true;
+
+    // Prevent process from exiting - keep event loop alive
+    setImmediate(() => {
+      process.stdin.resume();
+    });
   } catch (error) {
     if (error?.code === "EADDRINUSE") {
       const alreadyRunning = await isExistingBackendHealthy();
