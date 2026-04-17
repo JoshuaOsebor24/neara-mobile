@@ -410,13 +410,13 @@ app.get("/", (req, res) => {
   res.send("Backend running");
 });
 
-app.get("/health", async (req, res) => {
-  const payload = await buildHealthPayload();
-  const statusCode = payload.status === "ok" ? 200 : 500;
-
-  res.status(statusCode).json({
-    ...payload,
-    payment_provider: payment.provider,
+app.get("/health", (req, res) => {
+  res.status(200).json({
+    pid: process.pid,
+    readiness: isReady ? "ready" : "starting",
+    status: shuttingDown ? "shutting_down" : "ok",
+    timestamp: new Date().toISOString(),
+    uptime_s: Number(process.uptime().toFixed(1)),
   });
 });
 
@@ -501,8 +501,8 @@ START SERVER
 --------------------------------
 */
 
-const PORT = appConfig.port;
-const HOST = appConfig.host;
+const PORT = Number(process.env.PORT) || appConfig.port;
+const HOST = "0.0.0.0";
 
 function validateRequiredEnv() {
   const missing = ["DATABASE_URL", "JWT_SECRET"].filter(
