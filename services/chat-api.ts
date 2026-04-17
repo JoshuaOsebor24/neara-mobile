@@ -202,6 +202,10 @@ function buildChatCacheKey(token: string, suffix: string) {
   return `${token}:${suffix}`;
 }
 
+function buildInvalidPayloadError(context: string) {
+  return `We couldn't load ${context} right now.`;
+}
+
 function cleanupChatCaches() {
   const now = Date.now();
 
@@ -256,7 +260,10 @@ export function invalidateChatCache(options?: {
   }
 
   if (options?.conversationId) {
-    const detailKey = buildChatCacheKey(token, `detail:${options.conversationId}`);
+    const detailKey = buildChatCacheKey(
+      token,
+      `detail:${options.conversationId}`,
+    );
     conversationDetailCache.delete(detailKey);
     inflightConversationDetailRequests.delete(detailKey);
   }
@@ -296,11 +303,16 @@ export async function fetchChatConversations(
   }
 
   const request = (async () => {
-    const result = await requireChatRequest<ApiEnvelope<ChatListResponse>>(`/chats?role=${role}`, {
-      method: "GET",
-      token,
-    });
-    const payload = result.ok ? unwrapEnvelope<ChatListResponse>(result.data) : null;
+    const result = await requireChatRequest<ApiEnvelope<ChatListResponse>>(
+      `/chats?role=${role}`,
+      {
+        method: "GET",
+        token,
+      },
+    );
+    const payload = result.ok
+      ? unwrapEnvelope<ChatListResponse>(result.data)
+      : null;
 
     if (!result.ok) {
       return {
@@ -312,8 +324,18 @@ export async function fetchChatConversations(
       };
     }
 
+    if (!Array.isArray(payload?.conversations)) {
+      return {
+        conversations: [] as ChatConversationSummary[],
+        error: buildInvalidPayloadError("chats"),
+        ok: false as const,
+        status: result.status,
+        url: result.url,
+      };
+    }
+
     const value = {
-      conversations: payload?.conversations ?? [],
+      conversations: payload.conversations,
       ok: true as const,
       status: result.status,
       url: result.url,
@@ -361,7 +383,9 @@ export async function fetchStoreChatPreview(token: string, storeId: string) {
         token,
       },
     );
-    const payload = result.ok ? unwrapEnvelope<ChatPreviewResponse>(result.data) : null;
+    const payload = result.ok
+      ? unwrapEnvelope<ChatPreviewResponse>(result.data)
+      : null;
 
     if (!result.ok) {
       return {
@@ -401,7 +425,10 @@ export async function fetchStoreChatPreview(token: string, storeId: string) {
   }
 }
 
-export async function fetchChatConversation(token: string, conversationId: string) {
+export async function fetchChatConversation(
+  token: string,
+  conversationId: string,
+) {
   cleanupChatCaches();
   const cacheKey = buildChatCacheKey(token, `detail:${conversationId}`);
   const cached = conversationDetailCache.get(cacheKey);
@@ -424,12 +451,16 @@ export async function fetchChatConversation(token: string, conversationId: strin
         token,
       },
     );
-    const payload = result.ok ? unwrapEnvelope<ChatDetailResponse>(result.data) : null;
+    const payload = result.ok
+      ? unwrapEnvelope<ChatDetailResponse>(result.data)
+      : null;
 
     if (!result.ok || !payload?.conversation) {
       return {
         conversation: null,
-        error: result.ok ? "Could not load this conversation." : result.error,
+        error: result.ok
+          ? "We couldn't open this conversation right now."
+          : result.error,
         ok: false as const,
         status: result.status,
         url: result.url,
@@ -475,16 +506,20 @@ export async function sendStoreChatMessage(
       token,
     },
   );
-  const payload = result.ok ? unwrapEnvelope<ChatSendResponse>(result.data) : null;
+  const payload = result.ok
+    ? unwrapEnvelope<ChatSendResponse>(result.data)
+    : null;
 
   if (!result.ok || !payload?.conversation) {
     return {
       conversation: null,
-      error: result.ok ? "Could not send this message." : result.error,
+      error: result.ok
+        ? "We couldn't send your message right now."
+        : result.error,
       ok: false as const,
       status: result.status,
       url: result.url,
-      user: result.ok ? payload?.user ?? null : null,
+      user: result.ok ? (payload?.user ?? null) : null,
     };
   }
 
@@ -515,16 +550,20 @@ export async function sendConversationChatMessage(
       token,
     },
   );
-  const payload = result.ok ? unwrapEnvelope<ChatSendResponse>(result.data) : null;
+  const payload = result.ok
+    ? unwrapEnvelope<ChatSendResponse>(result.data)
+    : null;
 
   if (!result.ok || !payload?.conversation) {
     return {
       conversation: null,
-      error: result.ok ? "Could not send this reply." : result.error,
+      error: result.ok
+        ? "We couldn't send your reply right now."
+        : result.error,
       ok: false as const,
       status: result.status,
       url: result.url,
-      user: result.ok ? payload?.user ?? null : null,
+      user: result.ok ? (payload?.user ?? null) : null,
     };
   }
 
@@ -542,7 +581,10 @@ export async function sendConversationChatMessage(
   };
 }
 
-export async function markConversationRead(token: string, conversationId: string) {
+export async function markConversationRead(
+  token: string,
+  conversationId: string,
+) {
   const result = await requireChatRequest<ApiEnvelope<ChatDetailResponse>>(
     `/chats/${conversationId}/read`,
     {
@@ -550,12 +592,16 @@ export async function markConversationRead(token: string, conversationId: string
       token,
     },
   );
-  const payload = result.ok ? unwrapEnvelope<ChatDetailResponse>(result.data) : null;
+  const payload = result.ok
+    ? unwrapEnvelope<ChatDetailResponse>(result.data)
+    : null;
 
   if (!result.ok || !payload?.conversation) {
     return {
       conversation: null,
-      error: result.ok ? "Could not update this conversation." : result.error,
+      error: result.ok
+        ? "We couldn't refresh this conversation right now."
+        : result.error,
       ok: false as const,
       status: result.status,
       url: result.url,

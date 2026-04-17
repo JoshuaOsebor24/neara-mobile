@@ -1,10 +1,5 @@
-import {
-  Pressable,
-  StyleSheet,
-  TextInput,
-  View,
-} from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { Pressable, StyleSheet, TextInput, View } from "react-native";
 
 import { theme } from "@/constants/theme";
 
@@ -50,7 +45,11 @@ export function ChatInputBar({
           ]}
         >
           <Ionicons
-            color={sendDisabled ? theme.colors.mutedText : theme.colors.primaryTextOnAccent}
+            color={
+              sendDisabled
+                ? theme.colors.mutedText
+                : theme.colors.primaryTextOnAccent
+            }
             name={isSending ? "time-outline" : "send"}
             size={18}
           />
@@ -62,26 +61,29 @@ export function ChatInputBar({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: "rgba(8, 12, 24, 0.98)",
-    borderTopColor: theme.colors.borderSoft,
-    borderTopWidth: 1,
+    backgroundColor: "transparent",
     paddingBottom: theme.spacing.screenBottom,
-    paddingHorizontal: theme.spacing.screenHorizontal,
-    paddingTop: 10,
+    paddingHorizontal: 14,
+    paddingTop: 12,
   },
   wrapper: {
     alignItems: "flex-end",
-    backgroundColor: theme.colors.surfaceElevated,
-    borderColor: theme.colors.border,
-    borderRadius: 28,
+    backgroundColor: "rgba(16, 24, 41, 0.98)",
+    borderColor: "rgba(255,255,255,0.08)",
+    borderRadius: 26,
     borderWidth: 1,
     flexDirection: "row",
     paddingHorizontal: 10,
-    paddingVertical: 8,
+    paddingVertical: 9,
+    shadowColor: theme.colors.shadow,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.18,
+    shadowRadius: 18,
+    elevation: 8,
   },
   wrapperActive: {
-    borderColor: "rgba(96,143,255,0.28)",
-    backgroundColor: "rgba(18, 28, 47, 1)",
+    borderColor: "rgba(96,143,255,0.30)",
+    backgroundColor: "rgba(18, 29, 49, 1)",
   },
   input: {
     color: theme.colors.text,
@@ -90,7 +92,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginRight: 10,
     maxHeight: 100,
-    minHeight: 24,
+    minHeight: 26,
     paddingBottom: 10,
     paddingLeft: 8,
     paddingRight: 0,
@@ -98,12 +100,11 @@ const styles = StyleSheet.create({
   },
   sendButton: {
     alignItems: "center",
-    backgroundColor: "rgba(74,136,255,0.22)",
+    backgroundColor: "rgba(74,136,255,0.20)",
     borderRadius: 22,
     justifyContent: "center",
     height: 44,
     width: 44,
-    ...theme.shadows.soft,
   },
   sendButtonActive: {
     backgroundColor: theme.colors.accent,

@@ -1,12 +1,7 @@
+import { AppBackground } from "@/components/ui/app-background";
 import { BackPillButton } from "@/components/ui/back-pill-button";
 import { ChatInputBar } from "@/components/ui/chat-input-bar";
-import Ionicons from "@expo/vector-icons/Ionicons";
-import { LinearGradient } from "expo-linear-gradient";
-import {
-  ErrorCard,
-  LoadingCard,
-  SkeletonCard,
-} from "@/components/ux-state";
+import { ErrorCard, LoadingCard, SkeletonCard } from "@/components/ux-state";
 import { theme } from "@/constants/theme";
 import { buildSessionPatchFromAuthUser } from "@/services/auth-api";
 import {
@@ -30,19 +25,21 @@ import {
   NEARA_FREE_LIMIT_REACHED,
   NEARA_ONE_FREE_MESSAGE_LEFT,
 } from "@/services/role-access";
+import Ionicons from "@expo/vector-icons/Ionicons";
+import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Dimensions,
   KeyboardAvoidingView,
   Platform,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 const { width } = Dimensions.get("window");
 
@@ -212,6 +209,7 @@ export default function ChatThreadScreen() {
               url: result.url,
             });
           }
+
           if (result.status === 401) {
             router.replace("/login");
             return;
@@ -256,6 +254,7 @@ export default function ChatThreadScreen() {
             url: result.url,
           });
         }
+
         if (result.status === 401) {
           router.replace("/login");
           return;
@@ -354,6 +353,7 @@ export default function ChatThreadScreen() {
           url: result.url,
         });
       }
+
       if (result.status === 401) {
         router.replace("/login");
         return;
@@ -457,11 +457,10 @@ export default function ChatThreadScreen() {
   };
 
   const title = storeName || "Chat";
-  const subtitle = conversation?.messages?.length
-    ? "Online"
-    : "Responds fast";
+  const subtitle = conversation?.messages?.length ? "Online" : "Responds fast";
   const messages = conversation?.messages ?? [];
-  const hasDraftPreview = !conversationId && !messages.length && Boolean(draft.trim());
+  const hasDraftPreview =
+    !conversationId && !messages.length && Boolean(draft.trim());
   const renderedMessages = [
     ...messages,
     ...optimisticMessages.filter(
@@ -472,250 +471,303 @@ export default function ChatThreadScreen() {
   const threadTitle = storeName || "Store";
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView edges={["top"]} style={styles.container}>
+      <AppBackground />
       <KeyboardAvoidingView
         style={styles.keyboardAvoidingView}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <BackPillButton fallbackHref="/(tabs)/chats" />
-          <TouchableOpacity
-            activeOpacity={0.85}
-            onPress={() => router.push(`/store/${storeId}`)}
-            style={styles.headerContentButton}
-          >
-            <View style={styles.headerAvatar}>
-              <Text style={styles.headerAvatarText}>
-                {buildStoreInitial(threadTitle)}
-              </Text>
+        <View style={styles.page}>
+          <View style={styles.headerWrap}>
+            <View style={styles.headerTopRow}>
+              <BackPillButton fallbackHref="/(tabs)/chats" />
             </View>
-            <View style={styles.headerContent}>
-              <Text numberOfLines={1} style={styles.headerTitle}>
-                {title}
-              </Text>
-              <Text style={styles.headerSubtitle}>{subtitle}</Text>
-            </View>
-            <Ionicons color="#7F8EAD" name="chevron-forward" size={16} />
-          </TouchableOpacity>
-        </View>
 
-        {/* Messages */}
-        <View style={styles.threadWrap}>
-          <LinearGradient
-            colors={[
-              "rgba(10,15,31,0.96)",
-              "rgba(8,12,24,1)",
-              "rgba(4, 10, 20, 1)",
-            ]}
-            pointerEvents="none"
-            style={StyleSheet.absoluteFillObject}
-          />
-          <ScrollView
-            ref={scrollViewRef}
-            style={styles.messagesContainer}
-            contentContainerStyle={[
-              styles.messagesContent,
-              !renderedMessages.length && styles.messagesContentEmpty,
-            ]}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-          >
-            {productPrompt ? (
-              <View style={styles.contextCard}>
-                <Text style={styles.contextLabel}>About</Text>
-                <Text style={styles.contextValue}>
-                  {variantPrompt ? `${productPrompt} (${variantPrompt})` : productPrompt}
-                </Text>
-                {pricePrompt ? (
-                  <Text style={styles.contextMeta}>Price: {pricePrompt}</Text>
-                ) : null}
-              </View>
-            ) : null}
-            {isLoading ? (
-              <View style={styles.stateWrap}>
-                <LoadingCard
-                  message="Loading conversation"
-                  detail="Fetching the latest messages."
-                />
-                <SkeletonCard height={72} />
-                <SkeletonCard height={64} />
-              </View>
-            ) : null}
-            {!isLoading && errorMessage ? (
-              <View style={styles.stateWrap}>
-                <ErrorCard title="Chat unavailable" detail={errorMessage} />
-              </View>
-            ) : null}
-            {!isLoading && !errorMessage && !session.isPro && quotaNotice ? (
-              <View style={styles.noticeCard}>
-                <Text style={styles.noticeTitle}>Free chat limit</Text>
-                <Text style={styles.noticeText}>{quotaNotice}</Text>
-              </View>
-            ) : null}
-            {!isLoading &&
-            !errorMessage &&
-            !session.isPro &&
-            !quotaNotice &&
-            freeMessagesRemaining === 2 ? (
-              <View style={styles.noticeCard}>
-                <Text style={styles.noticeTitle}>Free chat limit</Text>
-                <Text style={styles.noticeText}>
-                  Free users have {NEARA_FREE_CHAT_LIMIT} total free messages.
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => router.push(`/store/${storeId}`)}
+              style={styles.headerCard}
+            >
+              <LinearGradient
+                colors={[
+                  "rgba(84, 140, 255, 0.22)",
+                  "rgba(22, 34, 58, 0.92)",
+                  "rgba(12, 18, 34, 0.96)",
+                ]}
+                pointerEvents="none"
+                style={StyleSheet.absoluteFillObject}
+              />
+              <View style={styles.headerAvatar}>
+                <Text style={styles.headerAvatarText}>
+                  {buildStoreInitial(threadTitle)}
                 </Text>
               </View>
-            ) : null}
-            {!isLoading && !errorMessage && !renderedMessages.length ? (
-              <View style={styles.emptyThreadSpacer}>
-                <Text style={styles.emptyThreadLabel}>
-                  Messages with {title} will appear here
+              <View style={styles.headerContent}>
+                <Text style={styles.headerEyebrow}>Chat</Text>
+                <Text numberOfLines={1} style={styles.headerTitle}>
+                  {title}
+                </Text>
+                <Text numberOfLines={1} style={styles.headerSubtitle}>
+                  {subtitle}
                 </Text>
               </View>
-            ) : null}
-            {renderedMessages.map((message: ChatMessage | DraftBubble, index) => {
-              const isOwn = String(message.sender_id) === session.id;
-              const previousMessage =
-                index > 0 ? renderedMessages[index - 1] : null;
-              const nextMessage =
-                index < renderedMessages.length - 1
-                  ? renderedMessages[index + 1]
-                  : null;
-              const startsNewDay =
-                !previousMessage ||
-                !isSameDay(previousMessage.created_at, message.created_at);
-              const isGroupedWithPrevious =
-                previousMessage &&
-                String(previousMessage.sender_id) === String(message.sender_id) &&
-                isSameDay(previousMessage.created_at, message.created_at);
-              const endsGroup =
-                !nextMessage ||
-                String(nextMessage.sender_id) !== String(message.sender_id) ||
-                !isSameDay(nextMessage.created_at, message.created_at);
-              const hasLaterIncomingMessage = renderedMessages
-                .slice(index + 1)
-                .some(
-                  (nextItem) =>
-                    String(nextItem.sender_id) !== String(message.sender_id),
-                );
-              const ownStatus =
-                "pending" in message && message.pending
-                  ? "sending"
-                  : hasLaterIncomingMessage
-                    ? "read"
-                    : index === renderedMessages.length - 1 && isOwn
-                      ? "delivered"
-                      : "sent";
+              <View style={styles.headerChevronWrap}>
+                <Ionicons color="#A9C7FF" name="storefront-outline" size={18} />
+                <Ionicons color="#7F8EAD" name="chevron-forward" size={16} />
+              </View>
+            </TouchableOpacity>
+          </View>
 
-              return (
-                <View key={message.id}>
-                  {startsNewDay ? (
-                    <View style={styles.dateSeparatorWrap}>
-                      <View style={styles.dateSeparatorLine} />
-                      <Text style={styles.dateSeparatorText}>
-                        {formatDayLabel(message.created_at)}
-                      </Text>
-                      <View style={styles.dateSeparatorLine} />
-                    </View>
+          <View style={styles.threadShell}>
+            <LinearGradient
+              colors={[
+                "rgba(10,15,31,0.96)",
+                "rgba(8,12,24,0.98)",
+                "rgba(4,10,20,1)",
+              ]}
+              pointerEvents="none"
+              style={StyleSheet.absoluteFillObject}
+            />
+            <View style={styles.threadTopGlow} />
+
+            <ScrollView
+              ref={scrollViewRef}
+              style={styles.messagesContainer}
+              contentContainerStyle={[
+                styles.messagesContent,
+                !renderedMessages.length && styles.messagesContentEmpty,
+              ]}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              {productPrompt ? (
+                <View style={styles.contextCard}>
+                  <Text style={styles.contextLabel}>Request</Text>
+                  <Text style={styles.contextValue}>
+                    {variantPrompt
+                      ? `${productPrompt} (${variantPrompt})`
+                      : productPrompt}
+                  </Text>
+                  {pricePrompt ? (
+                    <Text style={styles.contextMeta}>Price: {pricePrompt}</Text>
                   ) : null}
+                </View>
+              ) : null}
+
+              {isLoading ? (
+                <View style={styles.stateWrap}>
+                  <LoadingCard
+                    message="Loading conversation"
+                    detail="Fetching messages."
+                  />
+                  <SkeletonCard height={72} />
+                  <SkeletonCard height={64} />
+                </View>
+              ) : null}
+
+              {!isLoading && errorMessage ? (
+                <View style={styles.stateWrap}>
+                  <View style={styles.errorCardWrap}>
+                    <ErrorCard
+                      title="Messages are paused"
+                      detail={errorMessage}
+                    />
+                  </View>
+                </View>
+              ) : null}
+
+              {!isLoading && !errorMessage && !session.isPro && quotaNotice ? (
+                <View style={styles.noticeCard}>
+                  <Text style={styles.noticeTitle}>Free limit</Text>
+                  <Text style={styles.noticeText}>{quotaNotice}</Text>
+                </View>
+              ) : null}
+
+              {!isLoading &&
+              !errorMessage &&
+              !session.isPro &&
+              !quotaNotice &&
+              freeMessagesRemaining === 2 ? (
+                <View style={styles.noticeCard}>
+                  <Text style={styles.noticeTitle}>Free limit</Text>
+                  <Text style={styles.noticeText}>2 free messages left.</Text>
+                </View>
+              ) : null}
+
+              {!isLoading && !errorMessage && !renderedMessages.length ? (
+                <View style={styles.emptyThreadState}>
+                  <View style={styles.emptyThreadCard}>
+                    <Text style={styles.emptyThreadEyebrow}>Conversation</Text>
+                    <Text style={styles.emptyThreadTitle}>Start chat</Text>
+                    <Text style={styles.emptyThreadLabel}>
+                      Ask about price, stock, or delivery.
+                    </Text>
+                  </View>
+                </View>
+              ) : null}
+
+              {renderedMessages.map(
+                (message: ChatMessage | DraftBubble, index) => {
+                  const isOwn = String(message.sender_id) === session.id;
+                  const previousMessage =
+                    index > 0 ? renderedMessages[index - 1] : null;
+                  const nextMessage =
+                    index < renderedMessages.length - 1
+                      ? renderedMessages[index + 1]
+                      : null;
+                  const startsNewDay =
+                    !previousMessage ||
+                    !isSameDay(previousMessage.created_at, message.created_at);
+                  const isGroupedWithPrevious =
+                    previousMessage &&
+                    String(previousMessage.sender_id) ===
+                      String(message.sender_id) &&
+                    isSameDay(previousMessage.created_at, message.created_at);
+                  const endsGroup =
+                    !nextMessage ||
+                    String(nextMessage.sender_id) !==
+                      String(message.sender_id) ||
+                    !isSameDay(nextMessage.created_at, message.created_at);
+                  const hasLaterIncomingMessage = renderedMessages
+                    .slice(index + 1)
+                    .some(
+                      (nextItem) =>
+                        String(nextItem.sender_id) !==
+                        String(message.sender_id),
+                    );
+                  const ownStatus =
+                    "pending" in message && message.pending
+                      ? "sending"
+                      : hasLaterIncomingMessage
+                        ? "read"
+                        : index === renderedMessages.length - 1 && isOwn
+                          ? "delivered"
+                          : "sent";
+
+                  return (
+                    <View key={message.id}>
+                      {startsNewDay ? (
+                        <View style={styles.dateSeparatorWrap}>
+                          <View style={styles.dateSeparatorLine} />
+                          <Text style={styles.dateSeparatorText}>
+                            {formatDayLabel(message.created_at)}
+                          </Text>
+                          <View style={styles.dateSeparatorLine} />
+                        </View>
+                      ) : null}
+                      <View
+                        style={
+                          isOwn ? styles.messageRowOwn : styles.messageRowOther
+                        }
+                      >
+                        <View
+                          style={[
+                            styles.messageBubble,
+                            isOwn ? styles.ownMessage : styles.otherMessage,
+                            isGroupedWithPrevious
+                              ? styles.messageBubbleGrouped
+                              : null,
+                            "pending" in message &&
+                              message.pending &&
+                              styles.pendingMessage,
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.messageText,
+                              isOwn
+                                ? styles.ownMessageText
+                                : styles.otherMessageText,
+                            ]}
+                          >
+                            {message.text}
+                          </Text>
+                          {endsGroup ? (
+                            <View style={styles.messageMetaRow}>
+                              {!isOwn ? (
+                                <Text style={styles.otherMessageTime}>
+                                  {formatTime(message.created_at)}
+                                </Text>
+                              ) : (
+                                <>
+                                  <Text style={styles.ownMessageTime}>
+                                    {formatTime(message.created_at)}
+                                  </Text>
+                                  <View style={styles.messageStatusWrap}>
+                                    {ownStatus === "sending" ? (
+                                      <Ionicons
+                                        color="rgba(191,219,254,0.8)"
+                                        name="time-outline"
+                                        size={12}
+                                      />
+                                    ) : ownStatus === "read" ? (
+                                      <Ionicons
+                                        color="#4A88FF"
+                                        name="checkmark-done"
+                                        size={13}
+                                      />
+                                    ) : ownStatus === "delivered" ? (
+                                      <Ionicons
+                                        color="rgba(191,219,254,0.84)"
+                                        name="checkmark-done"
+                                        size={13}
+                                      />
+                                    ) : (
+                                      <Ionicons
+                                        color="rgba(191,219,254,0.84)"
+                                        name="checkmark"
+                                        size={12}
+                                      />
+                                    )}
+                                  </View>
+                                </>
+                              )}
+                            </View>
+                          ) : null}
+                        </View>
+                      </View>
+                    </View>
+                  );
+                },
+              )}
+
+              {!isLoading && !errorMessage && hasDraftPreview ? (
+                <View style={styles.messageRowOwn}>
                   <View
                     style={[
                       styles.messageBubble,
-                      isOwn ? styles.ownMessage : styles.otherMessage,
-                      isGroupedWithPrevious
-                        ? styles.messageBubbleGrouped
-                        : null,
-                      "pending" in message &&
-                        message.pending &&
-                        styles.pendingMessage,
+                      styles.ownMessage,
+                      styles.draftPreviewBubble,
                     ]}
                   >
-                    <Text
-                      style={[
-                        styles.messageText,
-                        isOwn ? styles.ownMessageText : styles.otherMessageText,
-                      ]}
-                    >
-                      {message.text}
+                    <Text style={[styles.messageText, styles.ownMessageText]}>
+                      {draft.trim()}
                     </Text>
-                    {endsGroup ? (
-                      <View style={styles.messageMetaRow}>
-                        {!isOwn ? (
-                          <Text style={styles.otherMessageTime}>
-                            {formatTime(message.created_at)}
-                          </Text>
-                        ) : (
-                          <>
-                            <Text style={styles.ownMessageTime}>
-                              {formatTime(message.created_at)}
-                            </Text>
-                            <View style={styles.messageStatusWrap}>
-                              {ownStatus === "sending" ? (
-                                <Ionicons
-                                  color="rgba(191,219,254,0.8)"
-                                  name="time-outline"
-                                  size={12}
-                                />
-                              ) : ownStatus === "read" ? (
-                                <Ionicons
-                                  color="#4A88FF"
-                                  name="checkmark-done"
-                                  size={13}
-                                />
-                              ) : ownStatus === "delivered" ? (
-                                <Ionicons
-                                  color="rgba(191,219,254,0.84)"
-                                  name="checkmark-done"
-                                  size={13}
-                                />
-                              ) : (
-                                <Ionicons
-                                  color="rgba(191,219,254,0.84)"
-                                  name="checkmark"
-                                  size={12}
-                                />
-                              )}
-                            </View>
-                          </>
-                        )}
-                      </View>
-                    ) : null}
+                    <View style={styles.messageMetaRow}>
+                      <Text style={styles.ownMessageTime}>Draft</Text>
+                      <Ionicons
+                        color="rgba(191,219,254,0.72)"
+                        name="create-outline"
+                        size={12}
+                      />
+                    </View>
                   </View>
                 </View>
-              );
-            })}
-            {!isLoading && !errorMessage && hasDraftPreview ? (
-              <View
-                style={[
-                  styles.messageBubble,
-                  styles.ownMessage,
-                  styles.draftPreviewBubble,
-                ]}
-              >
-                <Text style={[styles.messageText, styles.ownMessageText]}>
-                  {draft.trim()}
-                </Text>
-                <View style={styles.messageMetaRow}>
-                  <Text style={styles.ownMessageTime}>Draft</Text>
-                  <Ionicons
-                    color="rgba(191,219,254,0.72)"
-                    name="create-outline"
-                    size={12}
-                  />
-                </View>
-              </View>
-            ) : null}
-          </ScrollView>
-        </View>
+              ) : null}
+            </ScrollView>
+          </View>
 
-        {/* Input */}
-        <ChatInputBar
-          isSending={isSending}
-          onChangeText={setDraft}
-          onSend={handleSend}
-          placeholder={`Message ${title}...`}
-          value={draft}
-        />
+          <View style={styles.composerDock}>
+            <ChatInputBar
+              isSending={isSending}
+              onChangeText={setDraft}
+              onSend={handleSend}
+              placeholder={`Message ${title}...`}
+              value={draft}
+            />
+          </View>
+        </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -729,89 +781,156 @@ const styles = StyleSheet.create({
   keyboardAvoidingView: {
     flex: 1,
   },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: theme.spacing.screenHorizontal,
-    paddingTop: theme.spacing.screenTop + 4,
-    paddingBottom: 18,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.borderSoft,
-    backgroundColor: theme.colors.surfaceCard,
-  },
-  headerContentButton: {
-    alignItems: "center",
+  page: {
     flex: 1,
-    flexDirection: "row",
+    paddingHorizontal: 16,
+    paddingTop: 6,
+    paddingBottom: 12,
+  },
+  headerWrap: {
     gap: 12,
-    marginLeft: 12,
+    marginBottom: 12,
+  },
+  headerTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-start",
+  },
+  headerCard: {
+    overflow: "hidden",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
+    backgroundColor: "rgba(12,18,34,0.9)",
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    shadowColor: theme.colors.shadow,
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.24,
+    shadowRadius: 24,
+    elevation: 10,
   },
   headerAvatar: {
     alignItems: "center",
     backgroundColor: "rgba(74,136,255,0.16)",
-    borderColor: "rgba(74,136,255,0.22)",
-    borderRadius: 22,
+    borderColor: "rgba(140,190,255,0.24)",
+    borderRadius: 24,
     borderWidth: 1,
-    height: 44,
+    height: 48,
     justifyContent: "center",
-    width: 44,
+    width: 48,
   },
   headerAvatarText: {
     color: theme.colors.text,
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "800",
   },
   headerContent: {
     flex: 1,
+    minWidth: 0,
+  },
+  headerEyebrow: {
+    color: "#A9C7FF",
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 1.2,
+    textTransform: "uppercase",
+    marginBottom: 4,
   },
   headerTitle: {
-    fontSize: 21,
+    fontSize: 22,
     fontWeight: "800",
     color: theme.colors.text,
-    marginBottom: 3,
   },
   headerSubtitle: {
     fontSize: 13,
-    color: "#D9E4FF",
-    fontWeight: "600",
+    color: theme.colors.subduedText,
+    fontWeight: "700",
+    marginTop: 4,
   },
-  threadWrap: {
+  headerChevronWrap: {
+    alignItems: "center",
+    gap: 8,
+  },
+  threadShell: {
     flex: 1,
+    overflow: "hidden",
+    borderRadius: 30,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(7,12,24,0.88)",
+  },
+  threadTopGlow: {
+    position: "absolute",
+    top: -90,
+    right: -40,
+    width: 220,
+    height: 220,
+    borderRadius: 999,
+    backgroundColor: "rgba(74,136,255,0.12)",
   },
   messagesContainer: {
     flex: 1,
-    paddingHorizontal: theme.spacing.screenHorizontal,
+    paddingHorizontal: 14,
     backgroundColor: "transparent",
   },
   messagesContent: {
     flexGrow: 1,
     paddingTop: 18,
-    paddingBottom: 18,
+    paddingBottom: 24,
   },
   messagesContentEmpty: {
-    justifyContent: "flex-end",
+    justifyContent: "center",
   },
   stateWrap: {
     gap: 12,
-    paddingVertical: 12,
+    paddingVertical: 16,
   },
-  emptyThreadSpacer: {
+  errorCardWrap: {
+    borderRadius: 22,
+    overflow: "hidden",
+  },
+  emptyThreadState: {
     flex: 1,
-    justifyContent: "flex-end",
-    paddingBottom: 8,
+    justifyContent: "center",
+    paddingVertical: 24,
+  },
+  emptyThreadCard: {
+    alignSelf: "stretch",
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(13,20,36,0.88)",
+    paddingHorizontal: 18,
+    paddingVertical: 20,
+    gap: 8,
+  },
+  emptyThreadEyebrow: {
+    color: "#A9C7FF",
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 1.1,
+    textTransform: "uppercase",
+  },
+  emptyThreadTitle: {
+    color: theme.colors.text,
+    fontSize: 20,
+    fontWeight: "800",
   },
   emptyThreadLabel: {
-    alignSelf: "center",
     color: theme.colors.mutedText,
-    fontSize: 13,
-    paddingVertical: 12,
+    fontSize: 14,
+    lineHeight: 21,
   },
   noticeCard: {
-    backgroundColor: "rgba(120,163,255,0.08)",
-    borderColor: "rgba(120,163,255,0.18)",
-    borderRadius: 18,
+    backgroundColor: "rgba(74,136,255,0.09)",
+    borderColor: "rgba(120,163,255,0.20)",
+    borderRadius: 20,
     borderWidth: 1,
-    marginBottom: 14,
+    marginBottom: 16,
     paddingHorizontal: 16,
     paddingVertical: 14,
   },
@@ -829,20 +948,19 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   contextCard: {
-    alignSelf: "flex-start",
-    backgroundColor: theme.colors.surfaceOverlay,
-    borderColor: theme.colors.borderSoft,
-    borderRadius: 16,
+    alignSelf: "stretch",
+    backgroundColor: "rgba(17,26,45,0.9)",
+    borderColor: "rgba(255,255,255,0.08)",
+    borderRadius: 20,
     borderWidth: 1,
     marginBottom: 18,
-    maxWidth: width * 0.82,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
   },
   contextLabel: {
-    color: "#D9E4FF",
+    color: "#A9C7FF",
     fontSize: 11,
-    fontWeight: "700",
+    fontWeight: "800",
     letterSpacing: 1.2,
     textTransform: "uppercase",
   },
@@ -863,7 +981,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 10,
     marginBottom: 14,
-    marginTop: 6,
+    marginTop: 10,
   },
   dateSeparatorLine: {
     backgroundColor: "rgba(148,163,184,0.14)",
@@ -874,6 +992,12 @@ const styles = StyleSheet.create({
     color: theme.colors.mutedText,
     fontSize: 12,
     fontWeight: "700",
+  },
+  messageRowOwn: {
+    alignItems: "flex-end",
+  },
+  messageRowOther: {
+    alignItems: "flex-start",
   },
   messageBubble: {
     maxWidth: width * 0.72,
@@ -891,14 +1015,12 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   ownMessage: {
-    alignSelf: "flex-end",
     backgroundColor: "rgba(74,136,255,0.24)",
     borderWidth: 1,
     borderColor: "rgba(96, 165, 250, 0.3)",
     borderBottomRightRadius: 8,
   },
   otherMessage: {
-    alignSelf: "flex-start",
     backgroundColor: theme.colors.surfaceOverlay,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.1)",
@@ -932,20 +1054,25 @@ const styles = StyleSheet.create({
     gap: 4,
     marginTop: 2,
   },
-  messageTime: {
+  ownMessageTime: {
+    color: "rgba(74,136,255,0.7)",
     fontSize: 11,
     fontWeight: "500",
   },
-  ownMessageTime: {
-    color: "rgba(74,136,255,0.7)",
-  },
   otherMessageTime: {
     color: theme.colors.mutedText,
+    fontSize: 11,
+    fontWeight: "500",
   },
   messageStatusWrap: {
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "center",
     minWidth: 14,
+  },
+  composerDock: {
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.06)",
+    backgroundColor: "rgba(8, 12, 24, 0.92)",
   },
 });

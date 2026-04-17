@@ -1,17 +1,12 @@
 import { useMobileSession } from "@/services/mobile-session";
-import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import React, { useEffect } from "react";
-import {
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { SafeAreaView, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { BackPillButton } from "@/components/ui/back-pill-button";
 import { Button } from "@/components/ui/button";
+import { ScreenCard } from "@/components/ui/screen-card";
+import { theme } from "@/constants/theme";
 
 interface StorePlan {
   id: "basic" | "pro";
@@ -30,8 +25,7 @@ const STORE_PLANS: StorePlan[] = [
   {
     id: "basic",
     title: "Basic Store",
-    description:
-      "Create your store and start getting discovered by nearby customers.",
+    description: "Create your store and get discovered nearby.",
     price: "₦1,000 / month",
     dailyEquivalent: "About ₦33/day",
     features: [
@@ -42,12 +36,12 @@ const STORE_PLANS: StorePlan[] = [
     ],
     isRecommended: true,
     buttonLabel: "Start your store",
-    includesLabel: "Affordable monthly plan for getting visible fast",
+    includesLabel: "A simple monthly plan",
   },
   {
     id: "pro",
     title: "Pro Store",
-    description: "More tools for faster growth and stronger visibility.",
+    description: "More tools for growth.",
     price: "Coming soon",
     features: [
       "Boost visibility across Neara",
@@ -57,7 +51,7 @@ const STORE_PLANS: StorePlan[] = [
     isRecommended: false,
     buttonLabel: "Coming soon",
     disabled: true,
-    includesLabel: "Premium growth tools are on the way",
+    includesLabel: "Premium tools on the way",
   },
 ];
 
@@ -104,129 +98,127 @@ export default function StoreModeScreen() {
           </Text>
         </View>
       ) : null}
-      <LinearGradient
-        colors={["rgba(74,136,255,0.16)", "transparent"]}
-        start={{ x: 0.5, y: 0 }}
-        end={{ x: 0.5, y: 0.28 }}
-        style={styles.gradient}
-      />
       <ScrollView
-        style={styles.scrollView}
+        bounces={false}
+        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
-        <View style={styles.headerContainer}>
-          <BackPillButton fallbackHref="/(tabs)/profile" />
-          <Text style={styles.eyebrow}>Neara Store Mode</Text>
-          <Text style={styles.title}>Start Your Store</Text>
-          <Text style={styles.subtitle}>
-            {session.isAuthenticated
-              ? "Choose a plan that gets your store visible and brings in customers"
-              : "Log in to continue into store mode"}
-          </Text>
-          {session.isAuthenticated && hasOwnerDraft && !session.isStoreOwner ? (
-            <View style={styles.draftPill}>
-              <Text style={styles.draftPillText}>
-                Existing draft:{" "}
-                {session.primaryStoreName ||
-                  "Store details saved on this device"}
+        <View style={styles.page}>
+          <View style={styles.header}>
+            <BackPillButton fallbackHref="/(tabs)/profile" />
+            <Text style={styles.headerBrand}>Neara</Text>
+          </View>
+
+          <ScreenCard style={styles.panel}>
+            <View style={styles.headerContainer}>
+              <Text style={styles.eyebrow}>Neara Store Mode</Text>
+              <Text style={styles.title}>Start Your Store</Text>
+              <Text style={styles.subtitle}>
+                {session.isAuthenticated
+                  ? "Choose a plan to launch your store"
+                  : "Log in to continue"}
               </Text>
-            </View>
-          ) : null}
-          {session.isAuthenticated && hasOwnerDraft && !session.isStoreOwner ? (
-            <Button
-              label="Continue Store Setup"
-              onPress={() =>
-                router.push(`/store-payment?storePlan=${draftPlan}`)
-              }
-              style={styles.resumeButton}
-            />
-          ) : null}
-        </View>
-
-        {/* Plans */}
-        <View style={styles.plansContainer}>
-          {STORE_PLANS.map((plan) => (
-            <View key={plan.id} style={styles.planWrapper}>
-              <LinearGradient
-                colors={
-                  plan.isRecommended
-                    ? ["rgba(74,136,255,0.16)", "rgba(17,24,39,0.92)"]
-                    : ["rgba(255,255,255,0.05)", "rgba(255,255,255,0.02)"]
-                }
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={[
-                  styles.planCard,
-                  plan.isRecommended && styles.planCardRecommended,
-                  plan.disabled && styles.planCardDisabled,
-                ]}
-              >
-                {plan.isRecommended && (
-                  <View style={styles.recommendedBadge}>
-                    <Text style={styles.recommendedBadgeText}>
-                      Best to start
-                    </Text>
-                  </View>
-                )}
-
-                <View style={styles.planHeader}>
-                  <View>
-                    <Text style={styles.planTitle}>{plan.title}</Text>
-                    <Text style={styles.planDescription}>
-                      {plan.description}
-                    </Text>
-                  </View>
-                </View>
-
-                <View style={styles.priceSection}>
-                  <Text style={styles.price}>{plan.price}</Text>
-                  {plan.dailyEquivalent ? (
-                    <Text style={styles.dailyEquivalent}>
-                      {plan.dailyEquivalent}
-                    </Text>
-                  ) : null}
-                  {plan.includesLabel && (
-                    <Text style={styles.includesLabel}>
-                      {plan.includesLabel}
-                    </Text>
-                  )}
-                </View>
-
-                <View style={styles.featuresList}>
-                  {plan.features.map((feature, index) => (
-                    <View key={index} style={styles.featureItem}>
-                      <Text style={styles.featureCheckmark}>✓</Text>
-                      <Text style={styles.featureText}>{feature}</Text>
-                    </View>
-                  ))}
-                </View>
-
-                <Button
-                  disabled={plan.disabled}
-                  label={plan.buttonLabel}
-                  onPress={() => handleChoosePlan(plan.id)}
-                  style={[
-                    styles.button,
-                    plan.disabled && styles.buttonDisabled,
-                  ]}
-                  variant={plan.isRecommended ? "primary" : "secondary"}
-                />
-                {plan.id === "basic" ? (
-                  <Text style={styles.buttonSupportingText}>
-                    Instant setup after payment
+              {session.isAuthenticated &&
+              hasOwnerDraft &&
+              !session.isStoreOwner ? (
+                <View style={styles.draftPill}>
+                  <Text style={styles.draftPillText}>
+                    Existing draft:{" "}
+                    {session.primaryStoreName ||
+                      "Store details saved on this device"}
                   </Text>
-                ) : null}
-                {plan.id === "basic" ? (
-                  <View style={styles.planTrustRow}>
-                    <Text style={styles.planTrustText}>Secure payment</Text>
-                    <Text style={styles.planTrustDivider}>•</Text>
-                    <Text style={styles.planTrustText}>Cancel anytime</Text>
-                  </View>
-                ) : null}
-              </LinearGradient>
+                </View>
+              ) : null}
+              {session.isAuthenticated &&
+              hasOwnerDraft &&
+              !session.isStoreOwner ? (
+                <Button
+                  label="Continue Store Setup"
+                  onPress={() =>
+                    router.push(`/store-payment?storePlan=${draftPlan}`)
+                  }
+                  style={styles.resumeButton}
+                />
+              ) : null}
             </View>
-          ))}
+
+            <View style={styles.plansContainer}>
+              {STORE_PLANS.map((plan) => (
+                <View key={plan.id} style={styles.planWrapper}>
+                  <View
+                    style={[
+                      styles.planCard,
+                      plan.isRecommended && styles.planCardRecommended,
+                      plan.disabled && styles.planCardDisabled,
+                    ]}
+                  >
+                    {plan.isRecommended && (
+                      <View style={styles.recommendedBadge}>
+                        <Text style={styles.recommendedBadgeText}>
+                          Best to start
+                        </Text>
+                      </View>
+                    )}
+
+                    <View style={styles.planHeader}>
+                      <View>
+                        <Text style={styles.planTitle}>{plan.title}</Text>
+                        <Text style={styles.planDescription}>
+                          {plan.description}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.priceSection}>
+                      <Text style={styles.price}>{plan.price}</Text>
+                      {plan.dailyEquivalent ? (
+                        <Text style={styles.dailyEquivalent}>
+                          {plan.dailyEquivalent}
+                        </Text>
+                      ) : null}
+                      {plan.includesLabel && (
+                        <Text style={styles.includesLabel}>
+                          {plan.includesLabel}
+                        </Text>
+                      )}
+                    </View>
+
+                    <View style={styles.featuresList}>
+                      {plan.features.map((feature, index) => (
+                        <View key={index} style={styles.featureItem}>
+                          <Text style={styles.featureCheckmark}>✓</Text>
+                          <Text style={styles.featureText}>{feature}</Text>
+                        </View>
+                      ))}
+                    </View>
+
+                    <Button
+                      disabled={plan.disabled}
+                      label={plan.buttonLabel}
+                      onPress={() => handleChoosePlan(plan.id)}
+                      style={[
+                        styles.button,
+                        plan.disabled && styles.buttonDisabled,
+                      ]}
+                      variant={plan.isRecommended ? "primary" : "secondary"}
+                    />
+                    {plan.id === "basic" ? (
+                      <Text style={styles.buttonSupportingText}>
+                        Setup after payment
+                      </Text>
+                    ) : null}
+                    {plan.id === "basic" ? (
+                      <View style={styles.planTrustRow}>
+                        <Text style={styles.planTrustText}>Secure payment</Text>
+                        <Text style={styles.planTrustDivider}>•</Text>
+                        <Text style={styles.planTrustText}>Cancel anytime</Text>
+                      </View>
+                    ) : null}
+                  </View>
+                </View>
+              ))}
+            </View>
+          </ScreenCard>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -236,7 +228,7 @@ export default function StoreModeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#0A0F1F",
+    backgroundColor: "transparent",
   },
   loadingWrap: {
     position: "absolute",
@@ -247,7 +239,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 24,
-    backgroundColor: "#0A0F1F",
+    backgroundColor: "transparent",
     zIndex: 4,
   },
   loadingText: {
@@ -255,17 +247,28 @@ const styles = StyleSheet.create({
     color: "#CBD5E1",
     textAlign: "center",
   },
-  gradient: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 200,
-  },
-  scrollView: {
-    flex: 1,
+  scrollContent: {
     paddingHorizontal: 16,
-    paddingVertical: 24,
+    paddingTop: 8,
+    paddingBottom: 32,
+  },
+  page: {
+    width: "100%",
+  },
+  header: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 28,
+  },
+  headerBrand: {
+    color: "#B8C2D9",
+    fontSize: 12,
+    letterSpacing: 2.2,
+    textTransform: "uppercase",
+  },
+  panel: {
+    padding: 20,
   },
   headerContainer: {
     alignItems: "center",
@@ -337,16 +340,16 @@ const styles = StyleSheet.create({
   },
   plansContainer: {
     gap: 20,
-    marginBottom: 32,
   },
   planWrapper: {
     marginBottom: 4,
   },
   planCard: {
+    backgroundColor: theme.colors.surface,
     borderRadius: 24,
     padding: 20,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.1)",
+    borderColor: theme.colors.border,
   },
   planCardRecommended: {
     borderColor: "rgba(74,136,255,0.3)",

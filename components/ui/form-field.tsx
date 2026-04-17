@@ -71,7 +71,7 @@ export function FormField({
 
 const styles = StyleSheet.create({
   field: {
-    gap: 8,
+    gap: 6,
   },
   labelRow: {
     flexDirection: "row",
@@ -79,32 +79,33 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   label: {
-    color: theme.colors.mutedText,
-    fontSize: 13,
+    color: theme.form.labelColor,
+    fontSize: theme.form.labelSize,
     fontWeight: "700",
   },
   input: {
     minHeight: theme.controls.inputHeight,
-    borderRadius: theme.radius.input,
+    borderRadius: theme.form.inputRadius,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
+    borderColor: theme.form.inputBorder,
     backgroundColor: theme.form.inputBackground,
     color: theme.colors.text,
     fontSize: 15,
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingVertical: 12,
   },
   multilineInput: {
-    minHeight: 108,
+    minHeight: 112,
+    paddingTop: 12,
   },
   errorText: {
     color: theme.colors.danger,
-    fontSize: 12,
-    lineHeight: 18,
+    fontSize: 11,
+    lineHeight: 16,
   },
   hintText: {
     color: theme.colors.mutedText,
-    fontSize: 12,
-    lineHeight: 18,
+    fontSize: 11,
+    lineHeight: 16,
   },
 });

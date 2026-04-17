@@ -20,7 +20,9 @@ const HELP_CENTER_PORT = "5500";
 const HELP_CENTER_PATH = "/neara-help-center/index.html";
 
 function normalizeBaseUrl(value?: string | null) {
-  const normalized = String(value || "").trim().replace(/\/+$/, "");
+  const normalized = String(value || "")
+    .trim()
+    .replace(/\/+$/, "");
   return normalized || null;
 }
 
@@ -84,7 +86,7 @@ export default function HelpScreen() {
     } catch {
       Alert.alert(
         "Help Center unavailable",
-        "We could not open the Neara Help Center right now.",
+        "We couldn't open the Help Center right now.",
       );
     }
   };

@@ -39,9 +39,35 @@ const allowedDevOrigins = new Set([
 ]);
 const allowedConfiguredOrigins = new Set(envCors.allowedOrigins);
 
+function isValidHttpOrigin(origin) {
+  try {
+    const parsed = new URL(origin);
+    return (
+      (parsed.protocol === "http:" || parsed.protocol === "https:") &&
+      !parsed.username &&
+      !parsed.password &&
+      parsed.origin === origin
+    );
+  } catch {
+    return false;
+  }
+}
+
 function isAllowedLanOrigin(origin) {
   return /^http:\/\/(?:192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}):(\d+)$/.test(
     origin,
+  );
+}
+
+function isAllowedProductionOrigin(origin) {
+  return allowedConfiguredOrigins.has(origin);
+}
+
+function isAllowedDevelopmentOrigin(origin) {
+  return (
+    allowedConfiguredOrigins.has(origin) ||
+    allowedDevOrigins.has(origin) ||
+    isAllowedLanOrigin(origin)
   );
 }
 
@@ -50,12 +76,16 @@ const corsOptions = {
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
   origin(origin, callback) {
-    if (
-      !origin ||
-      allowedConfiguredOrigins.has(origin) ||
-      (!runtime.isProduction &&
-        (allowedDevOrigins.has(origin) || isAllowedLanOrigin(origin)))
-    ) {
+    if (!origin) {
+      callback(null, true);
+      return;
+    }
+
+    const isAllowed = runtime.isProduction
+      ? isAllowedProductionOrigin(origin)
+      : isAllowedDevelopmentOrigin(origin);
+
+    if (isAllowed) {
       callback(null, true);
       return;
     }
@@ -198,7 +228,7 @@ setInterval(() => {
 }, runtime.diagnosticsIntervalMs);
 
 // Prevent event loop from exiting - keep server alive
-const keepAlive = setInterval(() => {
+setInterval(() => {
   // This interval keeps Node.js alive
 }, 60000);
 
@@ -241,13 +271,7 @@ MIDDLEWARE
 
 // Enable CORS for local frontend development origins and handle preflight.
 app.use(cors(corsOptions));
-app.use((req, res, next) => {
-  if (req.method === "OPTIONS") {
-    return cors(corsOptions)(req, res, next);
-  }
-
-  next();
-});
+app.options(/.*/, cors(corsOptions));
 // Parse request bodies
 app.use(express.json({ limit: `${appConfig.bodyLimitMb}mb` }));
 app.use(
@@ -484,9 +508,28 @@ function validateRequiredEnv() {
   const missing = ["DATABASE_URL", "JWT_SECRET"].filter(
     (key) => !String(process.env[key] || "").trim(),
   );
+  const invalid = [];
 
   if (runtime.isProduction && allowedConfiguredOrigins.size === 0) {
     missing.push("CORS_ALLOWED_ORIGINS");
+  }
+
+  if (runtime.isProduction) {
+    if (
+      envCors.allowedOrigins.some(
+        (origin) => origin === "*" || origin.includes("*"),
+      )
+    ) {
+      invalid.push(
+        "CORS_ALLOWED_ORIGINS must not contain wildcard origins in production",
+      );
+    }
+
+    if (envCors.allowedOrigins.some((origin) => !isValidHttpOrigin(origin))) {
+      invalid.push(
+        "CORS_ALLOWED_ORIGINS must contain only valid http/https origins in production",
+      );
+    }
   }
 
   if (
@@ -509,52 +552,44 @@ function validateRequiredEnv() {
       `Missing required environment variables: ${Array.from(new Set(missing)).join(", ")}`,
     );
   }
-}
 
-async function isExistingBackendHealthy() {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 1500);
-  const probeHost =
-    HOST === "0.0.0.0" || HOST === "::" ? "127.0.0.1" : HOST;
-
-  try {
-    const response = await fetch(
-      `http://${probeHost}:${PORT}/health/live`,
-      {
-        method: "GET",
-        signal: controller.signal,
-      },
-    );
-
-    return response.ok;
-  } catch {
-    return false;
-  } finally {
-    clearTimeout(timeout);
+  if (invalid.length > 0) {
+    throw new Error(Array.from(new Set(invalid)).join("; "));
   }
 }
 
-async function isPortInUse(port, host) {
-  const net = require("net");
-  const probeHost =
-    host === "0.0.0.0" || host === "::" ? "127.0.0.1" : host;
+async function isExistingBackendHealthy() {
+  const http = require("http");
+  const probeHost = HOST === "0.0.0.0" || HOST === "::" ? "127.0.0.1" : HOST;
 
   return await new Promise((resolve) => {
-    const socket = net.createConnection({ host: probeHost, port });
+    const request = http.request(
+      {
+        host: probeHost,
+        port: PORT,
+        path: "/health/live",
+        method: "GET",
+        timeout: 1500,
+        headers: {
+          Connection: "close",
+        },
+      },
+      (response) => {
+        response.resume();
+        resolve(response.statusCode === 200);
+      },
+    );
 
-    socket.once("connect", () => {
-      socket.destroy();
-      resolve(true);
-    });
-
-    socket.once("error", () => {
+    request.once("timeout", () => {
+      request.destroy();
       resolve(false);
     });
 
-    socket.setTimeout(1000, () => {
-      socket.destroy();
+    request.once("error", () => {
       resolve(false);
     });
+
+    request.end();
   });
 }
 
@@ -599,20 +634,6 @@ async function startServer() {
       delayMs: 1500,
     });
 
-    const portAlreadyInUse = await isPortInUse(PORT, HOST);
-    if (portAlreadyInUse) {
-      const alreadyRunning = await isExistingBackendHealthy();
-
-      if (alreadyRunning) {
-        console.warn(`${SERVER_LOG_PREFIX}[already-running]`, {
-          host: HOST,
-          port: PORT,
-        });
-        process.exit(0);
-        return;
-      }
-    }
-
     server = app.listen(PORT, HOST);
     await new Promise((resolve, reject) => {
       server.once("listening", resolve);
@@ -621,8 +642,15 @@ async function startServer() {
 
     isReady = true;
     console.log(`Server running on http://${HOST}:${PORT}`);
-    console.log('PID:', process.pid);
-    
+    console.log("PID:", process.pid);
+    console.log(`${SERVER_LOG_PREFIX}[cors-policy]`, {
+      allowedOrigins: envCors.allowedOrigins,
+      host: HOST,
+      mode: runtime.isProduction ? "production" : "development",
+      allowsLanOrigins: !runtime.isProduction,
+      allowsLocalhostOrigins: !runtime.isProduction,
+    });
+
     // Prevent process from exiting - keep event loop alive
     setImmediate(() => {
       // This prevents the process from exiting when stdin is closed
@@ -634,11 +662,12 @@ async function startServer() {
 
         if (alreadyRunning) {
           console.warn(`${SERVER_LOG_PREFIX}[already-running]`, {
+            action: "exiting duplicate start",
             host: HOST,
             port: PORT,
+            reason: "healthy backend already running on requested port",
           });
           process.exit(0);
-          return;
         }
       }
 
@@ -650,6 +679,20 @@ async function startServer() {
     server.maxRequestsPerSocket = appConfig.maxRequestsPerSocket;
     server.requestTimeout = appConfig.requestTimeoutMs;
   } catch (error) {
+    if (error?.code === "EADDRINUSE") {
+      const alreadyRunning = await isExistingBackendHealthy();
+
+      if (alreadyRunning) {
+        console.warn(`${SERVER_LOG_PREFIX}[already-running]`, {
+          action: "exiting duplicate start",
+          host: HOST,
+          port: PORT,
+          reason: "healthy backend already running on requested port",
+        });
+        process.exit(0);
+      }
+    }
+
     console.error("Server startup failed", {
       message: error?.message || String(error),
       code: error?.code,

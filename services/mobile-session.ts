@@ -1,7 +1,13 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as SecureStore from "expo-secure-store";
 import { useSyncExternalStore } from "react";
+import { Platform } from "react-native";
 
-import { buildActiveRoles, getAccountType, type ActiveRole } from "@/services/role-access";
+import {
+    buildActiveRoles,
+    getAccountType,
+    type ActiveRole,
+} from "@/services/role-access";
 
 export type MobileUser = {
   accountType: ActiveRole;
@@ -56,25 +62,70 @@ const MOBILE_SESSION_STORAGE_KEY = "neara-mobile-session:v1";
 let sessionState: MobileUser = defaultUser;
 let isSessionHydrated = false;
 const listeners = new Set<() => void>();
+let sessionPersistenceTask: Promise<void> = Promise.resolve();
 
 function emit() {
   listeners.forEach((listener) => listener());
 }
 
+async function readSecureSession() {
+  try {
+    return await SecureStore.getItemAsync(MOBILE_SESSION_STORAGE_KEY);
+  } catch (error) {
+    console.warn("Failed to read secure mobile session", error);
+    return null;
+  }
+}
+
+async function writeSecureSession(value: string) {
+  try {
+    await SecureStore.setItemAsync(MOBILE_SESSION_STORAGE_KEY, value);
+  } catch (error) {
+    console.warn("Failed to write secure mobile session", error);
+  }
+}
+
+async function clearSecureSession() {
+  try {
+    await SecureStore.deleteItemAsync(MOBILE_SESSION_STORAGE_KEY);
+  } catch (error) {
+    console.warn("Failed to clear secure mobile session", error);
+  }
+}
+
 async function persistMobileSession() {
   try {
-    await AsyncStorage.setItem(
-      MOBILE_SESSION_STORAGE_KEY,
-      JSON.stringify(sessionState),
-    );
+    const serializedSession = JSON.stringify(sessionState);
+
+    if (Platform.OS === "web") {
+      await AsyncStorage.setItem(MOBILE_SESSION_STORAGE_KEY, serializedSession);
+      return;
+    }
+
+    await AsyncStorage.setItem(MOBILE_SESSION_STORAGE_KEY, serializedSession);
+    await writeSecureSession(serializedSession);
   } catch (error) {
     console.warn("Failed to persist mobile session", error);
   }
 }
 
+function enqueueSessionPersistence(task: () => Promise<void>) {
+  sessionPersistenceTask = sessionPersistenceTask
+    .catch(() => undefined)
+    .then(task);
+
+  return sessionPersistenceTask;
+}
+
 async function clearPersistedMobileSession() {
   try {
+    if (Platform.OS === "web") {
+      await AsyncStorage.removeItem(MOBILE_SESSION_STORAGE_KEY);
+      return;
+    }
+
     await AsyncStorage.removeItem(MOBILE_SESSION_STORAGE_KEY);
+    await clearSecureSession();
   } catch (error) {
     console.warn("Failed to clear mobile session", error);
   }
@@ -105,14 +156,21 @@ function sanitizeMobileSession(value: unknown): MobileUser | null {
     isAuthenticated &&
     (Boolean(parsed.isStoreOwner) ||
       hasStoreOwnerRole ||
-      (typeof parsed.primaryStoreId === "string" && Boolean(parsed.primaryStoreId.trim())));
+      (typeof parsed.primaryStoreId === "string" &&
+        Boolean(parsed.primaryStoreId.trim())));
   const roles = buildActiveRoles(isPro, isStoreOwner);
 
   return {
     accountType: getAccountType(isPro),
     authToken,
-    email: isAuthenticated && typeof parsed.email === "string" ? parsed.email : defaultUser.email,
-    id: isAuthenticated && typeof parsed.id === "string" ? parsed.id : defaultUser.id,
+    email:
+      isAuthenticated && typeof parsed.email === "string"
+        ? parsed.email
+        : defaultUser.email,
+    id:
+      isAuthenticated && typeof parsed.id === "string"
+        ? parsed.id
+        : defaultUser.id,
     isAdmin: isAuthenticated && Boolean(parsed.isAdmin),
     isAuthenticated,
     isPro,
@@ -121,9 +179,14 @@ function sanitizeMobileSession(value: unknown): MobileUser | null {
       isAuthenticated && Number.isFinite(Number(parsed.messagesSentCount))
         ? Number(parsed.messagesSentCount)
         : 0,
-    name: isAuthenticated && typeof parsed.name === "string" ? parsed.name : defaultUser.name,
+    name:
+      isAuthenticated && typeof parsed.name === "string"
+        ? parsed.name
+        : defaultUser.name,
     phoneNumber:
-      isAuthenticated && typeof parsed.phoneNumber === "string" ? parsed.phoneNumber : "",
+      isAuthenticated && typeof parsed.phoneNumber === "string"
+        ? parsed.phoneNumber
+        : "",
     primaryStoreAddress:
       isAuthenticated && typeof parsed.primaryStoreAddress === "string"
         ? parsed.primaryStoreAddress
@@ -133,7 +196,9 @@ function sanitizeMobileSession(value: unknown): MobileUser | null {
         ? parsed.primaryStoreCategory
         : "",
     primaryStoreId:
-      isAuthenticated && typeof parsed.primaryStoreId === "string" && parsed.primaryStoreId.trim()
+      isAuthenticated &&
+      typeof parsed.primaryStoreId === "string" &&
+      parsed.primaryStoreId.trim()
         ? parsed.primaryStoreId
         : null,
     primaryStoreImageUrl:
@@ -171,7 +236,8 @@ export function updateMobileSession(next: Partial<MobileUser>) {
     ...next,
   }) ?? { ...defaultUser };
   emit();
-  void persistMobileSession();
+
+  return enqueueSessionPersistence(() => persistMobileSession());
 }
 
 export function resetMobileSession() {
@@ -179,7 +245,8 @@ export function resetMobileSession() {
     ...defaultUser,
   };
   emit();
-  void clearPersistedMobileSession();
+
+  return enqueueSessionPersistence(() => clearPersistedMobileSession());
 }
 
 export function useMobileSession() {
@@ -214,7 +281,20 @@ export async function hydrateMobileSession() {
   }
 
   try {
-    const storedValue = await AsyncStorage.getItem(MOBILE_SESSION_STORAGE_KEY);
+    let storedValue: string | null = null;
+
+    if (Platform.OS === "web") {
+      storedValue = await AsyncStorage.getItem(MOBILE_SESSION_STORAGE_KEY);
+    } else {
+      const asyncValue = await AsyncStorage.getItem(MOBILE_SESSION_STORAGE_KEY);
+      const secureValue = await readSecureSession();
+
+      storedValue = secureValue || asyncValue;
+
+      if (storedValue && secureValue !== storedValue) {
+        await writeSecureSession(storedValue);
+      }
+    }
 
     if (storedValue) {
       const parsed = JSON.parse(storedValue) as unknown;

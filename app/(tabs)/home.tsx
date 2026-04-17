@@ -4,6 +4,7 @@ import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
+  Easing,
   KeyboardAvoidingView,
   PanResponder,
   Platform,
@@ -23,6 +24,10 @@ import {
 import { NearaMapView } from "@/components/map/MapView";
 import { useDrawer } from "@/components/navigation/drawer-provider";
 import { SavedStoreSkeleton } from "@/components/saved/saved-store-skeleton";
+import {
+  SearchResultCard,
+  type SearchResultCardVariant,
+} from "@/components/search/search-result-card";
 import { AppImage } from "@/components/ui/app-image";
 import { PremiumBadge } from "@/components/ui/premium-badge";
 import { SearchInput } from "@/components/ui/search-input";
@@ -38,6 +43,7 @@ import {
   useRecentStores,
 } from "@/services/saved-stores";
 import {
+  groupSearchResultCards,
   loadSearchResults,
   type SearchResultRecord,
 } from "@/services/search-data";
@@ -47,21 +53,6 @@ import {
 } from "@/services/store-data";
 
 type HomePreviewResult = SearchResultRecord;
-
-type HomePreviewCard = {
-  distance: string;
-  distanceKm: number | null;
-  id: string;
-  image?: string | null;
-  productName: string;
-  storeId: string;
-  storeName: string;
-  variants: {
-    id: string;
-    label: string;
-    price: number | null;
-  }[];
-};
 
 type HomeStoreCard = StoreListItem;
 
@@ -76,70 +67,6 @@ type SelectedMapStore = {
 function buildStoreInitial(name: string) {
   const trimmed = name.trim();
   return trimmed ? trimmed.charAt(0).toUpperCase() : "N";
-}
-
-function groupPreviewResults(items: HomePreviewResult[]) {
-  const groups = new Map<string, HomePreviewCard>();
-
-  items.forEach((item) => {
-    const isStoreMatch = item.kind === "store";
-    const key = isStoreMatch
-      ? `${item.storeId}::store`
-      : item.productId
-        ? `${item.storeId}::${item.productId}`
-        : `${item.storeId}::${item.productName.trim().toLowerCase()}`;
-    const existing = groups.get(key);
-
-    if (!existing) {
-      groups.set(key, {
-        distance: item.distance,
-        distanceKm: item.distanceKm,
-        id: key,
-        image: item.image || null,
-        productName: item.productName || "Store match",
-        storeId: item.storeId,
-        storeName: item.storeName,
-        variants: isStoreMatch
-          ? []
-          : [
-              {
-                id: item.id,
-                label: item.variant || "Product details available in store",
-                price: item.price,
-              },
-            ],
-      });
-      return;
-    }
-
-    if (isStoreMatch) {
-      return;
-    }
-
-    if (
-      existing.distanceKm === null &&
-      typeof item.distanceKm === "number" &&
-      Number.isFinite(item.distanceKm)
-    ) {
-      existing.distanceKm = item.distanceKm;
-      existing.distance = item.distance;
-    }
-
-    if (
-      !existing.variants.some(
-        (variant) =>
-          variant.label === item.variant && variant.price === item.price,
-      )
-    ) {
-      existing.variants.push({
-        id: item.id,
-        label: item.variant || "Product details available in store",
-        price: item.price,
-      });
-    }
-  });
-
-  return Array.from(groups.values());
 }
 
 export default function HomeScreen() {
@@ -223,10 +150,12 @@ export default function HomeScreen() {
   );
   const collapsedPeekHeight = 104;
   const maxSheetOffset = Math.max(0, sheetHeight - collapsedPeekHeight);
+  const sheetEntranceOpacity = useRef(new Animated.Value(0)).current;
   const sheetTranslateY = useRef(new Animated.Value(0)).current;
   const dragStartOffsetRef = useRef(0);
   const sheetOffsetRef = useRef(0);
   const sheetAnimationRef = useRef<Animated.CompositeAnimation | null>(null);
+  const hasPlayedSheetEntranceRef = useRef(false);
   const [isManuallyCollapsed, setIsManuallyCollapsed] = useState(false);
   const [isMapInteracting, setIsMapInteracting] = useState(false);
   const isManuallyCollapsedRef = useRef(false);
@@ -236,27 +165,30 @@ export default function HomeScreen() {
     storeMarkersRef.current = storeMarkers;
   }, [storeMarkers]);
 
-  const applyLoadedStores = useCallback((catalog: {
-    browseStores: StoreListItem[];
-    mapPins: StoreListItem[];
-    nearbyStores: StoreListItem[];
-    stores: StoreListItem[];
-  }) => {
-    setStoreMarkers(catalog.mapPins);
-    setBrowseStores(catalog.browseStores);
-    setNearbyStores(catalog.nearbyStores);
-    setSelectedStoreId((current) => {
-      if (!current) {
-        return null;
-      }
+  const applyLoadedStores = useCallback(
+    (catalog: {
+      browseStores: StoreListItem[];
+      mapPins: StoreListItem[];
+      nearbyStores: StoreListItem[];
+      stores: StoreListItem[];
+    }) => {
+      setStoreMarkers(catalog.mapPins);
+      setBrowseStores(catalog.browseStores);
+      setNearbyStores(catalog.nearbyStores);
+      setSelectedStoreId((current) => {
+        if (!current) {
+          return null;
+        }
 
-      return catalog.mapPins.some((store) => store.id === current)
-        ? current
-        : null;
-    });
+        return catalog.mapPins.some((store) => store.id === current)
+          ? current
+          : null;
+      });
 
-    return catalog.mapPins.length > 0;
-  }, []);
+      return catalog.mapPins.length > 0;
+    },
+    [],
+  );
 
   useEffect(() => {
     const fetchId = latestStoreFetchIdRef.current + 1;
@@ -311,7 +243,9 @@ export default function HomeScreen() {
       return;
     }
 
-    const matchingStore = storeMarkers.find((store) => store.id === focusStoreId);
+    const matchingStore = storeMarkers.find(
+      (store) => store.id === focusStoreId,
+    );
 
     if (!matchingStore?.id) {
       return;
@@ -346,7 +280,7 @@ export default function HomeScreen() {
       }
 
       if (!result.ok) {
-        setPreviewError(result.error || "Search unavailable");
+        setPreviewError(result.error || "We couldn't load results right now.");
         setPreviewResults([]);
         setIsLoadingPreview(false);
         return;
@@ -379,8 +313,12 @@ export default function HomeScreen() {
   }, [isSearchOverlayOpen]);
 
   const groupedPreviewResults = useMemo(
-    () => groupPreviewResults(previewResults),
+    () => groupSearchResultCards(previewResults),
     [previewResults],
+  );
+  const previewResultsAnimationKey = useMemo(
+    () => groupedPreviewResults.map((item) => item.key).join("|"),
+    [groupedPreviewResults],
   );
 
   const selectedMapStore = useMemo<SelectedMapStore | null>(() => {
@@ -473,11 +411,66 @@ export default function HomeScreen() {
     [maxSheetOffset, sheetTranslateY, syncSheetFlags],
   );
 
+  const animateSheetEntrance = useCallback(
+    (targetOffset: number) => {
+      const clamped = Math.max(0, Math.min(targetOffset, maxSheetOffset));
+
+      sheetAnimationRef.current?.stop();
+      sheetEntranceOpacity.setValue(0);
+      sheetTranslateY.setValue(sheetHeight);
+      sheetAnimationRef.current = Animated.parallel([
+        Animated.timing(sheetTranslateY, {
+          toValue: clamped,
+          duration: 720,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(sheetEntranceOpacity, {
+          toValue: 1,
+          duration: 520,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ]);
+
+      sheetAnimationRef.current.start(({ finished }) => {
+        if (!finished) {
+          return;
+        }
+
+        sheetOffsetRef.current = clamped;
+        syncSheetFlags(clamped, {
+          manualCollapsed: clamped >= maxSheetOffset * 0.5,
+        });
+        sheetEntranceOpacity.setValue(1);
+        sheetAnimationRef.current = null;
+      });
+    },
+    [
+      maxSheetOffset,
+      sheetEntranceOpacity,
+      sheetHeight,
+      sheetTranslateY,
+      syncSheetFlags,
+    ],
+  );
+
   useEffect(() => {
     setSheetPosition(sheetOffsetRef.current, {
       manualCollapsed: isManuallyCollapsedRef.current,
     });
   }, [setSheetPosition]);
+
+  useEffect(() => {
+    if (hasPlayedSheetEntranceRef.current) {
+      return;
+    }
+
+    hasPlayedSheetEntranceRef.current = true;
+    animateSheetEntrance(
+      focusStoreId ? maxSheetOffset : sheetOffsetRef.current,
+    );
+  }, [animateSheetEntrance, focusStoreId, maxSheetOffset]);
 
   useEffect(() => {
     isManuallyCollapsedRef.current = isManuallyCollapsed;
@@ -632,10 +625,12 @@ export default function HomeScreen() {
         <View style={styles.mapArea}>
           <NearaMapView
             coordinates={coordinates}
+            currentUserId={session.primaryStoreId}
             disableUserLocationRecenter={userInteractedWithMap}
             errorMessage={locationErrorMessage}
             focusedCoordinates={mapFocusCoordinates}
             isLoading={isLocationLoading}
+            isStoreOwner={session.isStoreOwner}
             mapRecenterKey={mapRecenterKey}
             onMapMoveStart={handleMapMoveStart}
             onMapMoveEnd={handleMapMoveEnd}
@@ -681,10 +676,7 @@ export default function HomeScreen() {
         {selectedMapStore ? (
           <View
             pointerEvents="box-none"
-            style={[
-              styles.mapPreviewWrap,
-              { top: insets.top + 112 },
-            ]}
+            style={[styles.mapPreviewWrap, { top: insets.top + 112 }]}
           >
             <View style={styles.mapPreviewCard}>
               <View style={styles.mapPreviewMediaWrap}>
@@ -733,7 +725,11 @@ export default function HomeScreen() {
                     style={styles.mapPreviewOpenButton}
                   >
                     <Text style={styles.mapPreviewOpenText}>Open store</Text>
-                    <Ionicons color="#0A0F1F" name="chevron-forward" size={14} />
+                    <Ionicons
+                      color="#0A0F1F"
+                      name="chevron-forward"
+                      size={14}
+                    />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -833,7 +829,7 @@ export default function HomeScreen() {
               >
                 {overlaySearchQuery.trim().length >= 2 && previewError ? (
                   <View style={styles.infoCard}>
-                    <Text style={styles.infoCardTitle}>Search unavailable</Text>
+                    <Text style={styles.infoCardTitle}>Search paused</Text>
                     <Text style={styles.infoCardText}>{previewError}</Text>
                   </View>
                 ) : overlaySearchQuery.trim().length >= 2 &&
@@ -846,84 +842,30 @@ export default function HomeScreen() {
                   </View>
                 ) : overlaySearchQuery.trim().length >= 2 &&
                   groupedPreviewResults.length > 0 ? (
-                  groupedPreviewResults.map((item) => (
-                    <TouchableOpacity
-                      key={item.id}
-                      activeOpacity={0.85}
+                  groupedPreviewResults.map((item, index) => (
+                    <SearchResultCard
+                      key={item.key}
+                      actionLabel="View"
+                      animationIndex={index}
+                      animationTriggerKey={previewResultsAnimationKey}
+                      category={item.category}
+                      distance={item.distance}
+                      image={item.image}
                       onPress={() => {
                         setIsSearchOverlayOpen(false);
                         router.push(`/store/${item.storeId}`);
                       }}
+                      primaryText={item.store}
+                      secondaryText={item.productName || "Store match"}
                       style={styles.previewCard}
-                    >
-                      {item.image ? (
-                        <AppImage
-                          contentFit="cover"
-                          style={styles.previewImage}
-                          uri={item.image}
-                        />
-                      ) : (
-                        <View style={styles.previewImageFallback}>
-                          <Text style={styles.previewImageFallbackText}>
-                            {buildStoreInitial(item.storeName)}
-                          </Text>
-                        </View>
+                      variants={item.variants.map<SearchResultCardVariant>(
+                        (variant) => ({
+                          key: variant.key,
+                          label: variant.label,
+                          value: variant.priceLabel,
+                        }),
                       )}
-                      <View style={styles.previewBody}>
-                        <View style={styles.previewTopRow}>
-                          <Text
-                            numberOfLines={1}
-                            style={styles.previewStoreName}
-                          >
-                            {item.storeName}
-                          </Text>
-                          {item.distance ? (
-                            <Text
-                              numberOfLines={1}
-                              style={styles.previewDistanceText}
-                            >
-                              {item.distance}
-                            </Text>
-                          ) : null}
-                        </View>
-                        <Text
-                          numberOfLines={2}
-                          style={styles.previewProductName}
-                        >
-                          {item.productName || "Store match"}
-                        </Text>
-                        {item.variants.length > 0 ? (
-                          item.variants.map((variant) => (
-                            <View
-                              key={variant.id}
-                              style={styles.previewVariantRow}
-                            >
-                              <Text
-                                numberOfLines={1}
-                                style={styles.previewVariantText}
-                              >
-                                {variant.label}
-                              </Text>
-                              <Text style={styles.previewPriceText}>
-                                {variant.price !== null
-                                  ? `₦${variant.price.toLocaleString("en-NG")}`
-                                  : "View"}
-                              </Text>
-                            </View>
-                          ))
-                        ) : (
-                          <View style={styles.previewVariantRow}>
-                            <Text
-                              numberOfLines={1}
-                              style={styles.previewVariantText}
-                            >
-                              Open this store to view products and location
-                            </Text>
-                            <Text style={styles.previewPriceText}>View</Text>
-                          </View>
-                        )}
-                      </View>
-                    </TouchableOpacity>
+                    />
                   ))
                 ) : overlaySearchQuery.trim().length >= 2 ? (
                   <View style={styles.infoCard}>
@@ -993,6 +935,7 @@ export default function HomeScreen() {
             styles.sheet,
             {
               height: sheetHeight,
+              opacity: sheetEntranceOpacity,
               transform: [{ translateY: sheetTranslateY }],
             },
           ]}
@@ -1079,8 +1022,8 @@ export default function HomeScreen() {
                         activeOpacity={0.85}
                         onPress={() => router.push(`/store/${store.store_id}`)}
                         style={styles.recentVisualCard}
-                    >
-                      {store.image_url ? (
+                      >
+                        {store.image_url ? (
                           <AppImage
                             contentFit="cover"
                             style={styles.recentVisualImage}
@@ -1139,7 +1082,7 @@ export default function HomeScreen() {
                   ) : storesError ? (
                     <View style={styles.infoCard}>
                       <Text style={styles.infoCardTitle}>
-                        Could not load stores
+                        Stores are taking a moment
                       </Text>
                       <Text style={styles.infoCardText}>{storesError}</Text>
                     </View>
@@ -1155,8 +1098,8 @@ export default function HomeScreen() {
                             ? styles.storeRowCardSelected
                             : null,
                         ]}
-                    >
-                      {store.image ? (
+                      >
+                        {store.image ? (
                           <AppImage
                             contentFit="cover"
                             style={styles.storeRowImage}
@@ -1196,7 +1139,8 @@ export default function HomeScreen() {
                         Waiting for stores near you
                       </Text>
                       <Text style={styles.infoCardText}>
-                        Stores are sorted by distance as soon as your location is available.
+                        Stores are sorted by distance as soon as your location
+                        is available.
                       </Text>
                     </View>
                   )}
@@ -1222,7 +1166,7 @@ export default function HomeScreen() {
                   ) : storesError ? (
                     <View style={styles.infoCard}>
                       <Text style={styles.infoCardTitle}>
-                        Could not load stores
+                        Stores are taking a moment
                       </Text>
                       <Text style={styles.infoCardText}>{storesError}</Text>
                     </View>
@@ -1238,8 +1182,8 @@ export default function HomeScreen() {
                             ? styles.storeRowCardSelected
                             : null,
                         ]}
-                    >
-                      {store.image ? (
+                      >
+                        {store.image ? (
                           <AppImage
                             contentFit="cover"
                             style={styles.storeRowImage}
@@ -1279,7 +1223,8 @@ export default function HomeScreen() {
                         No stores available yet
                       </Text>
                       <Text style={styles.infoCardText}>
-                        Public stores with valid map coordinates will appear here automatically.
+                        Public stores with valid map coordinates will appear
+                        here automatically.
                       </Text>
                     </View>
                   )}
@@ -1694,91 +1639,7 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   previewCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surfaceCard,
-  },
-  previewImage: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
-    backgroundColor: "rgba(255,255,255,0.12)",
-  },
-  previewImageFallback: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
-    backgroundColor: "rgba(74,136,255,0.14)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  previewImageFallbackText: {
-    color: theme.colors.text,
-    fontSize: 20,
-    fontWeight: "700",
-  },
-  previewBody: {
-    flex: 1,
-    minWidth: 0,
-  },
-  previewTopRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  previewStoreName: {
-    flexShrink: 1,
-    color: theme.colors.text,
-    fontSize: 15,
-    fontWeight: "800",
-  },
-  previewDistanceText: {
-    color: theme.colors.accentStrong,
-    fontSize: 12,
-    fontWeight: "700",
-    marginLeft: "auto",
-  },
-  previewProductName: {
-    marginTop: 3,
-    color: theme.colors.subduedText,
-    fontSize: 13,
-    fontWeight: "700",
-    lineHeight: 18,
-  },
-  previewVariantText: {
-    marginTop: 4,
-    color: theme.colors.mutedText,
-    fontSize: 12,
-  },
-  previewVariantRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-    marginTop: 2,
-  },
-  previewRightMeta: {
-    alignItems: "flex-end",
-    gap: 4,
-    justifyContent: "center",
-  },
-  previewPriceText: {
-    color: theme.colors.text,
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  previewLinkText: {
-    color: theme.colors.accentStrong,
-    fontSize: 11,
-    fontWeight: "700",
+    marginBottom: 2,
   },
   recentCard: {
     flexDirection: "row",

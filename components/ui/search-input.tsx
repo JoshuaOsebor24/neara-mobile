@@ -1,13 +1,13 @@
-import type { RefObject } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import type { RefObject } from "react";
 import {
   Pressable,
   StyleSheet,
   Text,
   TextInput,
-  type TextInput as TextInputHandle,
   View,
   type StyleProp,
+  type TextInput as TextInputHandle,
   type TextInputProps,
   type TextStyle,
   type ViewStyle,
@@ -92,13 +92,13 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
     flex: 1,
     fontSize: 15,
-    marginLeft: 12,
+    marginLeft: 10,
     paddingVertical: 0,
   },
   pressable: {
     flex: 1,
     justifyContent: "center",
-    marginLeft: 12,
+    marginLeft: 10,
     minHeight: theme.controls.inputHeight - 2,
   },
   placeholder: {

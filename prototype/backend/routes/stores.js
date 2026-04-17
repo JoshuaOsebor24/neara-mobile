@@ -15,7 +15,6 @@ const {
 const { auth: AUTH_MESSAGES } = require("../config/messages.json");
 const {
   invalidatePublicReadCaches,
-  invalidatePublicStoreCaches,
   publicStoreCache,
 } = require("../utils/publicRouteCaches");
 
@@ -29,17 +28,9 @@ function normalizeNullableText(value) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
-function isInlineDataUrl(value) {
-  return typeof value === "string" && value.trim().toLowerCase().startsWith("data:");
-}
-
 function sanitizePublicImageUrl(value) {
   const normalized = normalizeNullableText(value);
-  if (!normalized || isInlineDataUrl(normalized)) {
-    return null;
-  }
-
-  return normalized;
+  return normalized || null;
 }
 
 function hasValidPhoneNumber(value) {
@@ -70,7 +61,10 @@ function pickPrimaryStoreImage(headerImages, fallbackImageUrl = null) {
     ? headerImages.find((item) => sanitizePublicImageUrl(item))
     : null;
 
-  return sanitizePublicImageUrl(fromHeaders) || sanitizePublicImageUrl(fallbackImageUrl);
+  return (
+    sanitizePublicImageUrl(fromHeaders) ||
+    sanitizePublicImageUrl(fallbackImageUrl)
+  );
 }
 
 function serializeHeaderImages(headerImages) {
@@ -82,8 +76,14 @@ function normalizeStoreRecord(store) {
     return store;
   }
 
-  const headerImages = normalizeHeaderImages(store.header_images, store.image_url);
-  const primaryStoreImage = pickPrimaryStoreImage(headerImages, store.image_url);
+  const headerImages = normalizeHeaderImages(
+    store.header_images,
+    store.image_url,
+  );
+  const primaryStoreImage = pickPrimaryStoreImage(
+    headerImages,
+    store.image_url,
+  );
 
   return {
     ...store,
@@ -134,11 +134,7 @@ function buildPublicStoreCacheKey(prefix, req) {
   return `${prefix}:${req.originalUrl}`;
 }
 
-async function queryAllPublicStores({
-  latitude,
-  longitude,
-  hasLocation,
-}) {
+async function queryAllPublicStores({ latitude, longitude, hasLocation }) {
   return pool.query(
     `
       SELECT
@@ -151,15 +147,11 @@ async function queryAllPublicStores({
         s.latitude,
         s.longitude,
         s.phone_number,
-        CASE
-          WHEN s.image_url ILIKE 'data:%' THEN NULL
-          ELSE s.image_url
-        END AS image_url,
+        s.image_url AS image_url,
         COALESCE(
           (
             SELECT jsonb_agg(image_item)
             FROM jsonb_array_elements_text(COALESCE(s.header_images, '[]'::jsonb)) AS image_item
-            WHERE image_item NOT ILIKE 'data:%'
           ),
           '[]'::jsonb
         ) AS header_images,
@@ -187,11 +179,7 @@ async function queryAllPublicStores({
         AND s.longitude IS NOT NULL
       ORDER BY distance_km ASC NULLS LAST, store_name ASC
     `,
-    [
-      latitude,
-      longitude,
-      Boolean(hasLocation),
-    ],
+    [latitude, longitude, Boolean(hasLocation)],
   );
 }
 
@@ -261,8 +249,10 @@ router.post("/", storeWriteLimiter, authMiddleware, async (req, res) => {
     const normalizedPhoneNumber = normalizeNullableText(phone_number);
     const normalizedLatitude = normalizeCoordinateValue(latitude);
     const normalizedLongitude = normalizeCoordinateValue(longitude);
-    const hasLatitude = normalizedLatitude !== undefined && normalizedLatitude !== null;
-    const hasLongitude = normalizedLongitude !== undefined && normalizedLongitude !== null;
+    const hasLatitude =
+      normalizedLatitude !== undefined && normalizedLatitude !== null;
+    const hasLongitude =
+      normalizedLongitude !== undefined && normalizedLongitude !== null;
 
     if (!normalizedStoreName) {
       return sendError(res, 400, "Store name is required", {
@@ -283,9 +273,14 @@ router.post("/", storeWriteLimiter, authMiddleware, async (req, res) => {
     }
 
     if (hasLatitude !== hasLongitude) {
-      return sendError(res, 400, "Latitude and longitude must be provided together", {
-        message: "Latitude and longitude must be provided together",
-      });
+      return sendError(
+        res,
+        400,
+        "Latitude and longitude must be provided together",
+        {
+          message: "Latitude and longitude must be provided together",
+        },
+      );
     }
 
     if (
@@ -321,8 +316,14 @@ router.post("/", storeWriteLimiter, authMiddleware, async (req, res) => {
       });
     }
 
-    const normalizedHeaderImages = normalizeHeaderImages(header_images, image_url);
-    const primaryStoreImage = pickPrimaryStoreImage(normalizedHeaderImages, image_url);
+    const normalizedHeaderImages = normalizeHeaderImages(
+      header_images,
+      image_url,
+    );
+    const primaryStoreImage = pickPrimaryStoreImage(
+      normalizedHeaderImages,
+      image_url,
+    );
 
     const newStore = await client.query(
       `INSERT INTO stores
@@ -343,7 +344,7 @@ router.post("/", storeWriteLimiter, authMiddleware, async (req, res) => {
         primaryStoreImage,
         serializeHeaderImages(normalizedHeaderImages),
         description || null,
-      ]
+      ],
     );
 
     await syncOwnerUserRoles(client, ownerId);
@@ -386,7 +387,7 @@ router.get("/owner/me", authMiddleware, async (req, res) => {
 
     const storeResult = await pool.query(
       "SELECT * FROM stores WHERE owner_id = $1 ORDER BY created_at DESC",
-      [ownerId]
+      [ownerId],
     );
 
     if (storeResult.rows.length === 0) {
@@ -406,7 +407,6 @@ router.get("/owner/me", authMiddleware, async (req, res) => {
     });
   }
 });
-
 
 // Get all public stores for map display
 router.get("/", async (req, res) => {
@@ -475,15 +475,11 @@ router.get("/:id/full", async (req, res, next) => {
         latitude,
         longitude,
         phone_number,
-        CASE
-          WHEN image_url ILIKE 'data:%' THEN NULL
-          ELSE image_url
-        END AS image_url,
+        image_url,
         COALESCE(
           (
             SELECT jsonb_agg(image_item)
             FROM jsonb_array_elements_text(COALESCE(header_images, '[]'::jsonb)) AS image_item
-            WHERE image_item NOT ILIKE 'data:%'
           ),
           '[]'::jsonb
         ) AS header_images,
@@ -507,10 +503,7 @@ router.get("/:id/full", async (req, res, next) => {
         p.product_name,
         p.category,
         p.description,
-        CASE
-          WHEN p.image_url ILIKE 'data:%' THEN NULL
-          ELSE p.image_url
-        END AS image_url,
+        p.image_url,
         p.tags,
         pv.id AS variant_id,
         pv.variant_name,
@@ -559,7 +552,8 @@ router.get("/:id/full", async (req, res, next) => {
             ? Number(row.unit_count)
             : row.unit_count,
         stock_quantity:
-          typeof row.stock_quantity === "string" && row.stock_quantity.trim() !== ""
+          typeof row.stock_quantity === "string" &&
+          row.stock_quantity.trim() !== ""
             ? Number(row.stock_quantity)
             : row.stock_quantity,
         in_stock: Boolean(row.in_stock),
@@ -639,15 +633,11 @@ router.get("/:id", async (req, res) => {
         latitude,
         longitude,
         phone_number,
-        CASE
-          WHEN image_url ILIKE 'data:%' THEN NULL
-          ELSE image_url
-        END AS image_url,
+        image_url,
         COALESCE(
           (
             SELECT jsonb_agg(image_item)
             FROM jsonb_array_elements_text(COALESCE(header_images, '[]'::jsonb)) AS image_item
-            WHERE image_item NOT ILIKE 'data:%'
           ),
           '[]'::jsonb
         ) AS header_images,
@@ -689,12 +679,17 @@ router.get("/:id", async (req, res) => {
     };
 
     publicStoreCache.set(cacheKey, payload);
-    return sendSuccess(res, 200, {
-      store: payload.store,
-    }, {
-      message: payload.message,
-      store: payload.store,
-    });
+    return sendSuccess(
+      res,
+      200,
+      {
+        store: payload.store,
+      },
+      {
+        message: payload.message,
+        store: payload.store,
+      },
+    );
   } catch (error) {
     logRouteFailure(req, routeLabel, 500, error, {
       duration_ms: Date.now() - startedAt,
@@ -734,10 +729,9 @@ router.put("/:id", storeWriteLimiter, authMiddleware, async (req, res) => {
       description,
     } = req.body;
 
-    const storeResult = await pool.query(
-      "SELECT * FROM stores WHERE id = $1",
-      [id]
-    );
+    const storeResult = await pool.query("SELECT * FROM stores WHERE id = $1", [
+      id,
+    ]);
 
     if (storeResult.rows.length === 0) {
       return res.status(404).json({
@@ -746,21 +740,58 @@ router.put("/:id", storeWriteLimiter, authMiddleware, async (req, res) => {
     }
 
     const store = storeResult.rows[0];
-    const currentHeaderImages = normalizeHeaderImages(store.header_images, store.image_url);
-    const normalizedImageUrl = image_url !== undefined ? normalizeNullableText(image_url) : undefined;
+    const currentHeaderImages = normalizeHeaderImages(
+      store.header_images,
+      store.image_url,
+    );
+    const normalizedImageUrl =
+      image_url !== undefined ? normalizeNullableText(image_url) : undefined;
     const normalizedLatitude = normalizeCoordinateValue(latitude);
     const normalizedLongitude = normalizeCoordinateValue(longitude);
-    const hasLatitude = normalizedLatitude !== undefined && normalizedLatitude !== null;
-    const hasLongitude = normalizedLongitude !== undefined && normalizedLongitude !== null;
+    const normalizedStoreName =
+      store_name !== undefined
+        ? normalizeNullableText(store_name)
+        : normalizeNullableText(store.store_name);
+    const normalizedCategory =
+      category !== undefined
+        ? normalizeNullableText(category)
+        : normalizeNullableText(store.category);
+    const normalizedAddress =
+      address !== undefined ? normalizeNullableText(address) : store.address;
+    const normalizedState =
+      state !== undefined ? normalizeNullableText(state) : store.state;
+    const normalizedCountry =
+      country !== undefined ? normalizeNullableText(country) : store.country;
+    const normalizedPhoneNumber =
+      phone_number !== undefined
+        ? normalizeNullableText(phone_number)
+        : store.phone_number;
+    const normalizedDescription =
+      description !== undefined
+        ? normalizeNullableText(description)
+        : store.description;
+    const hasLatitude =
+      normalizedLatitude !== undefined && normalizedLatitude !== null;
+    const hasLongitude =
+      normalizedLongitude !== undefined && normalizedLongitude !== null;
     let nextHeaderImages = currentHeaderImages;
 
     if (header_images !== undefined) {
-      nextHeaderImages = normalizeHeaderImages(header_images, normalizedImageUrl ?? store.image_url);
+      nextHeaderImages = normalizeHeaderImages(
+        header_images,
+        normalizedImageUrl ?? store.image_url,
+      );
     } else if (image_url !== undefined) {
-      nextHeaderImages = [normalizedImageUrl ?? null, ...currentHeaderImages.slice(1)];
+      nextHeaderImages = [
+        normalizedImageUrl ?? null,
+        ...currentHeaderImages.slice(1),
+      ];
     }
 
-    const primaryStoreImage = pickPrimaryStoreImage(nextHeaderImages, normalizedImageUrl ?? store.image_url);
+    const primaryStoreImage = pickPrimaryStoreImage(
+      nextHeaderImages,
+      normalizedImageUrl ?? store.image_url,
+    );
 
     // Authorization: only the owner may perform updates
     if (Number(store.owner_id) !== ownerId) {
@@ -770,9 +801,14 @@ router.put("/:id", storeWriteLimiter, authMiddleware, async (req, res) => {
     }
 
     if (hasLatitude !== hasLongitude) {
-      return sendError(res, 400, "Latitude and longitude must be provided together", {
-        message: "Latitude and longitude must be provided together",
-      });
+      return sendError(
+        res,
+        400,
+        "Latitude and longitude must be provided together",
+        {
+          message: "Latitude and longitude must be provided together",
+        },
+      );
     }
 
     if (
@@ -782,6 +818,24 @@ router.put("/:id", storeWriteLimiter, authMiddleware, async (req, res) => {
     ) {
       return sendError(res, 400, "Store coordinates are invalid", {
         message: "Store coordinates are invalid",
+      });
+    }
+
+    if (!normalizedStoreName) {
+      return sendError(res, 400, "Store name is required", {
+        message: "Store name is required",
+      });
+    }
+
+    if (!normalizedCategory) {
+      return sendError(res, 400, "Category is required", {
+        message: "Category is required",
+      });
+    }
+
+    if (normalizedPhoneNumber && !hasValidPhoneNumber(normalizedPhoneNumber)) {
+      return sendError(res, 400, "Phone number is invalid", {
+        message: "Phone number is invalid",
       });
     }
 
@@ -802,20 +856,24 @@ router.put("/:id", storeWriteLimiter, authMiddleware, async (req, res) => {
        WHERE id = $13
        RETURNING *`,
       [
-        store_name || store.store_name,
-        category || store.category,
-        address || store.address,
-        state !== undefined ? state : store.state,
-        country !== undefined ? country : store.country,
-        delivery_available !== undefined ? Boolean(delivery_available) : Boolean(store.delivery_available),
+        normalizedStoreName,
+        normalizedCategory,
+        normalizedAddress,
+        normalizedState,
+        normalizedCountry,
+        delivery_available !== undefined
+          ? Boolean(delivery_available)
+          : Boolean(store.delivery_available),
         normalizedLatitude !== undefined ? normalizedLatitude : store.latitude,
-        normalizedLongitude !== undefined ? normalizedLongitude : store.longitude,
-        phone_number || store.phone_number,
+        normalizedLongitude !== undefined
+          ? normalizedLongitude
+          : store.longitude,
+        normalizedPhoneNumber,
         primaryStoreImage,
         serializeHeaderImages(nextHeaderImages),
-        description !== undefined ? description : store.description,
+        normalizedDescription,
         id,
-      ]
+      ],
     );
 
     invalidatePublicReadCaches();

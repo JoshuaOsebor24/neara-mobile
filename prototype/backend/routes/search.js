@@ -64,8 +64,22 @@ function buildResultKey(row) {
   ].join(":");
 }
 
+function resolveRelevanceScore(row) {
+  const parsed = Number(row.relevance_score);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 function sortResults(a, b) {
-  if (a.distance_km != null && b.distance_km != null && a.distance_km !== b.distance_km) {
+  const relevanceDiff = resolveRelevanceScore(b) - resolveRelevanceScore(a);
+  if (relevanceDiff !== 0) {
+    return relevanceDiff;
+  }
+
+  if (
+    a.distance_km != null &&
+    b.distance_km != null &&
+    a.distance_km !== b.distance_km
+  ) {
     return a.distance_km - b.distance_km;
   }
 
@@ -81,12 +95,38 @@ function sortResults(a, b) {
     return b.match_priority - a.match_priority;
   }
 
-  const storeCompare = String(a.store_name || "").localeCompare(String(b.store_name || ""));
+  const storeCompare = String(a.store_name || "").localeCompare(
+    String(b.store_name || ""),
+  );
   if (storeCompare !== 0) {
     return storeCompare;
   }
 
-  return String(a.product_name || "").localeCompare(String(b.product_name || ""));
+  return String(a.product_name || "").localeCompare(
+    String(b.product_name || ""),
+  );
+}
+
+function buildStoreRelevanceSql(storeAlias) {
+  return `
+    CASE
+      WHEN LOWER(COALESCE(${storeAlias}.store_name, '')) = $2 THEN 180
+      WHEN POSITION($2 IN LOWER(COALESCE(${storeAlias}.store_name, ''))) = 1 THEN 170
+      WHEN POSITION($2 IN LOWER(COALESCE(${storeAlias}.store_name, ''))) > 0 THEN 150
+      ELSE 0
+    END
+  `;
+}
+
+function buildProductRelevanceSql(productAlias) {
+  return `
+    CASE
+      WHEN LOWER(COALESCE(${productAlias}.product_name, '')) = $2 THEN 420
+      WHEN POSITION($2 IN LOWER(COALESCE(${productAlias}.product_name, ''))) = 1 THEN 390
+      WHEN POSITION($2 IN LOWER(COALESCE(${productAlias}.product_name, ''))) > 0 THEN 320
+      ELSE 0
+    END
+  `;
 }
 
 function normalizeSearchImageUrl(productImageUrl, storeImageUrl, productId) {
@@ -101,12 +141,6 @@ function normalizeSearchImageUrl(productImageUrl, storeImageUrl, productId) {
 
   if (!primaryImage) {
     return null;
-  }
-
-  if (primaryImage.startsWith("data:")) {
-    return typeof storeImageUrl === "string" && storeImageUrl.trim() && !storeImageUrl.trim().startsWith("data:")
-      ? storeImageUrl.trim()
-      : null;
   }
 
   return primaryImage;
@@ -185,12 +219,17 @@ router.get("/", searchLimiter, async (req, res) => {
         cache_hit: true,
         duration_ms: Date.now() - startedAt,
       });
-      return sendSuccess(res, 200, {
-        results: cachedPayload.results,
-      }, {
-        message: cachedPayload.message,
-        results: cachedPayload.results,
-      });
+      return sendSuccess(
+        res,
+        200,
+        {
+          results: cachedPayload.results,
+        },
+        {
+          message: cachedPayload.message,
+          results: cachedPayload.results,
+        },
+      );
     }
 
     const { product, q, query, lat, lng, limit, preview } = req.query;
@@ -215,6 +254,7 @@ router.get("/", searchLimiter, async (req, res) => {
     const isPreviewRequest = String(preview || "") === "1";
     const resultLimit = parseSearchLimit(limit, isPreviewRequest ? 6 : 24);
     const likeTerm = `%${searchTerm}%`;
+    const normalizedSearchTerm = searchTerm.toLowerCase();
 
     const userLat = lat !== undefined ? Number.parseFloat(String(lat)) : NaN;
     const userLng = lng !== undefined ? Number.parseFloat(String(lng)) : NaN;
@@ -239,13 +279,20 @@ router.get("/", searchLimiter, async (req, res) => {
         result_count: 0,
         skipped: true,
       });
-      return sendSuccess(res, 200, {
-        results: [],
-      }, {
-        error: undefined,
-        message: !searchTerm ? "Search query is empty" : "Search query is too short",
-        results: [],
-      });
+      return sendSuccess(
+        res,
+        200,
+        {
+          results: [],
+        },
+        {
+          error: undefined,
+          message: !searchTerm
+            ? "Search query is empty"
+            : "Search query is too short",
+          results: [],
+        },
+      );
     }
 
     const fetchLimit = isPreviewRequest
@@ -253,6 +300,9 @@ router.get("/", searchLimiter, async (req, res) => {
       : Math.min(Math.max(resultLimit + 4, 12), 24);
 
     if (isPreviewRequest) {
+      const storePreviewRelevanceSql = buildStoreRelevanceSql("stores");
+      const productPreviewRelevanceSql = buildProductRelevanceSql("products");
+
       const storePreviewSql = `
         SELECT
           stores.id AS store_id,
@@ -272,16 +322,14 @@ router.get("/", searchLimiter, async (req, res) => {
           NULL::integer AS stock_quantity,
           NULL::boolean AS in_stock,
           'store'::text AS match_source,
-          1 AS match_priority
+          1 AS match_priority,
+          ${storePreviewRelevanceSql} AS relevance_score
         FROM stores
         WHERE
           stores.is_suspended = FALSE
-          AND (
-          stores.store_name ILIKE $1
-          OR COALESCE(stores.category, '') ILIKE $1
-          )
-        ORDER BY stores.store_name ASC
-        LIMIT $2
+          AND stores.store_name ILIKE $1
+        ORDER BY relevance_score DESC, stores.store_name ASC
+        LIMIT $3
       `;
 
       const productPreviewSql = `
@@ -296,10 +344,7 @@ router.get("/", searchLimiter, async (req, res) => {
           products.id AS product_id,
           products.product_name,
           NULL::text AS description,
-          CASE
-            WHEN products.image_url ILIKE 'data:%' THEN NULL
-            ELSE products.image_url
-          END AS image_url,
+          products.image_url AS image_url,
           preview_variant.variant_id,
           preview_variant.variant_name,
           preview_variant.unit_count,
@@ -307,7 +352,8 @@ router.get("/", searchLimiter, async (req, res) => {
           NULL::integer AS stock_quantity,
           NULL::boolean AS in_stock,
           'product'::text AS match_source,
-          2 AS match_priority
+          2 AS match_priority,
+          ${productPreviewRelevanceSql} AS relevance_score
         FROM products
         INNER JOIN stores ON stores.id = products.store_id
         LEFT JOIN LATERAL (
@@ -323,78 +369,31 @@ router.get("/", searchLimiter, async (req, res) => {
         ) AS preview_variant ON true
         WHERE
           stores.is_suspended = FALSE
-          AND (
-          COALESCE(products.product_name, '') ILIKE $1
-          OR COALESCE(products.category, '') ILIKE $1
-          OR EXISTS (
-            SELECT 1
-            FROM UNNEST(COALESCE(products.tags, ARRAY[]::TEXT[])) AS product_tag
-            WHERE product_tag ILIKE $1
-          )
-          OR COALESCE(stores.store_name, '') ILIKE $1
-          OR COALESCE(stores.category, '') ILIKE $1
-          )
-        ORDER BY stores.store_name ASC, products.product_name ASC
-        LIMIT $2
+          AND COALESCE(products.product_name, '') ILIKE $1
+        ORDER BY relevance_score DESC, products.product_name ASC, stores.store_name ASC
+        LIMIT $3
       `;
 
-      const variantPreviewSql = `
-        SELECT
-          stores.id AS store_id,
-          stores.store_name,
-          stores.category,
-          stores.address,
-          stores.latitude,
-          stores.longitude,
-          stores.image_url AS store_image_url,
-          products.id AS product_id,
-          products.product_name,
-          NULL::text AS description,
-          CASE
-            WHEN products.image_url ILIKE 'data:%' THEN NULL
-            ELSE products.image_url
-          END AS image_url,
-          product_variants.id AS variant_id,
-          product_variants.variant_name,
-          product_variants.unit_count,
-          product_variants.price,
-          NULL::integer AS stock_quantity,
-          NULL::boolean AS in_stock,
-          'variant'::text AS match_source,
-          3 AS match_priority
-        FROM product_variants
-        INNER JOIN products ON products.id = product_variants.product_id
-        INNER JOIN stores ON stores.id = products.store_id
-        WHERE
-          stores.is_suspended = FALSE
-          AND (
-          COALESCE(product_variants.variant_name, '') ILIKE $1
-          OR COALESCE(products.product_name, '') ILIKE $1
-          OR EXISTS (
-            SELECT 1
-            FROM UNNEST(COALESCE(products.tags, ARRAY[]::TEXT[])) AS product_tag
-            WHERE product_tag ILIKE $1
-          )
-          OR COALESCE(stores.store_name, '') ILIKE $1
-          )
-        ORDER BY stores.store_name ASC, products.product_name ASC
-        LIMIT $2
-      `;
-
-    console.log("[search] db query start", {
-      phase: "start",
-      mode: "preview",
-      store_sql: "stores by name/category",
-      product_sql: "products by name/category/store",
-        variant_sql: "variants by variant/product/store",
+      console.log("[search] db query start", {
+        phase: "start",
+        mode: "preview",
+        store_sql: "stores by name",
+        product_sql: "products by name",
         fetch_limit: fetchLimit,
       });
 
       const previewQueryStartedAt = Date.now();
-      const [storeMatches, productMatches, variantMatches] = await Promise.all([
-        pool.query(storePreviewSql, [likeTerm, fetchLimit]),
-        pool.query(productPreviewSql, [likeTerm, fetchLimit]),
-        pool.query(variantPreviewSql, [likeTerm, fetchLimit]),
+      const [storeMatches, productMatches] = await Promise.all([
+        pool.query(storePreviewSql, [
+          likeTerm,
+          normalizedSearchTerm,
+          fetchLimit,
+        ]),
+        pool.query(productPreviewSql, [
+          likeTerm,
+          normalizedSearchTerm,
+          fetchLimit,
+        ]),
       ]);
       const previewQueryDurationMs = Date.now() - previewQueryStartedAt;
 
@@ -405,11 +404,7 @@ router.get("/", searchLimiter, async (req, res) => {
       });
 
       const results = buildSearchResults(
-        [
-          ...variantMatches.rows,
-          ...productMatches.rows,
-          ...storeMatches.rows,
-        ].slice(0, fetchLimit * 3),
+        [...productMatches.rows, ...storeMatches.rows].slice(0, fetchLimit * 2),
         { hasCoords, userLat, userLng },
       ).slice(0, resultLimit);
 
@@ -420,7 +415,6 @@ router.get("/", searchLimiter, async (req, res) => {
         sql_duration_ms: previewQueryDurationMs,
         store_matches: storeMatches.rowCount,
         product_matches: productMatches.rowCount,
-        variant_matches: variantMatches.rowCount,
         result_count: results.length,
         duration_ms: Date.now() - startedAt,
       });
@@ -434,12 +428,17 @@ router.get("/", searchLimiter, async (req, res) => {
         preview: true,
         result_count: results.length,
       });
-      return sendSuccess(res, 200, {
-        results,
-      }, {
-        message: "Search completed successfully",
-        results,
-      });
+      return sendSuccess(
+        res,
+        200,
+        {
+          results,
+        },
+        {
+          message: "Search completed successfully",
+          results,
+        },
+      );
     }
 
     const storeSql = `
@@ -461,16 +460,14 @@ router.get("/", searchLimiter, async (req, res) => {
         NULL::integer AS stock_quantity,
         NULL::boolean AS in_stock,
         'store'::text AS match_source,
-        1 AS match_priority
+        1 AS match_priority,
+        ${buildStoreRelevanceSql("stores")} AS relevance_score
       FROM stores
       WHERE
         stores.is_suspended = FALSE
-        AND (
-        stores.store_name ILIKE $1
-        OR COALESCE(stores.category, '') ILIKE $1
-        )
-      ORDER BY stores.store_name ASC
-      LIMIT $2
+        AND stores.store_name ILIKE $1
+      ORDER BY relevance_score DESC, stores.store_name ASC
+      LIMIT $3
     `;
 
     const productSql = `
@@ -485,10 +482,7 @@ router.get("/", searchLimiter, async (req, res) => {
         products.id AS product_id,
         products.product_name,
         products.description,
-        CASE
-          WHEN products.image_url ILIKE 'data:%' THEN NULL
-          ELSE products.image_url
-        END AS image_url,
+        products.image_url AS image_url,
         display_variant.variant_id,
         display_variant.variant_name,
         display_variant.unit_count,
@@ -496,7 +490,8 @@ router.get("/", searchLimiter, async (req, res) => {
         display_variant.stock_quantity,
         display_variant.in_stock,
         'product'::text AS match_source,
-        2 AS match_priority
+        2 AS match_priority,
+        ${buildProductRelevanceSql("products")} AS relevance_score
       FROM products
       INNER JOIN stores ON stores.id = products.store_id
       LEFT JOIN LATERAL (
@@ -517,78 +512,22 @@ router.get("/", searchLimiter, async (req, res) => {
       ) AS display_variant ON true
       WHERE
         stores.is_suspended = FALSE
-        AND (
-        COALESCE(products.product_name, '') ILIKE $1
-        OR COALESCE(products.description, '') ILIKE $1
-        OR COALESCE(products.category, '') ILIKE $1
-        OR EXISTS (
-          SELECT 1
-          FROM UNNEST(COALESCE(products.tags, ARRAY[]::TEXT[])) AS product_tag
-          WHERE product_tag ILIKE $1
-        )
-        OR COALESCE(stores.store_name, '') ILIKE $1
-        OR COALESCE(stores.category, '') ILIKE $1
-        )
-      ORDER BY stores.store_name ASC, products.product_name ASC
-      LIMIT $2
-    `;
-
-    const variantSql = `
-      SELECT
-        stores.id AS store_id,
-        stores.store_name,
-        stores.category,
-        stores.address,
-        stores.latitude,
-        stores.longitude,
-        stores.image_url AS store_image_url,
-        products.id AS product_id,
-        products.product_name,
-        products.description,
-        CASE
-          WHEN products.image_url ILIKE 'data:%' THEN NULL
-          ELSE products.image_url
-        END AS image_url,
-        product_variants.id AS variant_id,
-        product_variants.variant_name,
-        product_variants.unit_count,
-        product_variants.price,
-        product_variants.stock_quantity,
-        product_variants.in_stock,
-        'variant'::text AS match_source,
-        3 AS match_priority
-      FROM product_variants
-      INNER JOIN products ON products.id = product_variants.product_id
-      INNER JOIN stores ON stores.id = products.store_id
-      WHERE
-        stores.is_suspended = FALSE
-        AND (
-        COALESCE(product_variants.variant_name, '') ILIKE $1
-        OR COALESCE(products.product_name, '') ILIKE $1
-        OR EXISTS (
-          SELECT 1
-          FROM UNNEST(COALESCE(products.tags, ARRAY[]::TEXT[])) AS product_tag
-          WHERE product_tag ILIKE $1
-        )
-        OR COALESCE(stores.store_name, '') ILIKE $1
-        )
-      ORDER BY stores.store_name ASC, products.product_name ASC
-      LIMIT $2
+        AND COALESCE(products.product_name, '') ILIKE $1
+      ORDER BY relevance_score DESC, products.product_name ASC, stores.store_name ASC
+      LIMIT $3
     `;
 
     console.log("[search] db query start", {
       phase: "start",
-      store_sql: "stores by name/category",
-      product_sql: "products by name/description/category/store",
-      variant_sql: "variants by variant/product/store",
+      store_sql: "stores by name",
+      product_sql: "products by name",
       fetch_limit: fetchLimit,
     });
 
     const sqlStartedAt = Date.now();
-    const [storeMatches, productMatches, variantMatches] = await Promise.all([
-      pool.query(storeSql, [likeTerm, fetchLimit]),
-      pool.query(productSql, [likeTerm, fetchLimit]),
-      pool.query(variantSql, [likeTerm, fetchLimit]),
+    const [storeMatches, productMatches] = await Promise.all([
+      pool.query(storeSql, [likeTerm, normalizedSearchTerm, fetchLimit]),
+      pool.query(productSql, [likeTerm, normalizedSearchTerm, fetchLimit]),
     ]);
     const sqlDurationMs = Date.now() - sqlStartedAt;
 
@@ -599,11 +538,7 @@ router.get("/", searchLimiter, async (req, res) => {
     });
 
     const results = buildSearchResults(
-      [
-        ...variantMatches.rows,
-        ...productMatches.rows,
-        ...storeMatches.rows,
-      ],
+      [...productMatches.rows, ...storeMatches.rows],
       { hasCoords, userLat, userLng },
     ).slice(0, resultLimit);
 
@@ -614,7 +549,6 @@ router.get("/", searchLimiter, async (req, res) => {
       sql_duration_ms: sqlDurationMs,
       store_matches: storeMatches.rowCount,
       product_matches: productMatches.rowCount,
-      variant_matches: variantMatches.rowCount,
       result_count: results.length,
       duration_ms: Date.now() - startedAt,
     });
@@ -628,12 +562,17 @@ router.get("/", searchLimiter, async (req, res) => {
       preview: false,
       result_count: results.length,
     });
-    return sendSuccess(res, 200, {
-      results,
-    }, {
-      message: "Search completed successfully",
-      results,
-    });
+    return sendSuccess(
+      res,
+      200,
+      {
+        results,
+      },
+      {
+        message: "Search completed successfully",
+        results,
+      },
+    );
   } catch (error) {
     logRouteFailure(req, routeLabel, 500, error, {
       duration_ms: Date.now() - startedAt,

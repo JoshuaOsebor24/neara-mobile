@@ -211,7 +211,7 @@ export function AuthScreen({
       return;
     }
 
-    updateMobileSession(
+    await updateMobileSession(
       buildSessionPatchFromAuthUser(result.user, result.token),
     );
 
@@ -530,7 +530,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.borderStrong,
     backgroundColor: theme.colors.surfaceCard,
-    padding: 22,
+    padding: 20,
     shadowColor: theme.colors.shadow,
     shadowOpacity: 0.34,
     shadowRadius: 28,
@@ -538,7 +538,7 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
   introBlock: {
-    marginBottom: 22,
+    marginBottom: 18,
   },
   introEyebrow: {
     color: theme.colors.accentStrong,
@@ -548,7 +548,7 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
   },
   introText: {
-    marginTop: 10,
+    marginTop: 8,
     color: theme.colors.subduedText,
     fontSize: 16,
     lineHeight: 24,
@@ -576,28 +576,28 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   formStack: {
-    gap: 18,
+    gap: 16,
   },
   fieldGroup: {
-    gap: 9,
+    gap: 6,
   },
   fieldLabel: {
     color: theme.colors.subduedText,
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: "700",
-    letterSpacing: 0.3,
-    textTransform: "uppercase",
+    letterSpacing: 0,
   },
   inputShell: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    borderRadius: 20,
+    gap: 10,
+    minHeight: theme.controls.inputHeight,
+    borderRadius: theme.form.inputRadius,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surfaceOverlay,
+    borderColor: theme.form.inputBorder,
+    backgroundColor: theme.form.inputBackground,
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingVertical: 12,
   },
   inputShellError: {
     borderColor: theme.colors.borderStrong,
@@ -605,7 +605,7 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     color: theme.colors.text,
-    fontSize: 16,
+    fontSize: 15,
     paddingVertical: 0,
   },
   errorText: {

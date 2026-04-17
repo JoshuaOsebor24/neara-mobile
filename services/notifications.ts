@@ -1,15 +1,18 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Constants from "expo-constants";
 import * as Device from "expo-device";
-import * as Notifications from "expo-notifications";
 import type {
-  Notification,
-  NotificationResponse,
-  Subscription,
+    Notification,
+    NotificationResponse,
+    Subscription,
 } from "expo-notifications";
+import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
 
-import { registerPushTokenWithBackend, type PushPlatform } from "@/services/notifications-api";
+import {
+    registerPushTokenWithBackend,
+    type PushPlatform,
+} from "@/services/notifications-api";
 
 const INSTALLATION_ID_STORAGE_KEY = "neara-notifications-installation-id:v1";
 
@@ -20,8 +23,12 @@ let notificationReceivedSubscription: Subscription | null = null;
 let notificationResponseSubscription: Subscription | null = null;
 let pendingNotificationResponse: NotificationResponse | null = null;
 
-const notificationReceivedListeners = new Set<(notification: Notification) => void>();
-const notificationResponseListeners = new Set<(response: NotificationResponse) => void>();
+const notificationReceivedListeners = new Set<
+  (notification: Notification) => void
+>();
+const notificationResponseListeners = new Set<
+  (response: NotificationResponse) => void
+>();
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -135,16 +142,16 @@ export async function initializeNotificationLifecycle(options?: {
     lifecycleInitialized = true;
     await ensureAndroidNotificationChannel();
 
-    notificationReceivedSubscription = Notifications.addNotificationReceivedListener((notification) => {
-      emitNotificationReceived(notification);
-    });
+    notificationReceivedSubscription =
+      Notifications.addNotificationReceivedListener((notification) => {
+        emitNotificationReceived(notification);
+      });
 
-    notificationResponseSubscription = Notifications.addNotificationResponseReceivedListener(
-      (response) => {
+    notificationResponseSubscription =
+      Notifications.addNotificationResponseReceivedListener((response) => {
         lastHandledNotificationResponseId = getNotificationResponseId(response);
         emitNotificationResponse(response);
-      },
-    );
+      });
   }
 
   await dispatchLastNotificationResponseIfNeeded();
@@ -237,7 +244,7 @@ async function requestPushRegistration() {
       error:
         error instanceof Error
           ? error.message
-          : "Could not generate an Expo push token on this device.",
+          : "We couldn't set up notifications on this device.",
       ok: false as const,
     };
   }

@@ -1,17 +1,11 @@
-import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useMemo, useState } from "react";
-import {
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { SafeAreaView, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { BackPillButton } from "@/components/ui/back-pill-button";
 import { Button } from "@/components/ui/button";
+import { ScreenCard } from "@/components/ui/screen-card";
 import { theme } from "@/constants/theme";
 import {
   updateMobileSession,
@@ -40,7 +34,7 @@ export default function StorePaymentScreen() {
 
     setIsSubmitting(true);
 
-    updateMobileSession({
+    await updateMobileSession({
       storePlan: "basic",
     });
 
@@ -50,12 +44,6 @@ export default function StorePaymentScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar style="light" />
-      <LinearGradient
-        colors={["rgba(74,136,255,0.16)", "transparent", "rgba(10,15,31,1)"]}
-        start={{ x: 0.5, y: 0 }}
-        end={{ x: 0.5, y: 1 }}
-        style={StyleSheet.absoluteFillObject}
-      />
       <ScrollView
         bounces={false}
         contentContainerStyle={styles.scrollContent}
@@ -64,15 +52,13 @@ export default function StorePaymentScreen() {
         <View style={styles.page}>
           <View style={styles.header}>
             <BackPillButton fallbackHref="/store-mode" />
-            <Text style={styles.headerLabel}>Store payment</Text>
+            <Text style={styles.headerLabel}>Neara</Text>
           </View>
 
-          <View style={styles.panel}>
+          <ScreenCard style={styles.panel}>
             <Text style={styles.eyebrow}>Neara Store Mode</Text>
             <Text style={styles.title}>Start Your Store</Text>
-            <Text style={styles.subtitle}>
-              Secure your store plan now and start getting discovered today.
-            </Text>
+            <Text style={styles.subtitle}>Secure your plan and continue.</Text>
 
             <View style={styles.mainCard}>
               <Text style={styles.planPrice}>{plan.price}</Text>
@@ -82,23 +68,15 @@ export default function StorePaymentScreen() {
               <Text style={styles.planDescription}>{plan.description}</Text>
 
               <View style={styles.benefitsSection}>
-                <Text style={styles.benefitsTitle}>What happens next</Text>
+                <Text style={styles.benefitsTitle}>Next</Text>
                 <View style={styles.noticeBullets}>
-                  <Text style={styles.noticeBullet}>
-                    • Continue setup after payment
-                  </Text>
-                  <Text style={styles.noticeBullet}>
-                    • Add your first products
-                  </Text>
-                  <Text style={styles.noticeBullet}>
-                    • Start appearing in search
-                  </Text>
+                  <Text style={styles.noticeBullet}>• Continue setup</Text>
+                  <Text style={styles.noticeBullet}>• Add products</Text>
+                  <Text style={styles.noticeBullet}>• Appear in search</Text>
                 </View>
               </View>
 
-              <Text style={styles.ctaPrompt}>
-                Start getting customers today
-              </Text>
+              <Text style={styles.ctaPrompt}>Start today</Text>
 
               <Button
                 disabled={isSubmitting}
@@ -123,11 +101,10 @@ export default function StorePaymentScreen() {
 
             {session.isAuthenticated ? (
               <Text style={styles.sameAccountText}>
-                This secure checkout continues on the same Neara account for{" "}
-                {session.email || "your login"}.
+                Checkout continues on {session.email || "your account"}.
               </Text>
             ) : null}
-          </View>
+          </ScreenCard>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -139,7 +116,7 @@ const BORDER = theme.colors.borderStrong;
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#0A0F1F",
+    backgroundColor: "transparent",
   },
   scrollContent: {
     paddingHorizontal: 16,
@@ -171,16 +148,11 @@ const styles = StyleSheet.create({
   headerLabel: {
     color: "#B8C2D9",
     fontSize: 12,
-    fontWeight: "700",
-    letterSpacing: 1.8,
+    letterSpacing: 2.2,
     textTransform: "uppercase",
   },
   panel: {
-    backgroundColor: theme.colors.surfaceCard,
-    borderColor: BORDER,
-    borderRadius: 32,
-    borderWidth: 1,
-    padding: 22,
+    padding: 20,
   },
   eyebrow: {
     color: theme.colors.accentStrong,

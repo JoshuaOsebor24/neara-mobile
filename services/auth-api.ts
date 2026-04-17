@@ -1,12 +1,12 @@
-import {
-  getMobileSession,
-  resetMobileSession,
-  updateMobileSession,
-  type MobileUser,
-} from "@/services/mobile-session";
 import { requestMobileApi } from "@/services/api";
-import { createStoreWithBackend } from "@/services/store-api";
+import {
+    getMobileSession,
+    resetMobileSession,
+    updateMobileSession,
+    type MobileUser,
+} from "@/services/mobile-session";
 import { buildActiveRoles, getAccountType } from "@/services/role-access";
+import { createStoreWithBackend } from "@/services/store-api";
 
 type BackendUser = {
   email: string;
@@ -95,7 +95,9 @@ const SESSION_REFRESH_COOLDOWN_MS = 15000;
 let lastSessionRefreshAt = 0;
 let inflightSessionRefresh: Promise<void> | null = null;
 
-function normalizeBackendRoles(value: BackendUser["roles"] | string | undefined) {
+function normalizeBackendRoles(
+  value: BackendUser["roles"] | string | undefined,
+) {
   if (Array.isArray(value)) {
     return value
       .filter((role): role is string => typeof role === "string")
@@ -120,21 +122,37 @@ function isTruthyFlag(value: unknown) {
 
   if (typeof value === "string") {
     const normalized = value.trim().toLowerCase();
-    return normalized === "true" || normalized === "1" || normalized === "t" || normalized === "yes";
+    return (
+      normalized === "true" ||
+      normalized === "1" ||
+      normalized === "t" ||
+      normalized === "yes"
+    );
   }
 
   return false;
 }
 
-function unwrapAuthUser(payload: AuthResponse | ProSubscriptionVerifyResponse | null | undefined) {
+function unwrapAuthUser(
+  payload: AuthResponse | ProSubscriptionVerifyResponse | null | undefined,
+) {
   return payload?.user ?? payload?.data?.user ?? null;
 }
 
-function unwrapAuthToken(payload: AuthResponse | OwnerAuthResponse | null | undefined) {
+function unwrapAuthToken(
+  payload: AuthResponse | OwnerAuthResponse | null | undefined,
+) {
   return payload?.token ?? payload?.data?.token ?? null;
 }
 
-function unwrapAuthMessage(payload: AuthResponse | OwnerAuthResponse | ProSubscriptionVerifyResponse | null | undefined) {
+function unwrapAuthMessage(
+  payload:
+    | AuthResponse
+    | OwnerAuthResponse
+    | ProSubscriptionVerifyResponse
+    | null
+    | undefined,
+) {
   return payload?.message ?? payload?.data?.message;
 }
 
@@ -168,7 +186,9 @@ export function buildSessionPatchFromAuthUser(
     hasProRole ||
     isTruthyFlag(user.premium_status) ||
     isTruthyFlag(user.premium);
-  const isStoreOwner = Boolean(user.is_store_owner || hasStoreOwnerRole || user.primary_store_id);
+  const isStoreOwner = Boolean(
+    user.is_store_owner || hasStoreOwnerRole || user.primary_store_id,
+  );
 
   return {
     accountType: getAccountType(isPro),
@@ -234,7 +254,7 @@ export async function loginWithBackend(payload: {
 
   if (!result.ok || !user || !token) {
     return {
-      error: result.ok ? "Login failed." : result.error,
+      error: result.ok ? "We couldn't sign you in right now." : result.error,
       ok: false as const,
     };
   }
@@ -262,7 +282,9 @@ export async function signupWithBackend(payload: {
 
   if (!result.ok || !user || !token) {
     return {
-      error: result.ok ? "Signup failed." : result.error,
+      error: result.ok
+        ? "We couldn't create your account right now."
+        : result.error,
       ok: false as const,
     };
   }
@@ -296,10 +318,13 @@ export async function registerOwnerWithBackend(payload: {
     store_name: string;
   };
 }) {
-  const result = await requestMobileApi<OwnerAuthResponse>("/auth/register-owner", {
-    body: payload,
-    method: "POST",
-  });
+  const result = await requestMobileApi<OwnerAuthResponse>(
+    "/auth/register-owner",
+    {
+      body: payload,
+      method: "POST",
+    },
+  );
 
   if (result.ok && result.data.user && result.data.token) {
     return {
@@ -313,7 +338,9 @@ export async function registerOwnerWithBackend(payload: {
 
   if (result.status !== 404 && result.status !== 405) {
     return {
-      error: result.ok ? "Owner signup failed." : result.error,
+      error: result.ok
+        ? "We couldn't finish your store setup right now."
+        : result.error,
       ok: false as const,
       status: result.status,
       store: result.data?.store ?? null,
@@ -345,7 +372,10 @@ export async function registerOwnerWithBackend(payload: {
       };
     }
 
-    const storeResult = await createStoreWithBackend(loginResult.token, payload.store);
+    const storeResult = await createStoreWithBackend(
+      loginResult.token,
+      payload.store,
+    );
 
     if (!storeResult.ok) {
       return {
@@ -367,7 +397,10 @@ export async function registerOwnerWithBackend(payload: {
     };
   }
 
-  const storeResult = await createStoreWithBackend(signupResult.token, payload.store);
+  const storeResult = await createStoreWithBackend(
+    signupResult.token,
+    payload.store,
+  );
 
   if (!storeResult.ok) {
     return {
@@ -399,7 +432,9 @@ export async function fetchCurrentUserFromBackend(token: string) {
 
   if (!result.ok || !user) {
     return {
-      error: result.ok ? "Could not load current user." : result.error,
+      error: result.ok
+        ? "We couldn't refresh your account details right now."
+        : result.error,
       ok: false as const,
       status: result.status,
     };
@@ -430,7 +465,9 @@ export async function updateCurrentUserWithBackend(
 
   if (!result.ok || !user) {
     return {
-      error: result.ok ? "Could not update account." : result.error,
+      error: result.ok
+        ? "We couldn't save your account changes right now."
+        : result.error,
       ok: false as const,
       status: result.status,
     };
@@ -444,10 +481,13 @@ export async function updateCurrentUserWithBackend(
 }
 
 export async function fetchOwnerPrimaryStoreFromBackend(token: string) {
-  const result = await requestMobileApi<{ stores?: BackendStore[] }>("/stores/owner/me", {
-    method: "GET",
-    token,
-  });
+  const result = await requestMobileApi<{ stores?: BackendStore[] }>(
+    "/stores/owner/me",
+    {
+      method: "GET",
+      token,
+    },
+  );
 
   if (!result.ok) {
     return {
@@ -457,24 +497,32 @@ export async function fetchOwnerPrimaryStoreFromBackend(token: string) {
     };
   }
 
+  if (!Array.isArray(result.data.stores)) {
+    return {
+      error: "We couldn't load your store details right now.",
+      ok: false as const,
+      status: result.status,
+    };
+  }
+
   return {
     ok: true as const,
-    store: result.data.stores?.[0] ?? null,
+    store: result.data.stores[0] ?? null,
   };
 }
 
 export async function upgradeToProWithBackend(token: string) {
-  const result = await requestMobileApi<{ user?: BackendUser; message?: string }>(
-    "/auth/roles/pro",
-    {
-      method: "PATCH",
-      token,
-    },
-  );
+  const result = await requestMobileApi<{
+    user?: BackendUser;
+    message?: string;
+  }>("/auth/roles/pro", {
+    method: "PATCH",
+    token,
+  });
 
   if (!result.ok || !result.data.user) {
     return {
-      error: result.ok ? "Could not activate Pro." : result.error,
+      error: result.ok ? "We couldn't activate Pro right now." : result.error,
       ok: false as const,
     };
   }
@@ -497,7 +545,9 @@ export async function initializeProSubscriptionWithBackend(token: string) {
 
   if (!result.ok || !result.data.reference) {
     return {
-      error: result.ok ? "Could not start checkout." : result.error,
+      error: result.ok
+        ? "We couldn't start your upgrade right now."
+        : result.error,
       ok: false as const,
       status: result.status,
     };
@@ -514,7 +564,10 @@ export async function initializeProSubscriptionWithBackend(token: string) {
   };
 }
 
-export async function verifyProSubscriptionWithBackend(token: string, reference: string) {
+export async function verifyProSubscriptionWithBackend(
+  token: string,
+  reference: string,
+) {
   const result = await requestMobileApi<ProSubscriptionVerifyResponse>(
     "/payments/subscriptions/verify",
     {
@@ -525,11 +578,12 @@ export async function verifyProSubscriptionWithBackend(token: string, reference:
   );
 
   const user = unwrapAuthUser(result.data);
-  const subscription = result.data?.data?.subscription ?? result.data?.subscription ?? null;
+  const subscription =
+    result.data?.data?.subscription ?? result.data?.subscription ?? null;
 
   if (!result.ok || !user) {
     return {
-      error: result.ok ? "Could not verify the payment." : result.error,
+      error: result.ok ? "We couldn't confirm your payment yet." : result.error,
       ok: false as const,
       status: result.status,
     };
@@ -568,7 +622,7 @@ export async function refreshMobileSessionFromBackend(options?: {
 
     if (!userResult.ok) {
       if (userResult.status === 401 || userResult.status === 403) {
-        resetMobileSession();
+        await resetMobileSession();
         lastSessionRefreshAt = Date.now();
       }
 
@@ -586,7 +640,7 @@ export async function refreshMobileSessionFromBackend(options?: {
       }
     }
 
-    updateMobileSession({
+    await updateMobileSession({
       ...nextUserPatch,
       ...nextStorePatch,
     });

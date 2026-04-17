@@ -74,7 +74,7 @@ export default function SettingsScreen() {
       return;
     }
 
-    updateMobileSession(
+    await updateMobileSession(
       buildSessionPatchFromAuthUser(result.user, session.authToken),
     );
     setIsSaving(false);
@@ -82,8 +82,8 @@ export default function SettingsScreen() {
     setTimeout(() => setSettingsNotice(""), 2400);
   };
 
-  const handleLogout = () => {
-    resetMobileSession();
+  const handleLogout = async () => {
+    await resetMobileSession();
     router.replace("/login");
   };
 
@@ -380,15 +380,15 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   settingsStack: {
-    gap: 28,
-    marginTop: 28,
+    gap: 24,
+    marginTop: 24,
   },
   groupLabel: {
     color: "#B8C2D9",
     fontSize: 12,
     fontWeight: "700",
     letterSpacing: 1.8,
-    marginBottom: 12,
+    marginBottom: 10,
     textTransform: "uppercase",
   },
   settingsGroup: {
@@ -434,17 +434,18 @@ const styles = StyleSheet.create({
     textAlign: "right",
   },
   inlineFieldWrap: {
-    paddingBottom: 16,
+    paddingBottom: 14,
   },
   textField: {
-    backgroundColor: "rgba(10,15,31,0.6)",
-    borderColor: "rgba(255,255,255,0.10)",
-    borderRadius: 16,
+    minHeight: theme.controls.inputHeight,
+    backgroundColor: theme.form.inputBackground,
+    borderColor: theme.form.inputBorder,
+    borderRadius: theme.form.inputRadius,
     borderWidth: 1,
     color: theme.colors.text,
-    fontSize: 14,
+    fontSize: 15,
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingVertical: 12,
   },
   preferenceRow: {
     alignItems: "center",
@@ -488,12 +489,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(74,136,255,0.12)",
     borderColor: "rgba(74,136,255,0.20)",
-    borderRadius: 16,
+    borderRadius: theme.form.inputRadius,
     borderWidth: 1,
     justifyContent: "center",
-    marginTop: 8,
-    minHeight: 48,
+    marginTop: 10,
+    minHeight: theme.controls.inputHeight,
     paddingHorizontal: 20,
+    width: "100%",
   },
   saveButtonDisabled: {
     opacity: 0.6,

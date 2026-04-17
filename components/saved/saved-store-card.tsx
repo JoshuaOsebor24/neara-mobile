@@ -7,7 +7,7 @@ import type { SavedStoreRecord } from "@/services/saved-stores";
 
 function formatStoreArea(address?: string | null) {
   if (!address) {
-    return "Area unavailable";
+    return "No area";
   }
 
   const parts = address
@@ -23,7 +23,7 @@ function formatStoreArea(address?: string | null) {
     return parts[parts.length - 1];
   }
 
-  return parts[0] || "Area unavailable";
+  return parts[0] || "No area";
 }
 
 function buildInitialLabel(value: string, fallback = "S") {
@@ -44,7 +44,11 @@ function SavedStoreCardComponent({
 }) {
   return (
     <View style={styles.card}>
-      <TouchableOpacity activeOpacity={0.88} onPress={onOpen} style={styles.linkRow}>
+      <TouchableOpacity
+        activeOpacity={0.88}
+        onPress={onOpen}
+        style={styles.linkRow}
+      >
         <View style={styles.imageWrap}>
           {store.image_url ? (
             <AppImage
@@ -69,7 +73,7 @@ function SavedStoreCardComponent({
           </View>
 
           <Text numberOfLines={1} style={styles.categoryText}>
-            {store.category || "Local store"}
+            {store.category || "Store"}
           </Text>
           <Text numberOfLines={1} style={styles.locationText}>
             {formatStoreArea(store.address)}
@@ -83,7 +87,9 @@ function SavedStoreCardComponent({
         onPress={onUnsave}
         style={[styles.savedButton, isRemoving && styles.savedButtonDisabled]}
       >
-        <Text style={styles.savedButtonText}>{isRemoving ? "Removing..." : "Remove"}</Text>
+        <Text style={styles.savedButtonText}>
+          {isRemoving ? "Removing" : "Remove"}
+        </Text>
       </TouchableOpacity>
     </View>
   );
@@ -93,25 +99,25 @@ export const SavedStoreCard = memo(SavedStoreCardComponent);
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: "rgba(255,255,255,0.03)",
+    backgroundColor: "rgba(255,255,255,0.04)",
     borderColor: "rgba(255,255,255,0.08)",
-    borderRadius: 24,
+    borderRadius: 20,
     borderWidth: 1,
-    padding: 20,
+    padding: 16,
   },
   linkRow: {
     flexDirection: "row",
-    gap: 16,
+    gap: 14,
   },
   imageWrap: {
     alignSelf: "flex-start",
     backgroundColor: "#111827",
     borderColor: "rgba(255,255,255,0.10)",
-    borderRadius: 16,
+    borderRadius: 14,
     borderWidth: 1,
-    height: 80,
+    height: 72,
     overflow: "hidden",
-    width: 80,
+    width: 72,
   },
   storeImage: {
     height: "100%",
@@ -141,35 +147,35 @@ const styles = StyleSheet.create({
   storeName: {
     color: theme.colors.text,
     flexShrink: 1,
-    fontSize: 18,
-    fontWeight: "600",
+    fontSize: 16,
+    fontWeight: "800",
   },
   categoryText: {
     color: "#C7D2E5",
-    fontSize: 14,
-    marginTop: 8,
+    fontSize: 13,
+    marginTop: 6,
   },
   locationText: {
     color: "#B8C2D9",
-    fontSize: 14,
+    fontSize: 13,
     marginTop: 4,
   },
   savedButton: {
-    alignSelf: "flex-start",
-    backgroundColor: "rgba(255,255,255,0.10)",
-    borderColor: "rgba(255,255,255,0.25)",
-    borderRadius: 12,
+    alignSelf: "flex-end",
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderColor: theme.colors.borderSoft,
+    borderRadius: 14,
     borderWidth: 1,
-    marginTop: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    marginTop: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
   },
   savedButtonDisabled: {
     opacity: 0.7,
   },
   savedButtonText: {
-    color: "#ffe4e6",
-    fontSize: 14,
-    fontWeight: "500",
+    color: theme.colors.subduedText,
+    fontSize: 13,
+    fontWeight: "700",
   },
 });

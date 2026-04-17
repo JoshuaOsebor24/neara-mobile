@@ -94,7 +94,7 @@ export default function ChatsTab() {
         <StatusBar style="light" />
         <View style={styles.loadingWrap}>
           <Text style={styles.loadingText}>
-            {!session.isAuthenticated ? "Opening chats..." : "Opening inbox..."}
+            {!session.isAuthenticated ? "Opening..." : "Loading..."}
           </Text>
         </View>
       </SafeAreaView>
@@ -135,22 +135,17 @@ export default function ChatsTab() {
                 <Text style={styles.panelTitle}>Conversations</Text>
                 {session.isPro ? (
                   <View style={styles.limitBadge}>
-                    <Text style={styles.limitBadgeText}>
-                      Pro messaging active
-                    </Text>
+                    <Text style={styles.limitBadgeText}>Pro active</Text>
                   </View>
                 ) : freeMessagesRemaining > 0 ? (
                   <View style={styles.limitBadge}>
                     <Text style={styles.limitBadgeText}>
-                      Free messaging • {freeMessagesRemaining} message
-                      {freeMessagesRemaining === 1 ? "" : "s"} left
+                      Free • {freeMessagesRemaining} left
                     </Text>
                   </View>
                 ) : (
                   <View style={styles.limitBadgeExhausted}>
-                    <Text style={styles.limitBadgeText}>
-                      Free message quota exhausted
-                    </Text>
+                    <Text style={styles.limitBadgeText}>Limit reached</Text>
                   </View>
                 )}
               </View>
@@ -159,8 +154,8 @@ export default function ChatsTab() {
             {isLoading ? (
               <View style={styles.stateWrap}>
                 <LoadingCard
-                  message="Loading conversations"
-                  detail="Checking your latest store messages."
+                  message="Loading chats"
+                  detail="Checking messages."
                 />
                 <SkeletonCard height={92} />
                 <SkeletonCard height={92} />
@@ -169,13 +164,16 @@ export default function ChatsTab() {
             ) : null}
 
             {!isLoading && errorMessage ? (
-              <ErrorCard title="Couldn't load chats" detail={errorMessage} />
+              <ErrorCard
+                title="We couldn't load your conversations"
+                detail={errorMessage}
+              />
             ) : null}
 
             {!isLoading && !errorMessage && conversations.length === 0 ? (
               <EmptyCard
                 title="No conversations yet"
-                detail="Browse stores and tap the chat button to start messaging."
+                detail="Browse stores to start."
               />
             ) : null}
 
@@ -227,7 +225,7 @@ export default function ChatsTab() {
                       </Text>
                     </View>
                     <Text numberOfLines={2} style={styles.preview}>
-                      {conversation.last_message || "No messages yet."}
+                      {conversation.last_message || "No messages."}
                     </Text>
                   </Pressable>
                 ))}

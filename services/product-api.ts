@@ -1,7 +1,7 @@
 import {
-  requestMobileApi,
-  requestMobileApiNoCache,
-  requestMobileApiFormData,
+    requestMobileApi,
+    requestMobileApiFormData,
+    requestMobileApiNoCache,
 } from "@/services/api";
 import { invalidateStoreCache } from "@/services/store-api";
 
@@ -83,6 +83,10 @@ type ProductDeleteResponse = {
   message?: string;
 };
 
+function buildInvalidPayloadError(context: string) {
+  return `We couldn't load ${context} right now.`;
+}
+
 function cleanupStoreProductsCache() {
   const now = Date.now();
 
@@ -135,15 +139,22 @@ export async function fetchStoreProducts(
   const request = (async () => {
     const query = new URLSearchParams();
     query.set("store_id", normalizedStoreId);
-    const result = await requestMobileApiNoCache<ProductListResponse>("/products", {
-      method: "GET",
-      query,
-    });
+    const result = await requestMobileApiNoCache<ProductListResponse>(
+      "/products",
+      {
+        method: "GET",
+        query,
+      },
+    );
 
     if (!result.ok) {
-      const legacyResult = await requestMobileApiNoCache<LegacyProductListResponse>(`/products/${normalizedStoreId}`, {
-        method: "GET",
-      });
+      const legacyResult =
+        await requestMobileApiNoCache<LegacyProductListResponse>(
+          `/products/${normalizedStoreId}`,
+          {
+            method: "GET",
+          },
+        );
 
       if (!legacyResult.ok) {
         return {
@@ -154,9 +165,18 @@ export async function fetchStoreProducts(
         };
       }
 
+      if (!Array.isArray(legacyResult.data.products)) {
+        return {
+          error: buildInvalidPayloadError("store products"),
+          ok: false as const,
+          products: [] as BackendProduct[],
+          status: legacyResult.status,
+        };
+      }
+
       const value = {
         ok: true as const,
-        products: legacyResult.data.products ?? [],
+        products: legacyResult.data.products,
         status: legacyResult.status,
       };
 
@@ -168,9 +188,18 @@ export async function fetchStoreProducts(
       return value;
     }
 
+    if (!Array.isArray(result.data.products)) {
+      return {
+        error: buildInvalidPayloadError("store products"),
+        ok: false as const,
+        products: [] as BackendProduct[],
+        status: result.status,
+      };
+    }
+
     const value = {
       ok: true as const,
-      products: result.data.products ?? [],
+      products: result.data.products,
       status: result.status,
     };
 
@@ -220,7 +249,9 @@ export async function createProductWithBackend(
 
   if (!result.ok || !result.data.product) {
     return {
-      error: result.ok ? "Could not add this product." : result.error,
+      error: result.ok
+        ? "We couldn't add this product right now."
+        : result.error,
       ok: false as const,
       product: null,
       status: result.status,
@@ -291,7 +322,7 @@ export async function importProductsCsvWithBackend(
     errors: [] as { message: string; row: number }[],
     message: result.data.message,
     ok: true as const,
-    products: result.data.products ?? [],
+    products: Array.isArray(result.data.products) ? result.data.products : [],
     status: result.status,
   };
 }
@@ -315,15 +346,20 @@ export async function updateProductWithBackend(
     }[];
   },
 ) {
-  const result = await requestMobileApi<ProductMutationResponse>(`/products/${productId}`, {
-    body: payload,
-    method: "PUT",
-    token,
-  });
+  const result = await requestMobileApi<ProductMutationResponse>(
+    `/products/${productId}`,
+    {
+      body: payload,
+      method: "PUT",
+      token,
+    },
+  );
 
   if (!result.ok || !result.data.product) {
     return {
-      error: result.ok ? "Could not update this product." : result.error,
+      error: result.ok
+        ? "We couldn't save this product right now."
+        : result.error,
       ok: false as const,
       product: null,
       status: result.status,
@@ -341,11 +377,17 @@ export async function updateProductWithBackend(
   };
 }
 
-export async function deleteProductWithBackend(token: string, productId: string) {
-  const result = await requestMobileApi<ProductDeleteResponse>(`/products/${productId}`, {
-    method: "DELETE",
-    token,
-  });
+export async function deleteProductWithBackend(
+  token: string,
+  productId: string,
+) {
+  const result = await requestMobileApi<ProductDeleteResponse>(
+    `/products/${productId}`,
+    {
+      method: "DELETE",
+      token,
+    },
+  );
 
   if (!result.ok) {
     return {

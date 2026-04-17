@@ -1,13 +1,15 @@
 import { parseCoordinate } from "@/services/map-links";
-import {
-  fetchStoreById,
-  fetchStoreFullData,
-  fetchStoresNearby,
-  type BackendStore,
-} from "@/services/store-api";
 import { fetchStoreProducts } from "@/services/product-api";
+import {
+    fetchStoreById,
+    fetchStoreFullData,
+    fetchStoresNearby,
+    type BackendStore,
+} from "@/services/store-api";
 
-const NEARBY_STORE_RADIUS_KM = 6;
+const NEARBY_STORE_RADIUS_KM = 1;
+const STORE_CATALOG_CACHE_TTL_MS = 30_000;
+const STORE_DETAIL_CACHE_TTL_MS = 30_000;
 
 export type StoreRecord = {
   address: string;
@@ -69,6 +71,60 @@ export type StoreDetailRecord = {
   store: StoreRecord | null;
 };
 
+type PublicStoreCatalogResult =
+  | {
+      error: string;
+      mapPins: StoreListItem[];
+      nearbyStores: StoreListItem[];
+      ok: false;
+      status: number;
+      stores: StoreListItem[];
+      browseStores: StoreListItem[];
+    }
+  | ({
+      ok: true;
+      status: number;
+    } & StoreCatalog);
+
+type StoreDetailResult =
+  | {
+      error: string;
+      ok: false;
+      products: StoreProductRecord[];
+      status: number;
+      store: StoreRecord | null;
+    }
+  | {
+      error?: string;
+      ok: true;
+      products: StoreProductRecord[];
+      status: number;
+      store: StoreRecord | null;
+    };
+
+const publicStoreCatalogCache = new Map<
+  string,
+  {
+    expiresAt: number;
+    result: PublicStoreCatalogResult;
+  }
+>();
+const inflightPublicStoreCatalogRequests = new Map<
+  string,
+  Promise<PublicStoreCatalogResult>
+>();
+const storeDetailCache = new Map<
+  string,
+  {
+    expiresAt: number;
+    result: StoreDetailResult;
+  }
+>();
+const inflightStoreDetailRequests = new Map<
+  string,
+  Promise<StoreDetailResult>
+>();
+
 function normalizeText(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -123,6 +179,54 @@ function normalizeStorePhotos(
   }
 
   return [primary, ...normalized.filter((photo) => photo !== primary)];
+}
+
+function buildCoordinatesCacheKey(
+  coordinates?: {
+    latitude?: number | null;
+    longitude?: number | null;
+  } | null,
+) {
+  const latitude = parseOptionalNumber(coordinates?.latitude);
+  const longitude = parseOptionalNumber(coordinates?.longitude);
+
+  if (latitude === null || longitude === null) {
+    return "global";
+  }
+
+  return `${latitude.toFixed(4)}:${longitude.toFixed(4)}`;
+}
+
+function getFreshCachedValue<TResult>(
+  cache: Map<string, { expiresAt: number; result: TResult }>,
+  key: string,
+) {
+  const cached = cache.get(key);
+
+  if (!cached) {
+    return null;
+  }
+
+  if (cached.expiresAt <= Date.now()) {
+    cache.delete(key);
+    return null;
+  }
+
+  return cached.result;
+}
+
+function cacheValue<TResult>(
+  cache: Map<string, { expiresAt: number; result: TResult }>,
+  key: string,
+  result: TResult,
+  ttlMs: number,
+) {
+  cache.set(key, {
+    expiresAt: Date.now() + ttlMs,
+    result,
+  });
+
+  return result;
 }
 
 function createVariantKey(
@@ -231,7 +335,11 @@ export function buildStoreCatalog(
   stores.forEach((store) => {
     const normalized = normalizeStoreRecord(store);
 
-    if (!normalized || normalized.latitude === null || normalized.longitude === null) {
+    if (
+      !normalized ||
+      normalized.latitude === null ||
+      normalized.longitude === null
+    ) {
       return;
     }
 
@@ -251,11 +359,17 @@ export function buildStoreCatalog(
       return left.distanceKm - right.distanceKm;
     }
 
-    if (typeof left.distanceKm === "number" && Number.isFinite(left.distanceKm)) {
+    if (
+      typeof left.distanceKm === "number" &&
+      Number.isFinite(left.distanceKm)
+    ) {
       return -1;
     }
 
-    if (typeof right.distanceKm === "number" && Number.isFinite(right.distanceKm)) {
+    if (
+      typeof right.distanceKm === "number" &&
+      Number.isFinite(right.distanceKm)
+    ) {
       return 1;
     }
 
@@ -270,12 +384,17 @@ export function buildStoreCatalog(
   const browseStores =
     sortedStores.length > 0
       ? sortedStores
-      : [...storeItems].sort((left, right) => left.name.localeCompare(right.name));
+      : [...storeItems].sort((left, right) =>
+          left.name.localeCompare(right.name),
+        );
 
   return {
     browseStores: browseStores.slice(0, 6),
     mapPins: sortedStores,
-    nearbyStores: (nearbyStores.length > 0 ? nearbyStores : browseStores).slice(0, 6),
+    nearbyStores: (nearbyStores.length > 0 ? nearbyStores : browseStores).slice(
+      0,
+      6,
+    ),
     stores: sortedStores,
   } satisfies StoreCatalog;
 }
@@ -286,27 +405,56 @@ export async function loadPublicStoreCatalog(options?: {
     longitude?: number | null;
   } | null;
 }) {
-  const result = await fetchStoresNearby(options?.coordinates ?? undefined);
+  const coordinates = options?.coordinates ?? undefined;
+  const cacheKey = buildCoordinatesCacheKey(coordinates);
+  const cached = getFreshCachedValue(publicStoreCatalogCache, cacheKey);
 
-  if (!result.ok) {
-    return {
-      browseStores: [] as StoreListItem[],
-      error: result.error,
-      mapPins: [] as StoreListItem[],
-      nearbyStores: [] as StoreListItem[],
-      ok: false as const,
-      status: result.status,
-      stores: [] as StoreListItem[],
-    };
+  if (cached) {
+    return cached;
   }
 
-  const catalog = buildStoreCatalog(result.stores, options?.coordinates);
+  const inflight = inflightPublicStoreCatalogRequests.get(cacheKey);
 
-  return {
-    ...catalog,
-    ok: true as const,
-    status: result.status,
-  };
+  if (inflight) {
+    return inflight;
+  }
+
+  const requestPromise = (async () => {
+    const result = await fetchStoresNearby(coordinates);
+
+    if (!result.ok) {
+      return {
+        browseStores: [] as StoreListItem[],
+        error: result.error,
+        mapPins: [] as StoreListItem[],
+        nearbyStores: [] as StoreListItem[],
+        ok: false as const,
+        status: result.status,
+        stores: [] as StoreListItem[],
+      } satisfies PublicStoreCatalogResult;
+    }
+
+    const catalog = buildStoreCatalog(result.stores, coordinates);
+
+    return cacheValue(
+      publicStoreCatalogCache,
+      cacheKey,
+      {
+        ...catalog,
+        ok: true as const,
+        status: result.status,
+      } satisfies PublicStoreCatalogResult,
+      STORE_CATALOG_CACHE_TTL_MS,
+    );
+  })();
+
+  inflightPublicStoreCatalogRequests.set(cacheKey, requestPromise);
+
+  try {
+    return await requestPromise;
+  } finally {
+    inflightPublicStoreCatalogRequests.delete(cacheKey);
+  }
 }
 
 export function normalizeStoreProductRecord(
@@ -380,8 +528,11 @@ export function normalizeStoreDetailPayload(
       }[];
     }[];
     store: BackendStore | null;
-  }): StoreDetailRecord {
-  const normalizedStore = payload.store ? normalizeStoreRecord(payload.store) : null;
+  },
+): StoreDetailRecord {
+  const normalizedStore = payload.store
+    ? normalizeStoreRecord(payload.store)
+    : null;
   const products = payload.products
     .map((product) =>
       normalizeStoreProductRecord(
@@ -399,56 +550,89 @@ export function normalizeStoreDetailPayload(
 }
 
 export async function loadStoreDetailRecord(storeId: string) {
-  const result = await fetchStoreFullData(String(storeId));
+  const normalizedStoreId = String(storeId);
+  const cached = getFreshCachedValue(storeDetailCache, normalizedStoreId);
 
-  if (result.ok) {
-    const normalized = normalizeStoreDetailPayload(String(storeId), {
-      products: result.products,
-      store: result.store,
-    });
-
-    return {
-      ...normalized,
-      ok: true as const,
-      status: result.status,
-    };
+  if (cached) {
+    return cached;
   }
 
-  const [storeResult, productsResult] = await Promise.all([
-    fetchStoreById(String(storeId)),
-    fetchStoreProducts(String(storeId)),
-  ]);
+  const inflight = inflightStoreDetailRequests.get(normalizedStoreId);
 
-  if (!storeResult.ok || !storeResult.store) {
-    return {
-      error: result.error,
-      ok: false as const,
-      products: [] as StoreProductRecord[],
-      status: result.status,
-      store: null,
-    };
+  if (inflight) {
+    return inflight;
   }
 
-  const normalizedStore = normalizeStoreRecord(storeResult.store);
-  const normalizedProducts = productsResult.ok
-    ? productsResult.products
-        .map((product) =>
-          normalizeStoreProductRecord(
-            String(storeId),
-            product,
-            normalizedStore?.category || "",
-          ),
-        )
-        .filter((product): product is StoreProductRecord => product !== null)
-    : [];
+  const requestPromise = (async () => {
+    const result = await fetchStoreFullData(normalizedStoreId);
 
-  return {
-    error: productsResult.ok ? undefined : productsResult.error,
-    ok: true as const,
-    products: normalizedProducts,
-    status: storeResult.status,
-    store: normalizedStore,
-  };
+    if (result.ok) {
+      const normalized = normalizeStoreDetailPayload(normalizedStoreId, {
+        products: result.products,
+        store: result.store,
+      });
+
+      return cacheValue(
+        storeDetailCache,
+        normalizedStoreId,
+        {
+          ...normalized,
+          ok: true as const,
+          status: result.status,
+        } satisfies StoreDetailResult,
+        STORE_DETAIL_CACHE_TTL_MS,
+      );
+    }
+
+    const [storeResult, productsResult] = await Promise.all([
+      fetchStoreById(normalizedStoreId),
+      fetchStoreProducts(normalizedStoreId),
+    ]);
+
+    if (!storeResult.ok || !storeResult.store) {
+      return {
+        error: result.error,
+        ok: false as const,
+        products: [] as StoreProductRecord[],
+        status: result.status,
+        store: null,
+      } satisfies StoreDetailResult;
+    }
+
+    const normalizedStore = normalizeStoreRecord(storeResult.store);
+    const normalizedProducts = productsResult.ok
+      ? productsResult.products
+          .map((product) =>
+            normalizeStoreProductRecord(
+              normalizedStoreId,
+              product,
+              normalizedStore?.category || "",
+            ),
+          )
+          .filter((product): product is StoreProductRecord => product !== null)
+      : [];
+
+    return cacheValue(
+      storeDetailCache,
+      normalizedStoreId,
+      {
+        error: productsResult.ok ? undefined : productsResult.error,
+        ok: true as const,
+        products: normalizedProducts,
+        status: storeResult.status,
+        store: normalizedStore,
+      } satisfies StoreDetailResult,
+      STORE_DETAIL_CACHE_TTL_MS,
+    );
+  })();
+
+  inflightStoreDetailRequests.set(normalizedStoreId, requestPromise);
+
+  try {
+    return await requestPromise;
+  } finally {
+    inflightStoreDetailRequests.delete(normalizedStoreId);
+  }
 }
 
 export async function loadStoreProductsRecord(
@@ -469,9 +653,7 @@ export async function loadStoreProductsRecord(
   }
 
   const products = result.products
-    .map((product) =>
-      normalizeStoreProductRecord(String(storeId), product),
-    )
+    .map((product) => normalizeStoreProductRecord(String(storeId), product))
     .filter((product): product is StoreProductRecord => product !== null);
 
   return {

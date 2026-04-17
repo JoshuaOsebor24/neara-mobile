@@ -53,10 +53,7 @@ export function NearaMapView({
 }) {
   const currentCoordinates = coordinates ?? DEFAULT_MAP_COORDINATES;
   const validStores = useMemo(
-    () =>
-      (stores ?? []).filter(
-        (store) => store.id && store.name,
-      ),
+    () => (stores ?? []).filter((store) => store.id && store.name),
     [stores],
   );
 
@@ -75,9 +72,7 @@ export function NearaMapView({
 
       <View style={styles.coordinatesCard}>
         <Text style={styles.coordinatesLabel}>
-          {permissionStatus === "granted"
-            ? "Current center"
-            : "Default center"}
+          {permissionStatus === "granted" ? "Current center" : "Default center"}
         </Text>
         <Text style={styles.coordinatesValue}>
           {formatCoordinate(currentCoordinates.latitude)},{" "}
@@ -112,7 +107,9 @@ export function NearaMapView({
                 ]}
               >
                 <View style={styles.storeCardTopRow}>
-                  <Text numberOfLines={1} style={styles.storeName}>{store.name}</Text>
+                  <Text numberOfLines={1} style={styles.storeName}>
+                    {store.name}
+                  </Text>
                   {isSelected ? (
                     <Ionicons
                       color="#4A88FF"
@@ -258,7 +255,6 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   emptyState: {
-    alignItems: "center",
     backgroundColor: "rgba(17,24,39,0.72)",
     borderColor: "rgba(255,255,255,0.08)",
     borderRadius: 18,
@@ -269,6 +265,7 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
     fontSize: 15,
     fontWeight: "800",
+    textAlign: "center",
   },
   emptyStateText: {
     color: "#B8C2D9",

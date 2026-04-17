@@ -64,7 +64,9 @@ export default function ImportProductsScreen() {
   const params = useLocalSearchParams<{ store?: string }>();
   const session = useMobileSession();
   const preferredStoreId = params.store || session.primaryStoreId || "";
-  const [selectedFile, setSelectedFile] = useState<SelectedCsvFile | null>(null);
+  const [selectedFile, setSelectedFile] = useState<SelectedCsvFile | null>(
+    null,
+  );
   const [preview, setPreview] = useState<ParsedProductImport | null>(null);
   const [notice, setNotice] = useState<Notice>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -158,16 +160,21 @@ export default function ImportProductsScreen() {
       );
     } catch {
       setNotice({
-        message: "Could not read that CSV file. Try another file.",
+        message: "We couldn't read that CSV file. Try another one.",
         type: "error",
       });
     }
   };
 
   const handleImport = async () => {
-    if (!session.authToken || !preferredStoreId || !selectedFile || !importReady) {
+    if (
+      !session.authToken ||
+      !preferredStoreId ||
+      !selectedFile ||
+      !importReady
+    ) {
       setNotice({
-        message: "Upload a valid CSV file first.",
+        message: "Choose a valid CSV file before importing.",
         type: "error",
       });
       return;
@@ -199,13 +206,15 @@ export default function ImportProductsScreen() {
 
     showFlashFeedback(result.message || "Products imported.");
     setNotice({
-      message: `${result.count} products imported successfully.`,
+      message: `${result.count} products are ready in your store.`,
       type: "success",
     });
     setSelectedFile(null);
     setPreview(null);
     setIsSubmitting(false);
-    router.replace(preferredStoreId ? `/store/${preferredStoreId}` : "/store-mode");
+    router.replace(
+      preferredStoreId ? `/store/${preferredStoreId}` : "/store-mode",
+    );
   };
 
   return (
@@ -223,7 +232,11 @@ export default function ImportProductsScreen() {
           <View style={styles.pageShell}>
             <View style={styles.topBar}>
               <BackPillButton
-                fallbackHref={preferredStoreId ? `/store/${preferredStoreId}` : "/store-mode"}
+                fallbackHref={
+                  preferredStoreId
+                    ? `/store/${preferredStoreId}`
+                    : "/store-mode"
+                }
               />
               <Text style={styles.topBarLabel}>Neara</Text>
             </View>
@@ -246,7 +259,8 @@ export default function ImportProductsScreen() {
             <View style={styles.card}>
               <Text style={styles.sectionTitle}>Upload</Text>
               <Text style={styles.sectionSubtitle}>
-                Each CSV row represents one variant. Grouping happens automatically by product name.
+                Each CSV row represents one variant. Grouping happens
+                automatically by product name.
               </Text>
 
               <View style={styles.buttonRow}>
@@ -262,7 +276,9 @@ export default function ImportProductsScreen() {
                   onPress={() => void handleDownloadTemplate()}
                   style={styles.secondaryButton}
                 >
-                  <Text style={styles.secondaryButtonText}>Download template</Text>
+                  <Text style={styles.secondaryButtonText}>
+                    Download template
+                  </Text>
                 </TouchableOpacity>
               </View>
 
@@ -283,7 +299,9 @@ export default function ImportProductsScreen() {
               <View
                 style={[
                   styles.noticeCard,
-                  notice.type === "error" ? styles.noticeError : styles.noticeSuccess,
+                  notice.type === "error"
+                    ? styles.noticeError
+                    : styles.noticeSuccess,
                 ]}
               >
                 <Text style={styles.noticeText}>{notice.message}</Text>
@@ -298,7 +316,10 @@ export default function ImportProductsScreen() {
                 </Text>
                 <View style={styles.errorList}>
                   {preview.errors.map((error, index) => (
-                    <Text key={`${error.row}:${index}`} style={styles.errorText}>
+                    <Text
+                      key={`${error.row}:${index}`}
+                      style={styles.errorText}
+                    >
                       {`Row ${error.row} → ${error.message}`}
                     </Text>
                   ))}
@@ -310,7 +331,8 @@ export default function ImportProductsScreen() {
               <View style={styles.card}>
                 <Text style={styles.sectionTitle}>Preview</Text>
                 <Text style={styles.sectionSubtitle}>
-                  Search and grouping are based on the imported product and variant data below.
+                  Search and grouping are based on the imported product and
+                  variant data below.
                 </Text>
 
                 <View style={styles.previewList}>
@@ -318,10 +340,14 @@ export default function ImportProductsScreen() {
                     <View key={group.productName} style={styles.previewCard}>
                       <View style={styles.previewHeader}>
                         <View style={styles.previewHeaderText}>
-                          <Text style={styles.previewTitle}>{group.productName}</Text>
+                          <Text style={styles.previewTitle}>
+                            {group.productName}
+                          </Text>
                           <Text style={styles.previewMeta}>
                             {group.category || "No category"}
-                            {group.tags.length > 0 ? ` • ${group.tags.join(", ")}` : ""}
+                            {group.tags.length > 0
+                              ? ` • ${group.tags.join(", ")}`
+                              : ""}
                           </Text>
                         </View>
                         <Text style={styles.previewBadge}>
@@ -336,11 +362,15 @@ export default function ImportProductsScreen() {
                           style={styles.variantRow}
                         >
                           <View style={styles.variantTextWrap}>
-                            <Text style={styles.variantName}>{variant.variantName}</Text>
+                            <Text style={styles.variantName}>
+                              {variant.variantName}
+                            </Text>
                             <Text style={styles.variantMeta}>
                               {formatCurrency(variant.price)} •{" "}
                               {formatUnitCountLabel(variant.unitCount)}
-                              {variant.stock !== null ? ` • ${variant.stock} in stock` : ""}
+                              {variant.stock !== null
+                                ? ` • ${variant.stock} in stock`
+                                : ""}
                             </Text>
                           </View>
                         </View>

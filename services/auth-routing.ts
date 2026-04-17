@@ -16,9 +16,9 @@ const OWNER_PROTECTED_ROUTE_KEYS = new Set([
   "store/products/import",
 ]);
 
-const PRO_PROTECTED_ROUTE_KEYS = new Set([
-  "store/chats/index",
-]);
+const PRO_PROTECTED_ROUTE_KEYS = new Set(["store/chats/index"]);
+
+const ADMIN_PROTECTED_ROUTE_KEYS = new Set(["admin", "admin/index"]);
 
 function normalizeSegments(segments: readonly string[]) {
   return segments.filter(Boolean);
@@ -66,6 +66,14 @@ export function isProProtectedRoute(segments: readonly string[]) {
   return PRO_PROTECTED_ROUTE_KEYS.has(buildRouteKey(segments));
 }
 
+export function isAdminProtectedRoute(segments: readonly string[]) {
+  const routeKey = buildRouteKey(segments);
+
+  return (
+    ADMIN_PROTECTED_ROUTE_KEYS.has(routeKey) || routeKey.startsWith("admin/")
+  );
+}
+
 export function buildPostLoginHref(options: {
   isStoreOwner: boolean;
   primaryStoreId: string | null;
@@ -88,10 +96,7 @@ export function sanitizeReturnTo(returnTo?: string | null) {
     return null;
   }
 
-  if (
-    normalized === "/login" ||
-    normalized === "/signup"
-  ) {
+  if (normalized === "/login" || normalized === "/signup") {
     return null;
   }
 

@@ -28,9 +28,7 @@ import {
   updateMobileSession,
   useMobileSession,
 } from "@/services/mobile-session";
-import {
-  updateStoreWithBackend,
-} from "@/services/store-api";
+import { updateStoreWithBackend } from "@/services/store-api";
 import { loadStoreRecord } from "@/services/store-data";
 
 const HEADER_IMAGE_LIMIT = 3;
@@ -121,7 +119,9 @@ export default function StoreEditScreen() {
       }
 
       if (!result.ok || !result.store) {
-        setNotice(result.ok ? "Could not load your store." : result.error);
+        setNotice(
+          result.ok ? "We couldn't load your store right now." : result.error,
+        );
         setIsLoadingStore(false);
         return;
       }
@@ -143,7 +143,8 @@ export default function StoreEditScreen() {
             : [],
       );
       setLocationCoordinates(
-        typeof store.latitude === "number" && typeof store.longitude === "number"
+        typeof store.latitude === "number" &&
+          typeof store.longitude === "number"
           ? {
               latitude: store.latitude,
               longitude: store.longitude,
@@ -181,8 +182,8 @@ export default function StoreEditScreen() {
         Alert.alert(
           "Permission needed",
           mode === "camera"
-            ? "Allow camera access to take a store photo."
-            : "Allow photo library access to choose a store photo.",
+            ? "Allow camera access to add a store photo."
+            : "Allow photo access to choose a store photo.",
         );
         setEditingImageIndex(null);
         return;
@@ -220,7 +221,7 @@ export default function StoreEditScreen() {
     } catch {
       Alert.alert(
         "Image unavailable",
-        "We couldn’t load that image right now.",
+        "We couldn't load that image right now.",
       );
     } finally {
       setEditingImageIndex(null);
@@ -228,7 +229,7 @@ export default function StoreEditScreen() {
   };
 
   const handleEditImage = (slotIndex: number) => {
-    Alert.alert("Store image", "Choose how you want to update this image.", [
+    Alert.alert("Store image", "Choose how you want to update this photo.", [
       { text: "Cancel", style: "cancel" },
       {
         text: "Take Photo",
@@ -279,7 +280,9 @@ export default function StoreEditScreen() {
 
     if (!result.ok || !result.store) {
       setIsSubmitting(false);
-      setNotice(result.error || "Could not update your store.");
+      setNotice(
+        result.error || "We couldn't save your store changes right now.",
+      );
       return;
     }
 
@@ -293,7 +296,7 @@ export default function StoreEditScreen() {
           ? [result.store.image_url]
           : [],
     );
-    setNotice(result.message || "Store updated successfully.");
+    setNotice(result.message || "Your store details are up to date.");
     setIsSubmitting(false);
   };
 
@@ -330,8 +333,8 @@ export default function StoreEditScreen() {
           <View style={styles.panel}>
             <Text style={styles.title}>Edit Store Listing</Text>
             <Text style={styles.subtitle}>
-              Update the display address, header images, contact details, and
-              pin location.
+              Update address, header images, contact details, and your store
+              pin.
             </Text>
 
             {isLoadingStore ? (
@@ -419,9 +422,6 @@ export default function StoreEditScreen() {
 
             <View style={styles.fieldGroup}>
               <Text style={styles.fieldLabel}>Header Images</Text>
-              <Text style={styles.helperText}>
-                Add up to 3 images. These appear in your store header.
-              </Text>
               <View style={styles.imageGrid}>
                 {imageSlots.map((image, index) => (
                   <View
@@ -600,11 +600,11 @@ const styles = StyleSheet.create({
     color: "#C7D2E5",
     fontSize: 14,
     lineHeight: 21,
-    marginTop: 10,
+    marginTop: 8,
   },
   fieldGroup: {
-    gap: 8,
-    marginTop: 18,
+    gap: 6,
+    marginTop: 16,
   },
   fieldLabel: {
     color: "#C7D2E5",
@@ -612,9 +612,9 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   helperText: {
-    color: "#B8C2D9",
-    fontSize: 12,
-    lineHeight: 18,
+    color: "rgba(184,194,217,0.84)",
+    fontSize: 11,
+    lineHeight: 16,
   },
   inputShell: {
     backgroundColor: "rgba(10,15,31,0.5)",

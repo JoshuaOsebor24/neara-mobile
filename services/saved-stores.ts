@@ -49,25 +49,20 @@ let collectionState: CollectionState = {
   recentStores: [],
   savedStores: [],
 };
-let cachedPublicStores:
-  | {
-      expiresAt: number;
-      stores: PublicStoreRecord[];
-    }
-  | null = null;
-let inflightPublicStoresRequest: Promise<PublicStoreRecord[] | null> | null = null;
-let inflightSavedStoresLoad:
-  | {
-      key: string;
-      promise: Promise<SavedStoreRecord[]>;
-    }
-  | null = null;
-let inflightRecentStoresLoad:
-  | {
-      key: string;
-      promise: Promise<RecentStoreRecord[]>;
-    }
-  | null = null;
+let cachedPublicStores: {
+  expiresAt: number;
+  stores: PublicStoreRecord[];
+} | null = null;
+let inflightPublicStoresRequest: Promise<PublicStoreRecord[] | null> | null =
+  null;
+let inflightSavedStoresLoad: {
+  key: string;
+  promise: Promise<SavedStoreRecord[]>;
+} | null = null;
+let inflightRecentStoresLoad: {
+  key: string;
+  promise: Promise<RecentStoreRecord[]>;
+} | null = null;
 const listeners = new Set<() => void>();
 
 function emit() {
@@ -117,7 +112,8 @@ function normalizeSavedStore(value: unknown): SavedStoreRecord | null {
     created_at: typeof raw.created_at === "string" ? raw.created_at : undefined,
     id: typeof raw.id === "number" ? raw.id : undefined,
     image_url: typeof raw.image_url === "string" ? raw.image_url : null,
-    phone_number: typeof raw.phone_number === "string" ? raw.phone_number : null,
+    phone_number:
+      typeof raw.phone_number === "string" ? raw.phone_number : null,
     store_id: storeId,
     store_name: raw.store_name,
   };
@@ -146,7 +142,8 @@ function normalizeRecentStore(value: unknown): RecentStoreRecord | null {
     address: typeof raw.address === "string" ? raw.address : null,
     category: typeof raw.category === "string" ? raw.category : null,
     image_url: typeof raw.image_url === "string" ? raw.image_url : null,
-    phone_number: typeof raw.phone_number === "string" ? raw.phone_number : null,
+    phone_number:
+      typeof raw.phone_number === "string" ? raw.phone_number : null,
     store_id: storeId,
     store_name: raw.store_name,
     viewed_at: raw.viewed_at,
@@ -173,7 +170,8 @@ function normalizePublicStore(value: unknown): PublicStoreRecord | null {
     category: typeof raw.category === "string" ? raw.category : null,
     id: storeId,
     image_url: typeof raw.image_url === "string" ? raw.image_url : null,
-    phone_number: typeof raw.phone_number === "string" ? raw.phone_number : null,
+    phone_number:
+      typeof raw.phone_number === "string" ? raw.phone_number : null,
     store_name: raw.store_name,
   };
 }
@@ -296,7 +294,9 @@ function reconcileRecentStoreRecords(
 function sortSavedStores(stores: SavedStoreRecord[]) {
   return [...stores].sort((left, right) => {
     const leftTime = left.created_at ? new Date(left.created_at).getTime() : 0;
-    const rightTime = right.created_at ? new Date(right.created_at).getTime() : 0;
+    const rightTime = right.created_at
+      ? new Date(right.created_at).getTime()
+      : 0;
 
     return rightTime - leftTime;
   });
@@ -417,7 +417,9 @@ async function persistRecentStores(stores: RecentStoreRecord[]) {
 
 export async function upsertStoredSavedStore(store: SavedStoreRecord) {
   const currentStores = await readStoredSavedStores();
-  const nextStores = currentStores.filter((item) => item.store_id !== store.store_id);
+  const nextStores = currentStores.filter(
+    (item) => item.store_id !== store.store_id,
+  );
   nextStores.unshift(store);
   await persistSavedStores(nextStores);
   return store;
@@ -425,7 +427,9 @@ export async function upsertStoredSavedStore(store: SavedStoreRecord) {
 
 export async function removeStoredSavedStore(storeId: number) {
   const currentStores = await readStoredSavedStores();
-  await persistSavedStores(currentStores.filter((item) => item.store_id !== storeId));
+  await persistSavedStores(
+    currentStores.filter((item) => item.store_id !== storeId),
+  );
 }
 
 export async function trackRecentStoreVisit(store: {
@@ -462,37 +466,37 @@ export async function loadSavedStoresForSession() {
   }
 
   const request = (async () => {
-  const session = getMobileSession();
+    const session = getMobileSession();
 
-  if (!session.isAuthenticated) {
-    setSavedStoresState([]);
-    return [];
-  }
-
-  let localStores = await readStoredSavedStores();
-  const currentPublicStores = await fetchCurrentPublicStores();
-
-  if (currentPublicStores) {
-    const reconciledStores = reconcileSavedStoreRecords(
-      localStores,
-      currentPublicStores,
-    );
-
-    if (JSON.stringify(reconciledStores) !== JSON.stringify(localStores)) {
-      await persistSavedStores(reconciledStores);
-      localStores = reconciledStores;
+    if (!session.isAuthenticated) {
+      setSavedStoresState([]);
+      return [];
     }
-  }
 
-  if (!session.authToken) {
-    return localStores;
-  }
+    let localStores = await readStoredSavedStores();
+    const currentPublicStores = await fetchCurrentPublicStores();
 
-  try {
-    return await getSavedStores(session.authToken);
-  } catch {
-    return localStores;
-  }
+    if (currentPublicStores) {
+      const reconciledStores = reconcileSavedStoreRecords(
+        localStores,
+        currentPublicStores,
+      );
+
+      if (JSON.stringify(reconciledStores) !== JSON.stringify(localStores)) {
+        await persistSavedStores(reconciledStores);
+        localStores = reconciledStores;
+      }
+    }
+
+    if (!session.authToken) {
+      return localStores;
+    }
+
+    try {
+      return await getSavedStores(session.authToken);
+    } catch {
+      return localStores;
+    }
   })();
 
   inflightSavedStoresLoad = {
@@ -517,23 +521,23 @@ export async function loadRecentStoresForSession() {
   }
 
   const request = (async () => {
-  const localStores = await readStoredRecentStores();
-  const currentPublicStores = await fetchCurrentPublicStores();
+    const localStores = await readStoredRecentStores();
+    const currentPublicStores = await fetchCurrentPublicStores();
 
-  if (!currentPublicStores) {
-    return localStores;
-  }
+    if (!currentPublicStores) {
+      return localStores;
+    }
 
-  const reconciledStores = reconcileRecentStoreRecords(
-    localStores,
-    currentPublicStores,
-  );
+    const reconciledStores = reconcileRecentStoreRecords(
+      localStores,
+      currentPublicStores,
+    );
 
-  if (JSON.stringify(reconciledStores) !== JSON.stringify(localStores)) {
-    await persistRecentStores(reconciledStores);
-  }
+    if (JSON.stringify(reconciledStores) !== JSON.stringify(localStores)) {
+      await persistRecentStores(reconciledStores);
+    }
 
-  return reconciledStores;
+    return reconciledStores;
   })();
 
   inflightRecentStoresLoad = {
@@ -551,33 +555,43 @@ export async function loadRecentStoresForSession() {
 }
 
 export async function getSavedStores(token: string) {
-  const result = await requestMobileApi<{ savedStores?: unknown[] }>("/saved-stores", {
-    method: "GET",
-    token,
-  });
+  const result = await requestMobileApi<{ savedStores?: unknown[] }>(
+    "/saved-stores",
+    {
+      method: "GET",
+      token,
+    },
+  );
 
   if (!result.ok) {
-    throw new Error(result.error || "Could not load saved stores.");
+    throw new Error(
+      result.error || "We couldn't load your saved stores right now.",
+    );
   }
 
-  const savedStores = Array.isArray(result.data.savedStores)
-    ? result.data.savedStores
-        .map((item) => normalizeSavedStore(item))
-        .filter((item): item is SavedStoreRecord => item !== null)
-    : [];
+  if (!Array.isArray(result.data.savedStores)) {
+    throw new Error("We couldn't load your saved stores right now.");
+  }
+
+  const savedStores = result.data.savedStores
+    .map((item) => normalizeSavedStore(item))
+    .filter((item): item is SavedStoreRecord => item !== null);
 
   await persistSavedStores(savedStores);
   return savedStores;
 }
 
-export async function saveStore(token: string, store: {
-  address?: string | null;
-  category?: string | null;
-  id: number;
-  image_url?: string | null;
-  phone_number?: string | null;
-  store_name: string;
-}) {
+export async function saveStore(
+  token: string,
+  store: {
+    address?: string | null;
+    category?: string | null;
+    id: number;
+    image_url?: string | null;
+    phone_number?: string | null;
+    store_name: string;
+  },
+) {
   const result = await requestMobileApi<{ message?: string }>("/saved-stores", {
     body: { store_id: store.id },
     method: "POST",
@@ -585,7 +599,7 @@ export async function saveStore(token: string, store: {
   });
 
   if (!result.ok) {
-    throw new Error(result.error || "Could not save store.");
+    throw new Error(result.error || "We couldn't save this store right now.");
   }
 
   cachedPublicStores = null;
@@ -604,13 +618,16 @@ export async function saveStore(token: string, store: {
 }
 
 export async function unsaveStore(token: string, storeId: number) {
-  const result = await requestMobileApi<{ message?: string }>(`/saved-stores/${storeId}`, {
-    method: "DELETE",
-    token,
-  });
+  const result = await requestMobileApi<{ message?: string }>(
+    `/saved-stores/${storeId}`,
+    {
+      method: "DELETE",
+      token,
+    },
+  );
 
   if (!result.ok) {
-    throw new Error(result.error || "Could not remove this store.");
+    throw new Error(result.error || "We couldn't remove this store right now.");
   }
 
   cachedPublicStores = null;

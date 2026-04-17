@@ -1,12 +1,17 @@
-import Constants from "expo-constants";
 import { Platform } from "react-native";
 
 const REQUEST_TIMEOUT_MS = 8000;
-const DEFAULT_API_PORTS = ["5050", "5051"] as const;
 const DISCOVERY_TIMEOUT_MS = 2500;
 const GET_DEDUPE_WINDOW_MS = 4000;
 const RETRYABLE_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504]);
+const RUNTIME_IS_DEV = typeof __DEV__ !== "undefined" ? __DEV__ : false;
+const CONFIG_ERROR_MESSAGE = "Neara is not ready yet. Please try again later.";
+const INVALID_PAYLOAD_MESSAGE =
+  "We couldn't finish that right now. Please try again.";
+const TECHNICAL_ERROR_PATTERN =
+  /\b(api|backend|server|database|sql|payload|response|dns|econn|enotfound|cors|stack|exception|internal(?: error)?|request failed|fetch failed|load failed)\b/i;
 const successfulBaseUrlByPath = new Map<string, string>();
+let loggedResolvedApiBaseUrl: string | null = null;
 const inflightGetRequests = new Map<
   string,
   {
@@ -43,7 +48,8 @@ function normalizeApiPath(path: string) {
 }
 
 export function toFriendlyNetworkError(error: unknown) {
-  const rawMessage = error instanceof Error ? error.message : String(error || "");
+  const rawMessage =
+    error instanceof Error ? error.message : String(error || "");
   const normalizedMessage = rawMessage.trim().toLowerCase();
 
   if (
@@ -54,8 +60,11 @@ export function toFriendlyNetworkError(error: unknown) {
     return "Your device is offline. Reconnect to the internet and try again.";
   }
 
-  if (normalizedMessage.includes("aborted") || normalizedMessage.includes("timeout")) {
-    return "The server took too long to respond. Please try again.";
+  if (
+    normalizedMessage.includes("aborted") ||
+    normalizedMessage.includes("timeout")
+  ) {
+    return "This is taking longer than usual. Please try again.";
   }
 
   if (
@@ -67,7 +76,7 @@ export function toFriendlyNetworkError(error: unknown) {
     normalizedMessage.includes("enotfound") ||
     normalizedMessage.includes("dns")
   ) {
-    return "The Neara server is unavailable right now. Please try again shortly.";
+    return "Neara isn't reachable right now. Please try again shortly.";
   }
 
   if (
@@ -75,44 +84,165 @@ export function toFriendlyNetworkError(error: unknown) {
     normalizedMessage.includes("fetch failed") ||
     normalizedMessage.includes("load failed")
   ) {
-    return "We couldn't reach the Neara server. Check your connection and try again.";
+    return "We couldn't connect right now. Check your connection and try again.";
   }
 
-  return "Something went wrong while contacting Neara. Please try again.";
+  return "Something went wrong. Please try again.";
 }
 
-function extractExpoHostCandidate() {
-  const constants = Constants as unknown as {
-    expoConfig?: { hostUri?: string | null } | null;
-    linkingUri?: string | null;
-    manifest?: { debuggerHost?: string | null } | null;
-    manifest2?: {
-      extra?: {
-        expoGo?: { debuggerHost?: string | null } | null;
-      } | null;
-    } | null;
-  };
+function sanitizeBackendErrorMessage(status: number, message?: string | null) {
+  const normalizedMessage = String(message || "").trim();
 
-  const hostSource =
-    constants.expoConfig?.hostUri ||
-    constants.manifest2?.extra?.expoGo?.debuggerHost ||
-    constants.manifest?.debuggerHost ||
-    constants.linkingUri ||
-    "";
+  if (!normalizedMessage) {
+    return "";
+  }
 
-  const normalizedHost = String(hostSource)
-    .trim()
-    .replace(/^exp:\/\//, "")
-    .replace(/^https?:\/\//, "")
-    .split("/")[0]
-    .split(":")[0];
+  const lowercaseMessage = normalizedMessage.toLowerCase();
 
-  return normalizedHost || null;
+  if (
+    lowercaseMessage.includes("not authenticated") ||
+    lowercaseMessage.includes("unauthorized") ||
+    lowercaseMessage.includes("invalid token") ||
+    lowercaseMessage.includes("token expired") ||
+    lowercaseMessage.includes("session expired")
+  ) {
+    return "Log in again to continue.";
+  }
+
+  if (lowercaseMessage.includes("invalid store id")) {
+    return "That store link is no longer valid.";
+  }
+
+  if (lowercaseMessage.includes("invalid conversation id")) {
+    return "That conversation link is no longer valid.";
+  }
+
+  if (lowercaseMessage.includes("invalid user id")) {
+    return "That account link is no longer valid.";
+  }
+
+  if (lowercaseMessage.includes("user not found")) {
+    return "That account could not be found.";
+  }
+
+  if (lowercaseMessage.includes("store not found")) {
+    return "That store could not be found.";
+  }
+
+  if (lowercaseMessage.includes("product not found")) {
+    return "That product could not be found.";
+  }
+
+  if (
+    lowercaseMessage.includes("conversation not found") ||
+    lowercaseMessage.includes("chat not found")
+  ) {
+    return "That conversation could not be found.";
+  }
+
+  if (
+    lowercaseMessage.includes("for store owners") ||
+    lowercaseMessage.includes("store inbox is for store owners")
+  ) {
+    return "This feature is only available to store owners.";
+  }
+
+  if (lowercaseMessage.includes("for admins")) {
+    return "This feature is only available to admins.";
+  }
+
+  if (
+    lowercaseMessage.includes("forbidden") ||
+    lowercaseMessage.includes("not allowed") ||
+    lowercaseMessage.includes("permission")
+  ) {
+    return "Your account doesn't have access to that.";
+  }
+
+  if (lowercaseMessage.includes("push token")) {
+    return "We couldn't turn on notifications right now.";
+  }
+
+  if (lowercaseMessage.includes("test push notification")) {
+    return "We couldn't send a test notification right now.";
+  }
+
+  if (TECHNICAL_ERROR_PATTERN.test(normalizedMessage)) {
+    return "";
+  }
+
+  if (status === 401) {
+    return "Log in again to continue.";
+  }
+
+  return normalizedMessage;
 }
 
 function normalizeBaseUrl(value?: string | null) {
-  const normalized = String(value || "").trim().replace(/\/+$/, "");
+  const normalized = String(value || "")
+    .trim()
+    .replace(/\/+$/, "");
   return normalized || null;
+}
+
+function isProductionApiMode() {
+  const apiEnv = String(process.env.EXPO_PUBLIC_API_ENV || "")
+    .trim()
+    .toLowerCase();
+
+  if (apiEnv === "production") {
+    return true;
+  }
+
+  if (apiEnv === "development") {
+    return false;
+  }
+
+  return !RUNTIME_IS_DEV;
+}
+
+function logApiDebug(message: string, details?: unknown) {
+  if (!RUNTIME_IS_DEV) {
+    return;
+  }
+
+  if (details === undefined) {
+    console.info(`[api] ${message}`);
+    return;
+  }
+
+  console.info(`[api] ${message}`, details);
+}
+
+function getConfiguredApiBaseUrl() {
+  const productionBase = normalizeBaseUrl(process.env.EXPO_PUBLIC_API_URL);
+  const webDevelopmentBase = normalizeBaseUrl(
+    process.env.EXPO_PUBLIC_API_URL_DEV_WEB,
+  );
+  const mobileDevelopmentBase = normalizeBaseUrl(
+    process.env.EXPO_PUBLIC_API_URL_DEV_MOBILE,
+  );
+
+  let selectedBaseUrl: string | null = null;
+
+  if (isProductionApiMode()) {
+    selectedBaseUrl = productionBase;
+  } else if (Platform.OS === "web") {
+    selectedBaseUrl = webDevelopmentBase;
+  } else {
+    selectedBaseUrl = mobileDevelopmentBase;
+  }
+
+  if (!selectedBaseUrl) {
+    throw new Error(CONFIG_ERROR_MESSAGE);
+  }
+
+  if (RUNTIME_IS_DEV && loggedResolvedApiBaseUrl !== selectedBaseUrl) {
+    loggedResolvedApiBaseUrl = selectedBaseUrl;
+    logApiDebug(`selected API URL: ${selectedBaseUrl}`);
+  }
+
+  return selectedBaseUrl;
 }
 
 function buildDedupeKey(
@@ -139,7 +269,10 @@ function getOrderedCandidates(path: string, candidates: string[]) {
     return candidates;
   }
 
-  return [cachedBaseUrl, ...candidates.filter((candidate) => candidate !== cachedBaseUrl)];
+  return [
+    cachedBaseUrl,
+    ...candidates.filter((candidate) => candidate !== cachedBaseUrl),
+  ];
 }
 
 function cleanupInflightGetRequests() {
@@ -152,17 +285,7 @@ function cleanupInflightGetRequests() {
   }
 }
 
-function buildHostCandidates(host: string | null, ports: readonly string[]) {
-  if (!host) {
-    return [];
-  }
-
-  return ports.map((port) => `http://${host}:${port}`);
-}
-
-function parseJsonResponse<T>(
-  rawText: string,
-): {
+function parseJsonResponse<T>(rawText: string): {
   data: (T & { message?: string; error?: string }) | null;
   error?: string;
 } {
@@ -174,12 +297,15 @@ function parseJsonResponse<T>(
 
   try {
     return {
-      data: JSON.parse(normalizedText) as T & { message?: string; error?: string },
+      data: JSON.parse(normalizedText) as T & {
+        message?: string;
+        error?: string;
+      },
     };
   } catch {
     return {
       data: null,
-      error: "Neara returned unreadable data. Please try again.",
+      error: INVALID_PAYLOAD_MESSAGE,
     };
   }
 }
@@ -189,41 +315,41 @@ function isRetryableStatus(status: number) {
 }
 
 function buildHttpStatusErrorMessage(status: number, fallback?: string | null) {
-  const normalizedFallback = String(fallback || "").trim();
+  const normalizedFallback = sanitizeBackendErrorMessage(status, fallback);
 
   if (normalizedFallback) {
     return normalizedFallback;
   }
 
   if (status === 400 || status === 422) {
-    return "Neara could not process that request.";
+    return "Some details need attention. Review them and try again.";
   }
 
   if (status === 401) {
-    return "Your session has expired. Log in again and retry.";
+    return "Log in again to continue.";
   }
 
   if (status === 403) {
-    return "Your account is not allowed to do that.";
+    return "Your account doesn't have access to that.";
   }
 
   if (status === 404) {
-    return "The requested Neara data was not found.";
+    return "That item could not be found.";
   }
 
   if (status === 408 || status === 504) {
-    return "The Neara server took too long to respond.";
+    return "This is taking longer than usual. Please try again.";
   }
 
   if (status === 429) {
-    return "Too many requests were sent to Neara. Please wait a moment.";
+    return "You're moving fast. Please wait a moment and try again.";
   }
 
   if (status >= 500) {
-    return "The Neara server is having trouble right now. Please try again shortly.";
+    return "Neara is having a moment. Please try again shortly.";
   }
 
-  return `Request failed with status ${status}.`;
+  return "We couldn't complete that right now. Please try again.";
 }
 
 type RequestOptions = {
@@ -248,17 +374,22 @@ async function executeMobileApiRequest<T>({
   bypassCache = false,
 }: RequestOptions): Promise<MobileApiResult<T>> {
   const requestPath = normalizeApiPath(path);
-  
+
   // Add cache busting timestamp when bypassing cache
   let finalQuery = query;
   if (bypassCache) {
     finalQuery = new URLSearchParams(query || {});
-    finalQuery.append('_t', String(Date.now()));
+    finalQuery.append("_t", String(Date.now()));
   }
-  
-  const queryString = finalQuery && finalQuery.toString() ? `?${finalQuery.toString()}` : "";
-  const candidates = getOrderedCandidates(requestPath, getMobileApiBaseCandidates());
-  let lastNetworkError = "We couldn't reach the Neara server. Please try again.";
+
+  const queryString =
+    finalQuery && finalQuery.toString() ? `?${finalQuery.toString()}` : "";
+  const candidates = getOrderedCandidates(
+    requestPath,
+    getMobileApiBaseCandidates(),
+  );
+
+  let lastNetworkError = "We couldn't connect right now. Please try again.";
 
   for (const [candidateIndex, apiBase] of candidates.entries()) {
     const maxAttempts = method === "GET" ? 2 : 1;
@@ -274,30 +405,30 @@ async function executeMobileApiRequest<T>({
       const timeout = setTimeout(() => controller.abort(), timeoutMs);
       const url = `${apiBase}${requestPath}${queryString}`;
 
-        try {
+      try {
         const requestHeaders: Record<string, string> = {
-            Accept: "application/json",
-            ...(isJsonBody ? { "Content-Type": "application/json" } : {}),
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            ...headers,
-          };
+          Accept: "application/json",
+          ...(isJsonBody ? { "Content-Type": "application/json" } : {}),
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...headers,
+        };
 
-          if (bypassCache) {
-            requestHeaders["Cache-Control"] = "no-cache";
-            requestHeaders["Pragma"] = "no-cache";
-          }
+        if (bypassCache) {
+          requestHeaders["Cache-Control"] = "no-cache";
+          requestHeaders["Pragma"] = "no-cache";
+        }
 
-          const response = await fetch(url, {
-            method,
-            headers: requestHeaders,
-            body:
-              body === undefined
-                ? undefined
-                : isJsonBody
-                  ? JSON.stringify(body)
-                  : (body as BodyInit),
-            signal: controller.signal,
-          });
+        const response = await fetch(url, {
+          method,
+          headers: requestHeaders,
+          body:
+            body === undefined
+              ? undefined
+              : isJsonBody
+                ? JSON.stringify(body)
+                : (body as BodyInit),
+          signal: controller.signal,
+        });
 
         clearTimeout(timeout);
 
@@ -305,13 +436,13 @@ async function executeMobileApiRequest<T>({
         const parsed = parseJsonResponse<T>(rawText);
 
         if (parsed.error) {
-          lastNetworkError = parsed.error;
-
-          if (attemptIndex + 1 < maxAttempts && isRetryableStatus(response.status)) {
-            continue;
-          }
-
-          break;
+          return {
+            data: null,
+            error: parsed.error,
+            ok: false as const,
+            status: response.status,
+            url,
+          };
         }
 
         if (response.ok || response.status < 500) {
@@ -322,7 +453,7 @@ async function executeMobileApiRequest<T>({
         if (response.status === 304 && parsed.data === null) {
           return {
             data: null,
-            error: "Response not available. Please try again.",
+            error: "That update is not available right now. Please try again.",
             ok: false as const,
             status: 304,
             url,
@@ -332,7 +463,10 @@ async function executeMobileApiRequest<T>({
         const isSuccessStatus = response.status >= 200 && response.status < 300;
 
         if (!isSuccessStatus) {
-          if (attemptIndex + 1 < maxAttempts && isRetryableStatus(response.status)) {
+          if (
+            attemptIndex + 1 < maxAttempts &&
+            isRetryableStatus(response.status)
+          ) {
             continue;
           }
 
@@ -340,8 +474,7 @@ async function executeMobileApiRequest<T>({
             data: (parsed.data ?? null) as T | null,
             error: buildHttpStatusErrorMessage(
               response.status,
-              parsed.data &&
-                typeof parsed.data === "object"
+              parsed.data && typeof parsed.data === "object"
                 ? parsed.data.error || parsed.data.message
                 : undefined,
             ),
@@ -351,10 +484,22 @@ async function executeMobileApiRequest<T>({
           };
         }
 
+        if (
+          parsed.data === null &&
+          (response.status === 204 || response.status === 205)
+        ) {
+          return {
+            data: {} as T,
+            ok: true as const,
+            status: response.status,
+            url,
+          };
+        }
+
         if (parsed.data === null) {
           return {
             data: null,
-            error: "Neara returned unreadable data. Please try again.",
+            error: INVALID_PAYLOAD_MESSAGE,
             ok: false as const,
             status: response.status,
             url,
@@ -386,32 +531,7 @@ async function executeMobileApiRequest<T>({
 }
 
 export function getMobileApiBaseCandidates() {
-  const apiEnv = String(process.env.EXPO_PUBLIC_API_ENV || "").trim().toLowerCase();
-  const explicitBase = normalizeBaseUrl(process.env.EXPO_PUBLIC_API_URL);
-  const productionBase = normalizeBaseUrl(process.env.EXPO_PUBLIC_API_URL_PRODUCTION);
-  const developmentBase = normalizeBaseUrl(process.env.EXPO_PUBLIC_API_URL_DEVELOPMENT);
-  const expoHost = extractExpoHostCandidate();
-  const preferredEnvBase =
-    apiEnv === "production" ? productionBase || explicitBase : developmentBase || explicitBase;
-
-  const candidates = Array.from(
-    new Set(
-      [
-        preferredEnvBase,
-        explicitBase,
-        productionBase,
-        developmentBase,
-        ...buildHostCandidates(expoHost, DEFAULT_API_PORTS),
-        ...buildHostCandidates(
-          Platform.OS === "android" ? "10.0.2.2" : "localhost",
-          DEFAULT_API_PORTS,
-        ),
-        ...buildHostCandidates("localhost", DEFAULT_API_PORTS),
-      ].filter(Boolean),
-    ),
-  ) as string[];
-
-  return candidates;
+  return [getConfiguredApiBaseUrl()];
 }
 
 export async function requestMobileApi<T>(

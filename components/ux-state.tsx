@@ -48,46 +48,42 @@ export function ErrorCard({
   );
 }
 
-export function SkeletonCard({
-  height = 92,
-}: {
-  height?: number;
-}) {
+export function SkeletonCard({ height = 92 }: { height?: number }) {
   return <View style={[styles.skeletonCard, { height }]} />;
 }
 
 const styles = StyleSheet.create({
   statusCard: {
-    borderRadius: 20,
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
-    paddingHorizontal: 18,
-    paddingVertical: 18,
+    borderColor: theme.colors.borderSoft,
+    backgroundColor: theme.colors.surfaceCard,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
     alignItems: "center",
     justifyContent: "center",
-    gap: 10,
+    gap: 8,
   },
   errorCard: {
-    borderColor: "rgba(255,255,255,0.28)",
-    backgroundColor: "rgba(133, 54, 98, 0.22)",
+    borderColor: "rgba(255,194,214,0.18)",
+    backgroundColor: "rgba(133, 54, 98, 0.18)",
   },
   statusTitle: {
     color: theme.colors.text,
-    fontSize: 16,
-    fontWeight: "700",
+    fontSize: 15,
+    fontWeight: "800",
     textAlign: "center",
   },
   statusBody: {
     color: theme.colors.mutedText,
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 13,
+    lineHeight: 18,
     textAlign: "center",
   },
   skeletonCard: {
-    borderRadius: 20,
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: "rgba(19,29,49,0.82)",
+    borderColor: theme.colors.borderSoft,
+    backgroundColor: theme.colors.surfaceElevated,
   },
 });

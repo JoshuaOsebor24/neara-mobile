@@ -8,13 +8,13 @@ const authMiddleware = require("../middleware/authMiddleware");
 
 const router = express.Router();
 
-
 // Add a variant to a product
 // - Checks product exists and that the authenticated user owns it
 router.post("/", authMiddleware, async (req, res) => {
   try {
     const userId = req.user.id;
-    const { product_id, variant_name, price, stock_quantity, unit_count } = req.body;
+    const { product_id, variant_name, price, stock_quantity, unit_count } =
+      req.body;
 
     if (!product_id || !variant_name || price === undefined) {
       return res.status(400).json({
@@ -29,7 +29,7 @@ router.post("/", authMiddleware, async (req, res) => {
       JOIN stores ON products.store_id = stores.id
       WHERE products.id = $1
       `,
-      [product_id]
+      [product_id],
     );
 
     if (productResult.rows.length === 0) {
@@ -47,8 +47,10 @@ router.post("/", authMiddleware, async (req, res) => {
       });
     }
 
-    const finalStockQuantity = stock_quantity !== undefined ? Number(stock_quantity) : 0;
-    const finalUnitCount = unit_count !== undefined ? Number.parseInt(String(unit_count), 10) : 1;
+    const finalStockQuantity =
+      stock_quantity !== undefined ? Number(stock_quantity) : 0;
+    const finalUnitCount =
+      unit_count !== undefined ? Number.parseInt(String(unit_count), 10) : 1;
 
     if (!Number.isInteger(finalUnitCount) || finalUnitCount <= 0) {
       return res.status(400).json({
@@ -70,7 +72,7 @@ router.post("/", authMiddleware, async (req, res) => {
         finalUnitCount,
         finalStockQuantity,
         finalInStock,
-      ]
+      ],
     );
 
     res.status(201).json({
@@ -101,7 +103,7 @@ router.put("/:id", authMiddleware, async (req, res) => {
       JOIN stores ON products.store_id = stores.id
       WHERE product_variants.id = $1
       `,
-      [id]
+      [id],
     );
 
     if (variantResult.rows.length === 0) {
@@ -119,14 +121,32 @@ router.put("/:id", authMiddleware, async (req, res) => {
       });
     }
 
+    const normalizedVariantName =
+      variant_name !== undefined
+        ? String(variant_name || "").trim() || null
+        : variant.variant_name;
+    const finalPrice =
+      price !== undefined ? Number(price) : Number(variant.price);
     const finalStockQuantity =
       stock_quantity !== undefined
         ? Number(stock_quantity)
-        : variant.stock_quantity;
+        : Number(variant.stock_quantity ?? 0);
     const finalUnitCount =
       unit_count !== undefined
         ? Number.parseInt(String(unit_count), 10)
-        : variant.unit_count ?? 1;
+        : Number.parseInt(String(variant.unit_count ?? 1), 10);
+
+    if (!Number.isFinite(finalPrice) || finalPrice < 0) {
+      return res.status(400).json({
+        message: "price must be a valid non-negative number",
+      });
+    }
+
+    if (!Number.isFinite(finalStockQuantity) || finalStockQuantity < 0) {
+      return res.status(400).json({
+        message: "stock_quantity must be a valid non-negative number",
+      });
+    }
 
     if (!Number.isInteger(finalUnitCount) || finalUnitCount <= 0) {
       return res.status(400).json({
@@ -148,13 +168,13 @@ router.put("/:id", authMiddleware, async (req, res) => {
       RETURNING *
       `,
       [
-        variant_name || variant.variant_name,
-        price !== undefined ? price : variant.price,
+        normalizedVariantName,
+        finalPrice,
         finalStockQuantity,
         finalInStock,
         finalUnitCount,
         id,
-      ]
+      ],
     );
 
     res.json({
@@ -184,7 +204,7 @@ router.delete("/:id", authMiddleware, async (req, res) => {
       JOIN stores ON products.store_id = stores.id
       WHERE product_variants.id = $1
       `,
-      [id]
+      [id],
     );
 
     if (variantResult.rows.length === 0) {

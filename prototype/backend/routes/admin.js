@@ -30,8 +30,18 @@ router.get("/stats", async (req, res) => {
     const { rows } = await pool.query(`
       SELECT
         (SELECT COUNT(*)::INT FROM users) AS total_users,
+        (SELECT COUNT(*)::INT FROM users WHERE is_admin = TRUE) AS total_admins,
         (SELECT COUNT(*)::INT FROM users WHERE premium_status = TRUE) AS total_pro_users,
-        (SELECT COUNT(DISTINCT owner_id)::INT FROM stores WHERE owner_id IS NOT NULL) AS total_store_owners,
+        (
+          SELECT COUNT(*)::INT
+          FROM users u
+          WHERE COALESCE(u.roles, ARRAY[]::TEXT[]) @> ARRAY['store_owner']::TEXT[]
+             OR EXISTS (
+               SELECT 1
+               FROM stores s
+               WHERE s.owner_id = u.id
+             )
+        ) AS total_store_owners,
         (SELECT COUNT(*)::INT FROM stores) AS total_stores,
         (SELECT COUNT(*)::INT FROM products) AS total_products,
         (SELECT COUNT(*)::INT FROM conversations) AS total_chats
@@ -39,6 +49,7 @@ router.get("/stats", async (req, res) => {
 
     res.json({
       stats: rows[0] || {
+        total_admins: 0,
         total_users: 0,
         total_pro_users: 0,
         total_store_owners: 0,
@@ -64,14 +75,27 @@ router.get("/users", async (req, res) => {
         u.email,
         u.is_admin,
         u.premium_status,
+        u.roles,
+        u.phone_number,
         u.created_at,
+        EXISTS (
+          SELECT 1
+          FROM stores s
+          WHERE s.owner_id = u.id
+        ) AS has_owned_store,
+        (
+          SELECT COUNT(*)::INT
+          FROM stores s
+          WHERE s.owner_id = u.id
+        ) AS store_count,
         CASE
           WHEN u.is_admin THEN 'admin'
-          WHEN EXISTS (
-            SELECT 1
-            FROM stores s
-            WHERE s.owner_id = u.id
-          ) THEN 'store_owner'
+          WHEN COALESCE(u.roles, ARRAY[]::TEXT[]) @> ARRAY['store_owner']::TEXT[]
+            OR EXISTS (
+              SELECT 1
+              FROM stores s
+              WHERE s.owner_id = u.id
+            ) THEN 'store_owner'
           ELSE 'user'
         END AS role
       FROM users u
@@ -86,6 +110,13 @@ router.get("/users", async (req, res) => {
         role: user.role,
         is_admin: Boolean(user.is_admin),
         premium_status: Boolean(user.premium_status),
+        is_store_owner:
+          Boolean(user.has_owned_store) ||
+          (Array.isArray(user.roles) && user.roles.includes("store_owner")),
+        has_owned_store: Boolean(user.has_owned_store),
+        store_count: Number(user.store_count || 0),
+        phone_number: user.phone_number ?? null,
+        roles: Array.isArray(user.roles) ? user.roles : [],
         created_at: user.created_at,
       })),
     });
@@ -105,6 +136,11 @@ router.get("/stores", async (req, res) => {
         s.owner_id,
         s.store_name,
         s.category,
+        s.address,
+        s.state,
+        s.country,
+        s.phone_number,
+        s.delivery_available,
         s.is_suspended,
         s.created_at,
         u.name AS owner_name,
@@ -125,6 +161,11 @@ router.get("/stores", async (req, res) => {
         owner_name: store.owner_name ?? null,
         owner_email: store.owner_email ?? null,
         category: store.category ?? null,
+        address: store.address ?? null,
+        state: store.state ?? null,
+        country: store.country ?? null,
+        phone_number: store.phone_number ?? null,
+        delivery_available: Boolean(store.delivery_available),
         is_suspended: Boolean(store.is_suspended),
         product_count: Number(store.product_count || 0),
         created_at: store.created_at,
@@ -134,6 +175,139 @@ router.get("/stores", async (req, res) => {
     console.error("admin stores failed", error);
     res.status(500).json({
       message: "Could not load stores",
+    });
+  }
+});
+
+router.get("/stores/:storeId", async (req, res) => {
+  const storeId = parseInteger(req.params.storeId);
+
+  if (!storeId) {
+    return res.status(400).json({
+      message: "Invalid store id",
+    });
+  }
+
+  try {
+    const storeResult = await pool.query(
+      `
+        SELECT
+          s.id,
+          s.owner_id,
+          s.store_name,
+          s.category,
+          s.address,
+          s.state,
+          s.country,
+          s.phone_number,
+          s.delivery_available,
+          s.description,
+          s.image_url,
+          s.header_images,
+          s.is_suspended,
+          s.created_at,
+          u.name AS owner_name,
+          u.email AS owner_email,
+          COUNT(p.id)::INT AS product_count
+        FROM stores s
+        LEFT JOIN users u ON u.id = s.owner_id
+        LEFT JOIN products p ON p.store_id = s.id
+        WHERE s.id = $1
+        GROUP BY s.id, u.id
+        LIMIT 1
+      `,
+      [storeId],
+    );
+
+    if (storeResult.rows.length === 0) {
+      return res.status(404).json({
+        message: "Store not found",
+      });
+    }
+
+    const productsResult = await pool.query(
+      `
+        SELECT
+          p.id,
+          p.store_id,
+          p.product_name,
+          p.category,
+          p.description,
+          p.image_url,
+          p.tags,
+          p.created_at,
+          COALESCE(
+            json_agg(
+              json_build_object(
+                'id', pv.id,
+                'variant_name', pv.variant_name,
+                'price', pv.price,
+                'unit_count', COALESCE(pv.unit_count, 1),
+                'stock_quantity', pv.stock_quantity,
+                'in_stock', pv.in_stock
+              )
+              ORDER BY pv.id
+            ) FILTER (WHERE pv.id IS NOT NULL),
+            '[]'::json
+          ) AS variants
+        FROM products p
+        LEFT JOIN product_variants pv ON pv.product_id = p.id
+        WHERE p.store_id = $1
+        GROUP BY p.id
+        ORDER BY p.created_at DESC, p.id DESC
+      `,
+      [storeId],
+    );
+
+    const store = storeResult.rows[0];
+
+    res.json({
+      store: {
+        id: Number(store.id),
+        owner_id: store.owner_id === null ? null : Number(store.owner_id),
+        owner_name: store.owner_name ?? null,
+        owner_email: store.owner_email ?? null,
+        store_name: store.store_name,
+        category: store.category ?? null,
+        address: store.address ?? null,
+        state: store.state ?? null,
+        country: store.country ?? null,
+        phone_number: store.phone_number ?? null,
+        delivery_available: Boolean(store.delivery_available),
+        description: store.description ?? null,
+        image_url: store.image_url ?? null,
+        header_images: Array.isArray(store.header_images)
+          ? store.header_images
+          : [],
+        is_suspended: Boolean(store.is_suspended),
+        product_count: Number(store.product_count || 0),
+        created_at: store.created_at,
+      },
+      products: productsResult.rows.map((product) => ({
+        id: Number(product.id),
+        store_id: Number(product.store_id),
+        product_name: product.product_name,
+        category: product.category ?? null,
+        description: product.description ?? null,
+        image_url: product.image_url ?? null,
+        tags: Array.isArray(product.tags) ? product.tags : [],
+        created_at: product.created_at,
+        variants: Array.isArray(product.variants)
+          ? product.variants.map((variant) => ({
+              id: Number(variant.id),
+              variant_name: variant.variant_name ?? null,
+              price: normalizeNumeric(variant.price),
+              unit_count: normalizeNumeric(variant.unit_count) ?? 1,
+              stock_quantity: normalizeNumeric(variant.stock_quantity),
+              in_stock: Boolean(variant.in_stock),
+            }))
+          : [],
+      })),
+    });
+  } catch (error) {
+    console.error("admin store detail failed", error);
+    res.status(500).json({
+      message: "Could not load store detail",
     });
   }
 });

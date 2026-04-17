@@ -2,9 +2,9 @@ import { BackPillButton } from "@/components/ui/back-pill-button";
 import { Button } from "@/components/ui/button";
 import {
   MAIN_CATEGORY_OPTIONS,
-  type MainCategoryOption,
   normalizeCommaSeparatedValues,
   TAG_OPTIONS,
+  type MainCategoryOption,
   type ProductTagOption,
 } from "@/constants/product-taxonomy";
 import * as ImagePicker from "expo-image-picker";
@@ -281,7 +281,7 @@ export default function AddStoreProductScreen() {
       if (!matchedProduct) {
         setNotice({
           type: "error",
-          message: "Could not find this product.",
+          message: "We couldn't find that product.",
         });
         setIsLoadingProduct(false);
         return;
@@ -302,14 +302,16 @@ export default function AddStoreProductScreen() {
     return null;
   }
 
-  function hydrateFormFromProduct(product: StoreProductRecord, storeId: string) {
-    const variantDrafts =
-      product.variants.map((variant) => ({
-        id: createVariantId(),
-        price: String(variant.price ?? ""),
-        quantity: String(variant.stockQuantity ?? ""),
-        variantName: variant.label || "",
-      }));
+  function hydrateFormFromProduct(
+    product: StoreProductRecord,
+    storeId: string,
+  ) {
+    const variantDrafts = product.variants.map((variant) => ({
+      id: createVariantId(),
+      price: String(variant.price ?? ""),
+      quantity: String(variant.stockQuantity ?? ""),
+      variantName: variant.label || "",
+    }));
 
     const defaultVariant =
       variantDrafts.length === 1 && !variantDrafts[0].variantName
@@ -318,7 +320,11 @@ export default function AddStoreProductScreen() {
 
     const normalizedCategory = String(product.category || "").trim();
     const incomingTags = (Array.isArray(product.tags) ? product.tags : [])
-      .map((item) => String(item || "").trim().toLowerCase())
+      .map((item) =>
+        String(item || "")
+          .trim()
+          .toLowerCase(),
+      )
       .filter(Boolean);
     const knownTags = incomingTags.filter((item): item is ProductTagOption =>
       TAG_OPTIONS.includes(item as ProductTagOption),
@@ -429,8 +435,8 @@ export default function AddStoreProductScreen() {
         Alert.alert(
           "Permission needed",
           mode === "camera"
-            ? "Allow camera access to take a product photo."
-            : "Allow photo library access to choose a product photo.",
+            ? "Allow camera access to add a product photo."
+            : "Allow photo access to choose a product photo.",
         );
         setIsPickingImage(false);
         return;
@@ -462,7 +468,7 @@ export default function AddStoreProductScreen() {
     } catch {
       Alert.alert(
         "Image unavailable",
-        "We couldn’t load that image right now.",
+        "We couldn't load that image right now.",
       );
     } finally {
       setIsPickingImage(false);
@@ -500,12 +506,12 @@ export default function AddStoreProductScreen() {
         : selectedMainCategory.trim();
     const normalizedTags = Array.from(
       new Set([
-        ...selectedTags.map((item) => item.trim().toLowerCase()).filter(Boolean),
+        ...selectedTags
+          .map((item) => item.trim().toLowerCase())
+          .filter(Boolean),
         ...normalizeCommaSeparatedValues(customTags),
       ]),
-    ).filter(
-      (tag) => tag !== normalizedMainCategory.trim().toLowerCase(),
-    );
+    ).filter((tag) => tag !== normalizedMainCategory.trim().toLowerCase());
 
     if (!normalizedMainCategory) {
       setNotice({
@@ -518,7 +524,7 @@ export default function AddStoreProductScreen() {
     if (!session.authToken) {
       setNotice({
         type: "error",
-        message: "Log in again to manage store products.",
+        message: "Log in again to manage your products.",
       });
       return;
     }
@@ -595,7 +601,7 @@ export default function AddStoreProductScreen() {
       showFlashFeedback(result.message || "Product updated.");
       setNotice({
         type: "success",
-        message: result.message || "Product updated successfully.",
+        message: result.message || "Your product is updated.",
       });
       setSubmitMode(null);
       router.push(`/store/${selectedStoreId}`);
@@ -615,13 +621,13 @@ export default function AddStoreProductScreen() {
       setVariants([]);
       setNotice({
         type: "success",
-        message: result.message || "Added. Start the next one.",
+        message: result.message || "Saved. You can add the next one now.",
       });
     } else {
       showFlashFeedback(result.message || "Product created.");
       setNotice({
         type: "success",
-        message: result.message || "Added. Edit the next one.",
+        message: result.message || "Saved. You can keep editing from here.",
       });
       if (resultProductId) {
         router.replace(
@@ -1160,14 +1166,15 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
   },
   sectionSubtitle: {
-    marginTop: 8,
+    marginTop: 6,
     color: theme.colors.subduedText,
     fontSize: 14,
+    lineHeight: 20,
   },
   formBody: {
     paddingHorizontal: 20,
     paddingVertical: 20,
-    gap: 20,
+    gap: 18,
   },
   noticeCard: {
     borderRadius: 18,
@@ -1189,7 +1196,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   fieldGroup: {
-    gap: 10,
+    gap: 6,
   },
   fieldLabel: {
     color: theme.colors.mutedText,
@@ -1245,22 +1252,24 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   input: {
-    borderRadius: 18,
+    minHeight: theme.controls.inputHeight,
+    borderRadius: theme.form.inputRadius,
     borderWidth: 1,
-    borderColor: BORDER,
-    backgroundColor: theme.colors.surfaceOverlay,
+    borderColor: theme.form.inputBorder,
+    backgroundColor: theme.form.inputBackground,
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingVertical: 12,
     color: theme.colors.text,
     fontSize: 15,
   },
   priceInputWrap: {
     flexDirection: "row",
     alignItems: "center",
-    borderRadius: 18,
+    minHeight: theme.controls.inputHeight,
+    borderRadius: theme.form.inputRadius,
     borderWidth: 1,
-    borderColor: BORDER,
-    backgroundColor: theme.colors.surfaceOverlay,
+    borderColor: theme.form.inputBorder,
+    backgroundColor: theme.form.inputBackground,
     paddingHorizontal: 16,
   },
   currencyMark: {
@@ -1271,14 +1280,14 @@ const styles = StyleSheet.create({
   },
   priceInput: {
     flex: 1,
-    paddingVertical: 14,
+    paddingVertical: 12,
     color: theme.colors.text,
     fontSize: 15,
   },
   helperText: {
-    color: theme.colors.mutedText,
-    fontSize: 12,
-    lineHeight: 18,
+    color: "rgba(184,194,217,0.84)",
+    fontSize: 11,
+    lineHeight: 16,
   },
   categoryRow: {
     gap: 10,
@@ -1305,12 +1314,12 @@ const styles = StyleSheet.create({
   },
   textArea: {
     minHeight: 110,
-    borderRadius: 18,
+    borderRadius: theme.form.inputRadius,
     borderWidth: 1,
-    borderColor: BORDER,
-    backgroundColor: theme.colors.surfaceOverlay,
+    borderColor: theme.form.inputBorder,
+    backgroundColor: theme.form.inputBackground,
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingVertical: 12,
     color: theme.colors.text,
     fontSize: 14,
     lineHeight: 21,
@@ -1491,6 +1500,7 @@ const styles = StyleSheet.create({
   },
   submitRow: {
     gap: 12,
+    marginTop: 2,
   },
   primarySubmitButton: {
     borderRadius: 18,

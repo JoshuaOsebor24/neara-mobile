@@ -32,10 +32,11 @@ function readList(name, fallback = []) {
 
 const nodeEnv = readEnv("NODE_ENV", "development");
 const isProduction = nodeEnv === "production";
+const defaultHost = isProduction ? "0.0.0.0" : "0.0.0.0";
 
 module.exports = {
   app: {
-    host: readEnv("HOST", "0.0.0.0"),
+    host: readEnv("HOST", defaultHost),
     port: readInt("PORT", 5050),
     publicAppUrl: readEnv("PUBLIC_APP_URL", "http://localhost:8081"),
     bodyLimitMb: readInt("BODY_LIMIT_MB", 12),
@@ -75,13 +76,22 @@ module.exports = {
     paystackPlanCode: readEnv("PAYSTACK_PLAN_CODE"),
     stripePriceId: readEnv("STRIPE_PRICE_ID"),
     stripeSecretKey: readEnv("STRIPE_SECRET_KEY"),
-    successUrl: readEnv("PAYMENT_SUCCESS_URL", "https://example.com/payments/success"),
-    cancelUrl: readEnv("PAYMENT_CANCEL_URL", "https://example.com/payments/cancel"),
+    successUrl: readEnv(
+      "PAYMENT_SUCCESS_URL",
+      "https://example.com/payments/success",
+    ),
+    cancelUrl: readEnv(
+      "PAYMENT_CANCEL_URL",
+      "https://example.com/payments/cancel",
+    ),
     webhookSecret: readEnv("PAYMENT_WEBHOOK_SECRET"),
   },
   notifications: {
     expoAccessToken: readEnv("EXPO_ACCESS_TOKEN"),
-    productReminderCooldownHours: readInt("NOTIFICATION_PRODUCTS_REMINDER_COOLDOWN_HOURS", 72),
+    productReminderCooldownHours: readInt(
+      "NOTIFICATION_PRODUCTS_REMINDER_COOLDOWN_HOURS",
+      72,
+    ),
     productReminderStaleDays: readInt("NOTIFICATION_PRODUCTS_STALE_DAYS", 7),
     reminderBatchSize: readInt("NOTIFICATION_REMINDER_BATCH_SIZE", 50),
   },

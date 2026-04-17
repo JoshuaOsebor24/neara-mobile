@@ -23,7 +23,7 @@ const ROLE_USER = "user";
 const ROLE_PRO = "pro";
 const ROLE_STORE_OWNER = "store_owner";
 const ROLE_ORDER = Object.freeze([ROLE_USER, ROLE_PRO, ROLE_STORE_OWNER]);
-const AUTH_BCRYPT_ROUNDS = 8;
+const AUTH_BCRYPT_ROUNDS = 12;
 const EXISTING_ACCOUNT_MESSAGE = AUTH_MESSAGES.signup.emailExists;
 const authReadLimiter = rateLimit({
   windowMs: 60 * 1000,
@@ -45,7 +45,9 @@ const authWriteLimiter = rateLimit({
 });
 
 function normalizeEmail(value) {
-  return String(value || "").trim().toLowerCase();
+  return String(value || "")
+    .trim()
+    .toLowerCase();
 }
 
 function isValidEmail(value) {
@@ -79,7 +81,10 @@ function pickPrimaryStoreImage(headerImages, fallbackImageUrl = null) {
     ? headerImages.find((item) => normalizeNullableText(item))
     : null;
 
-  return normalizeNullableText(fromHeaders) || normalizeNullableText(fallbackImageUrl);
+  return (
+    normalizeNullableText(fromHeaders) ||
+    normalizeNullableText(fallbackImageUrl)
+  );
 }
 
 function serializeHeaderImages(headerImages) {
@@ -126,7 +131,9 @@ function rolesEqual(leftRoles, rightRoles) {
 function deriveUserRoles(user) {
   return normalizeUserRoles(user?.roles, [
     user?.premium_status ? ROLE_PRO : null,
-    user?.has_store_owner_role || user?.primary_store_id ? ROLE_STORE_OWNER : null,
+    user?.has_store_owner_role || user?.primary_store_id
+      ? ROLE_STORE_OWNER
+      : null,
   ]);
 }
 
@@ -238,7 +245,10 @@ async function syncUserRoles(client, userId, extraRoles = []) {
     return null;
   }
 
-  const nextRoles = normalizeUserRoles(deriveUserRoles(currentUser), extraRoles);
+  const nextRoles = normalizeUserRoles(
+    deriveUserRoles(currentUser),
+    extraRoles,
+  );
 
   if (!rolesEqual(currentUser.roles, nextRoles)) {
     await client.query(
@@ -285,7 +295,7 @@ function buildOwnerRegistrationLogBody(body) {
   const imageUrl = String(body?.store?.image_url || "");
   const headerImages = Array.isArray(body?.store?.header_images)
     ? body.store.header_images.map((item) =>
-        item ? `[redacted:${String(item).length} chars]` : null
+        item ? `[redacted:${String(item).length} chars]` : null,
       )
     : body?.store?.header_images;
 
@@ -429,55 +439,31 @@ async function handleCurrentUserRequest(req, res, routeLabel = "auth/me") {
     logRouteSuccess(req, routeLabel, 200, {
       userId,
     });
-    return sendSuccess(res, 200, {
-      user: publicUser,
-    }, {
-      message: "Current user loaded",
-    });
+    return sendSuccess(
+      res,
+      200,
+      {
+        user: publicUser,
+      },
+      {
+        message: "Current user loaded",
+      },
+    );
   } catch (error) {
     logRouteFailure(req, routeLabel, 500, error, {
       userId,
     });
-    return sendError(res, 500, "Something went wrong. Please try again later.", {
-      message: "Something went wrong. Please try again later.",
-    });
+    return sendError(
+      res,
+      500,
+      "Something went wrong. Please try again later.",
+      {
+        message: "Something went wrong. Please try again later.",
+      },
+    );
   } finally {
     client?.release();
   }
-}
-
-function getConfiguredAdminEmails() {
-  return Array.from(
-    new Set(
-      String(process.env.ADMIN_EMAILS || "")
-        .split(",")
-        .map((item) => normalizeEmail(item))
-        .filter(Boolean),
-    ),
-  );
-}
-
-function shouldGrantAdminForEmail(email) {
-  const normalizedEmail = normalizeEmail(email);
-  return Boolean(normalizedEmail) && getConfiguredAdminEmails().includes(normalizedEmail);
-}
-
-async function grantAdminForConfiguredEmail(client, user) {
-  if (!user || !shouldGrantAdminForEmail(user.email) || user.is_admin) {
-    return user;
-  }
-
-  await client.query(
-    `
-      UPDATE users
-      SET is_admin = TRUE
-      WHERE id = $1
-    `,
-    [user.id],
-  );
-
-  const refreshedUser = await fetchPublicUserById(client, user.id);
-  return refreshedUser || { ...user, is_admin: true };
 }
 
 // Signup: validate input, ensure uniqueness, hash password, save user
@@ -527,9 +513,15 @@ router.post("/signup", authWriteLimiter, async (req, res) => {
     }
 
     if (!hasMinPasswordLength(password)) {
-      logRouteFailure(req, routeLabel, 400, "Password must be at least 6 characters", {
-        email: normalizedEmail,
-      });
+      logRouteFailure(
+        req,
+        routeLabel,
+        400,
+        "Password must be at least 6 characters",
+        {
+          email: normalizedEmail,
+        },
+      );
       return sendError(res, 400, AUTH_MESSAGES.signup.failed, {
         message: AUTH_MESSAGES.signup.failed,
       });
@@ -573,7 +565,8 @@ router.post("/signup", authWriteLimiter, async (req, res) => {
 
     if (existingUser.rows.length > 0) {
       const existingAccount =
-        (await syncUserRoles(client, existingUser.rows[0].id)) || existingUser.rows[0];
+        (await syncUserRoles(client, existingUser.rows[0].id)) ||
+        existingUser.rows[0];
 
       logAuthFlowStep(routeLabel, "signup failed", {
         email: normalizedEmail,
@@ -615,9 +608,9 @@ router.post("/signup", authWriteLimiter, async (req, res) => {
         normalizedEmail,
         hashedPassword,
         phone_number || null,
-        shouldGrantAdminForEmail(normalizedEmail),
+        false,
         [ROLE_USER],
-      ]
+      ],
     );
 
     markStep("auth account created", {
@@ -637,7 +630,6 @@ router.post("/signup", authWriteLimiter, async (req, res) => {
       has_store_owner_role: false,
       primary_store_id: null,
     };
-    createdUser = await grantAdminForConfiguredEmail(client, createdUser);
     createdUser = await ensureUserRoles(client, createdUser, [ROLE_USER]);
     markStep("role assigned", {
       role: buildPublicUser(createdUser).roles.join(","),
@@ -655,18 +647,23 @@ router.post("/signup", authWriteLimiter, async (req, res) => {
       duration_ms: Date.now() - startedAt,
       userId: createdUser?.id,
     });
-    return sendSuccess(res, 201, {
-      token,
-      user: publicUser,
-    }, {
-      message: AUTH_MESSAGES.signup.success,
-      meta: {
-        completedSteps,
-        duration_ms: Date.now() - startedAt,
+    return sendSuccess(
+      res,
+      201,
+      {
+        token,
+        user: publicUser,
       },
-      token,
-      user: publicUser,
-    });
+      {
+        message: AUTH_MESSAGES.signup.success,
+        meta: {
+          completedSteps,
+          duration_ms: Date.now() - startedAt,
+        },
+        token,
+        user: publicUser,
+      },
+    );
   } catch (error) {
     const errorSource = detectAuthErrorSource(error);
     logAuthFlowError(routeLabel, "signup failed", error, {
@@ -706,17 +703,18 @@ router.post("/signup", authWriteLimiter, async (req, res) => {
         AUTH_MESSAGES.signup.failed,
       ),
       {
-      message: buildSignupFailureMessage(
-        currentStep,
-        error,
-        AUTH_MESSAGES.signup.failed,
-      ),
-      meta: {
-        completedSteps,
-        duration_ms: Date.now() - startedAt,
-        error_source: errorSource,
+        message: buildSignupFailureMessage(
+          currentStep,
+          error,
+          AUTH_MESSAGES.signup.failed,
+        ),
+        meta: {
+          completedSteps,
+          duration_ms: Date.now() - startedAt,
+          error_source: errorSource,
+        },
       },
-    });
+    );
   } finally {
     client?.release();
   }
@@ -740,9 +738,15 @@ router.post("/login", authWriteLimiter, async (req, res) => {
 
     if (!normalizedEmail || !password) {
       currentStep = "validation failed";
-      logRouteFailure(req, "auth/login", 400, "Email and password are required", {
-        email: normalizedEmail,
-      });
+      logRouteFailure(
+        req,
+        "auth/login",
+        400,
+        "Email and password are required",
+        {
+          email: normalizedEmail,
+        },
+      );
       return sendError(res, 400, AUTH_MESSAGES.login.invalidCredentials, {
         message: AUTH_MESSAGES.login.invalidCredentials,
       });
@@ -760,9 +764,15 @@ router.post("/login", authWriteLimiter, async (req, res) => {
 
     if (!hasMinPasswordLength(password)) {
       currentStep = "validation failed";
-      logRouteFailure(req, "auth/login", 400, "Password must be at least 6 characters", {
-        email: normalizedEmail,
-      });
+      logRouteFailure(
+        req,
+        "auth/login",
+        400,
+        "Password must be at least 6 characters",
+        {
+          email: normalizedEmail,
+        },
+      );
       return sendError(res, 400, AUTH_MESSAGES.login.invalidCredentials, {
         message: AUTH_MESSAGES.login.invalidCredentials,
       });
@@ -840,8 +850,30 @@ router.post("/login", authWriteLimiter, async (req, res) => {
     }
 
     currentStep = "role sync";
-    let user = await grantAdminForConfiguredEmail(client, matchedUser);
-    user = await ensureUserRoles(client, user);
+    let user = await ensureUserRoles(client, matchedUser);
+
+    const storedHashRounds = bcrypt.getRounds(matchedUser.password_hash);
+
+    if (storedHashRounds < AUTH_BCRYPT_ROUNDS) {
+      const upgradedPasswordHash = await bcrypt.hash(
+        password,
+        AUTH_BCRYPT_ROUNDS,
+      );
+
+      await client.query(
+        `
+          UPDATE users
+          SET password_hash = $2
+          WHERE id = $1
+        `,
+        [matchedUser.id, upgradedPasswordHash],
+      );
+
+      user = {
+        ...user,
+        password_hash: upgradedPasswordHash,
+      };
+    }
 
     // Create a signed JWT containing minimal user info
     const token = buildSignedUserToken(user);
@@ -854,17 +886,22 @@ router.post("/login", authWriteLimiter, async (req, res) => {
       duration_ms: Date.now() - startedAt,
       userId: user.id,
     });
-    return sendSuccess(res, 200, {
-      token,
-      user: buildPublicUser(user),
-    }, {
-      message: AUTH_MESSAGES.login.success,
-      meta: {
-        duration_ms: Date.now() - startedAt,
+    return sendSuccess(
+      res,
+      200,
+      {
+        token,
+        user: buildPublicUser(user),
       },
-      token,
-      user: buildPublicUser(user),
-    });
+      {
+        message: AUTH_MESSAGES.login.success,
+        meta: {
+          duration_ms: Date.now() - startedAt,
+        },
+        token,
+        user: buildPublicUser(user),
+      },
+    );
   } catch (error) {
     const errorSource = detectAuthErrorSource(error);
     logAuthFlowError("auth/login", "login failed", error, {
@@ -916,7 +953,7 @@ router.patch("/roles/pro", authMiddleware, async (req, res) => {
       });
     }
 
-    const currentUser = await grantAdminForConfiguredEmail(pool, userResult.rows[0]);
+    const currentUser = userResult.rows[0];
     const currentRoles = deriveUserRoles(currentUser);
 
     if (currentRoles.includes(ROLE_PRO)) {
@@ -1119,7 +1156,7 @@ router.post("/register-owner", authWriteLimiter, async (req, res) => {
        WHERE LOWER(email) = $1
        ORDER BY u.id ASC
        LIMIT 1`,
-      [ownerEmail]
+      [ownerEmail],
     );
     logAuthFlowStep(routeLabel, "existing user lookup result", {
       rowCount: existingUser.rows.length,
@@ -1137,7 +1174,7 @@ router.post("/register-owner", authWriteLimiter, async (req, res) => {
       const matchedUser = existingUser.rows[0];
       const passwordMatches = await bcrypt.compare(
         ownerPassword,
-        matchedUser.password_hash
+        matchedUser.password_hash,
       );
 
       if (!passwordMatches) {
@@ -1153,11 +1190,15 @@ router.post("/register-owner", authWriteLimiter, async (req, res) => {
         });
       }
 
-      const existingOwnerStore = await findExistingOwnerStore(client, matchedUser.id);
+      const existingOwnerStore = await findExistingOwnerStore(
+        client,
+        matchedUser.id,
+      );
 
       if (existingOwnerStore) {
         const existingOwnerUser =
-          (await syncUserRoles(client, matchedUser.id, [ROLE_STORE_OWNER])) || matchedUser;
+          (await syncUserRoles(client, matchedUser.id, [ROLE_STORE_OWNER])) ||
+          matchedUser;
         await client.query("ROLLBACK");
         transactionOpen = false;
         logAuthFlowStep(routeLabel, "signup failed", {
@@ -1184,7 +1225,7 @@ router.post("/register-owner", authWriteLimiter, async (req, res) => {
          SET name = $1,
              phone_number = $2
          WHERE id = $3`,
-        [ownerName, ownerPhone || null, matchedUser.id]
+        [ownerName, ownerPhone || null, matchedUser.id],
       );
 
       markStep("auth account created", {
@@ -1202,7 +1243,6 @@ router.post("/register-owner", authWriteLimiter, async (req, res) => {
         role: ROLE_STORE_OWNER,
         userId: user.id,
       });
-      user = await grantAdminForConfiguredEmail(client, user);
       markStep("role assigned", {
         role: deriveUserRoles(user).includes(ROLE_PRO)
           ? "user,pro,store_owner"
@@ -1219,7 +1259,10 @@ router.post("/register-owner", authWriteLimiter, async (req, res) => {
         ownerEmail,
         passwordLength: ownerPassword.length,
       });
-      const hashedPassword = await bcrypt.hash(ownerPassword, AUTH_BCRYPT_ROUNDS);
+      const hashedPassword = await bcrypt.hash(
+        ownerPassword,
+        AUTH_BCRYPT_ROUNDS,
+      );
 
       logAuthFlowStep(routeLabel, "user insert inputs", {
         name: ownerName,
@@ -1230,14 +1273,7 @@ router.post("/register-owner", authWriteLimiter, async (req, res) => {
         `INSERT INTO users (name, email, password_hash, phone_number, is_admin, roles)
          VALUES ($1, $2, $3, $4, $5, $6)
          RETURNING id`,
-        [
-          ownerName,
-          ownerEmail,
-          hashedPassword,
-          ownerPhone,
-          shouldGrantAdminForEmail(ownerEmail),
-          [ROLE_USER],
-        ]
+        [ownerName, ownerEmail, hashedPassword, ownerPhone, false, [ROLE_USER]],
       );
 
       user = await fetchPublicUserById(client, userResult.rows[0].id);
@@ -1255,7 +1291,6 @@ router.post("/register-owner", authWriteLimiter, async (req, res) => {
         role: ROLE_STORE_OWNER,
         userId: user.id,
       });
-      user = await grantAdminForConfiguredEmail(client, user);
       markStep("role assigned", {
         role: "user,store_owner",
         userId: user.id,
@@ -1277,10 +1312,10 @@ router.post("/register-owner", authWriteLimiter, async (req, res) => {
       store_name: storeName,
       category,
       phone_number: storePhone,
-        description: description || null,
-        image_url: primaryStoreImage,
+      description: description || null,
+      image_url: primaryStoreImage,
       header_images: headerImages.map((item) =>
-        item ? `[redacted:${String(item).length} chars]` : null
+        item ? `[redacted:${String(item).length} chars]` : null,
       ),
       address,
       state: state || null,
@@ -1306,7 +1341,7 @@ router.post("/register-owner", authWriteLimiter, async (req, res) => {
         country || null,
         latitude,
         longitude,
-      ]
+      ],
     );
     markStep("store data saved", {
       storeId: storeResult.rows[0]?.id,
@@ -1381,6 +1416,7 @@ router.patch("/me", authMiddleware, async (req, res) => {
     const nextName = String(req.body?.name || "").trim();
     const nextEmail = normalizeEmail(req.body?.email);
     const nextPhone = normalizeNullableText(req.body?.phone_number);
+    const currentPassword = String(req.body?.current_password || "");
     const nextPassword = String(req.body?.password || "");
 
     if (!nextName) {
@@ -1401,11 +1437,17 @@ router.patch("/me", authMiddleware, async (req, res) => {
       });
     }
 
+    if (nextPassword && !currentPassword) {
+      return sendError(res, 400, "Current password is required", {
+        message: "Current password is required",
+      });
+    }
+
     client = await pool.connect();
 
     const currentUserResult = await client.query(
       `
-        SELECT id, email
+        SELECT id, email, password_hash
         FROM users
         WHERE id = $1
         LIMIT 1
@@ -1417,6 +1459,19 @@ router.patch("/me", authMiddleware, async (req, res) => {
       return sendError(res, 404, "User not found", {
         message: "User not found",
       });
+    }
+
+    if (nextPassword) {
+      const passwordMatches = await bcrypt.compare(
+        currentPassword,
+        currentUserResult.rows[0].password_hash,
+      );
+
+      if (!passwordMatches) {
+        return sendError(res, 403, "Current password is incorrect", {
+          message: "Current password is incorrect",
+        });
+      }
     }
 
     const duplicateUserResult = await client.query(
@@ -1465,14 +1520,18 @@ router.patch("/me", authMiddleware, async (req, res) => {
     );
   } catch (error) {
     console.error("auth/me patch failed", buildErrorLog(error));
-    return sendError(res, 500, "Something went wrong. Please try again later.", {
-      message: "Something went wrong. Please try again later.",
-    });
+    return sendError(
+      res,
+      500,
+      "Something went wrong. Please try again later.",
+      {
+        message: "Something went wrong. Please try again later.",
+      },
+    );
   } finally {
     client?.release();
   }
 });
-
 
 module.exports = router;
 module.exports.handleCurrentUserRequest = handleCurrentUserRequest;

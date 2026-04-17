@@ -1,7 +1,9 @@
 import { DarkTheme, ThemeProvider } from "@react-navigation/native";
+import { Asset } from "expo-asset";
 import { Stack, usePathname, useRouter, useSegments } from "expo-router";
+import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { FlashFeedback } from "@/components/flash-feedback";
@@ -11,6 +13,7 @@ import { theme } from "@/constants/theme";
 import { refreshMobileSessionFromBackend } from "@/services/auth-api";
 import {
   buildPostLoginHref,
+  isAdminProtectedRoute,
   isAuthRoute,
   isOwnerProtectedRoute,
   isProProtectedRoute,
@@ -34,6 +37,13 @@ import {
 } from "@/services/saved-stores";
 import { loadPublicStoreCatalog } from "@/services/store-data";
 
+const SPLASH_LOGO_ASSET = require("@/assets/images/icon-transparent.png");
+const MIN_LAUNCH_SCREEN_DURATION_MS = 3000;
+
+void SplashScreen.preventAutoHideAsync().catch(() => {
+  // Ignore repeated calls during fast refresh.
+});
+
 const appTheme = {
   ...DarkTheme,
   colors: {
@@ -54,17 +64,52 @@ export default function RootLayout() {
   const session = useMobileSession();
   const isSessionHydrated = useMobileSessionHydrated();
   const [isAuthBootstrapComplete, setIsAuthBootstrapComplete] = useState(false);
+  const [hasHiddenNativeSplash, setHasHiddenNativeSplash] = useState(false);
+  const [hasMetMinimumLaunchDuration, setHasMetMinimumLaunchDuration] =
+    useState(false);
+  const [hasCompletedLaunchTransition, setHasCompletedLaunchTransition] =
+    useState(false);
   const isPendingStoreRegistrationRoute =
     session.isAuthenticated &&
     !session.isStoreOwner &&
     Boolean(session.storePlan) &&
     (pathname === "/signup" || pathname === "/auth/signup");
+  const isLaunchReady =
+    isSessionHydrated && isAuthBootstrapComplete && hasMetMinimumLaunchDuration;
+
+  const handleLaunchScreenReady = useCallback(() => {
+    if (hasHiddenNativeSplash) {
+      return;
+    }
+
+    setHasHiddenNativeSplash(true);
+    void SplashScreen.hideAsync().catch(() => {
+      // Ignore hide races during development reloads.
+    });
+  }, [hasHiddenNativeSplash]);
+
+  const handleLaunchScreenExit = useCallback(() => {
+    setHasCompletedLaunchTransition(true);
+  }, []);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setHasMetMinimumLaunchDuration(true);
+    }, MIN_LAUNCH_SCREEN_DURATION_MS);
+
+    return () => {
+      clearTimeout(timeout);
+    };
+  }, []);
 
   useEffect(() => {
     let mounted = true;
 
     const bootstrap = async () => {
-      await hydrateMobileSession();
+      await Promise.all([
+        Asset.fromModule(SPLASH_LOGO_ASSET).downloadAsync(),
+        hydrateMobileSession(),
+      ]);
       const refreshPromise = refreshMobileSessionFromBackend();
       void loadPublicStoreCatalog();
       await refreshPromise;
@@ -130,6 +175,15 @@ export default function RootLayout() {
 
     if (
       authenticated &&
+      isAdminProtectedRoute(currentSegments) &&
+      !session.isAdmin
+    ) {
+      router.replace("/(tabs)/home");
+      return;
+    }
+
+    if (
+      authenticated &&
       isOwnerProtectedRoute(currentSegments) &&
       !session.isStoreOwner
     ) {
@@ -167,6 +221,7 @@ export default function RootLayout() {
     router,
     segments,
     session.authToken,
+    session.isAdmin,
     session.isAuthenticated,
     session.isPro,
     session.isStoreOwner,
@@ -214,13 +269,17 @@ export default function RootLayout() {
     session.isAuthenticated,
   ]);
 
-  if (!isSessionHydrated || !isAuthBootstrapComplete) {
+  if (!isLaunchReady || !hasCompletedLaunchTransition) {
     return (
       <SafeAreaProvider>
         <ThemeProvider value={appTheme}>
           <StatusBar style="light" />
           <AppBackground />
-          <LaunchLoadingScreen />
+          <LaunchLoadingScreen
+            isExiting={isLaunchReady}
+            onExitComplete={handleLaunchScreenExit}
+            onReady={handleLaunchScreenReady}
+          />
         </ThemeProvider>
       </SafeAreaProvider>
     );

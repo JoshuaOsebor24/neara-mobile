@@ -24,16 +24,14 @@ function normalizeNullableText(value) {
 }
 
 function isInlineDataUrl(value) {
-  return typeof value === "string" && value.trim().toLowerCase().startsWith("data:");
+  return (
+    typeof value === "string" && value.trim().toLowerCase().startsWith("data:")
+  );
 }
 
 function sanitizePublicImageUrl(value) {
   const normalized = normalizeNullableText(value);
-  if (!normalized || isInlineDataUrl(normalized)) {
-    return null;
-  }
-
-  return normalized;
+  return normalized || null;
 }
 
 function normalizePrice(value) {
@@ -191,7 +189,9 @@ function readMultipartRequest(req, { maxBytes = 5 * 1024 * 1024 } = {}) {
           }
 
           const rawHeaders = segment.slice(0, headerEndIndex);
-          const rawValue = segment.slice(headerEndIndex + 4).replace(/\r\n$/, "");
+          const rawValue = segment
+            .slice(headerEndIndex + 4)
+            .replace(/\r\n$/, "");
           const headers = rawHeaders.split("\r\n");
           const dispositionHeader =
             headers.find((header) =>
@@ -267,14 +267,18 @@ function parseImportedProductsCsv(csvText) {
     };
   }
 
-  const headerIndex = new Map(headerRow.map((header, index) => [header, index]));
+  const headerIndex = new Map(
+    headerRow.map((header, index) => [header, index]),
+  );
   const groupedProducts = new Map();
   const errors = [];
 
   rows.slice(1).forEach((row, index) => {
     const rowNumber = index + 2;
     const getValue = (key) =>
-      normalizeText(String(row[headerIndex.get(key)] ?? "").replace(/^\uFEFF/, ""));
+      normalizeText(
+        String(row[headerIndex.get(key)] ?? "").replace(/^\uFEFF/, ""),
+      );
 
     const productName = getValue("product_name");
     const variantName = getValue("variant_name");
@@ -405,13 +409,19 @@ function normalizeVariantDrafts(variants) {
     const rawName = normalizeText(variant?.variant_name);
     const rawPrice = variant?.price;
     const rawQuantity =
-      variant?.stock_quantity ?? variant?.quantity_available ?? variant?.quantity;
+      variant?.stock_quantity ??
+      variant?.quantity_available ??
+      variant?.quantity;
     const rawUnitCount = variant?.unit_count;
     const isCompletelyBlank =
       !rawName &&
       (rawPrice === undefined || rawPrice === null || rawPrice === "") &&
-      (rawQuantity === undefined || rawQuantity === null || rawQuantity === "") &&
-      (rawUnitCount === undefined || rawUnitCount === null || rawUnitCount === "");
+      (rawQuantity === undefined ||
+        rawQuantity === null ||
+        rawQuantity === "") &&
+      (rawUnitCount === undefined ||
+        rawUnitCount === null ||
+        rawUnitCount === "");
 
     if (isCompletelyBlank) {
       return;
@@ -515,13 +525,13 @@ async function insertProductWithVariants(client, payload) {
     payload.variants.length > 0
       ? payload.variants
       : [
-            {
-              variant_name: null,
-              price: payload.basePrice,
-              unit_count: payload.unitCount ?? 1,
-              stock_quantity: payload.baseQuantity ?? 0,
-              in_stock: (payload.baseQuantity ?? 0) > 0,
-            },
+          {
+            variant_name: null,
+            price: payload.basePrice,
+            unit_count: payload.unitCount ?? 1,
+            stock_quantity: payload.baseQuantity ?? 0,
+            in_stock: (payload.baseQuantity ?? 0) > 0,
+          },
         ];
 
   const createdVariants = [];
@@ -595,10 +605,8 @@ router.post("/", authMiddleware, async (req, res) => {
     const rawBaseQuantity = quantity_available ?? stock_quantity;
     const normalizedBaseQuantity = normalizeQuantity(rawBaseQuantity);
     const normalizedUnitCount = normalizeUnitCount(unit_count);
-    const {
-      variants: normalizedVariants,
-      errors: normalizedVariantErrors,
-    } = normalizeVariantDrafts(variants);
+    const { variants: normalizedVariants, errors: normalizedVariantErrors } =
+      normalizeVariantDrafts(variants);
 
     if (!Number.isInteger(normalizedStoreId) || normalizedStoreId <= 0) {
       return res.status(400).json({
@@ -688,7 +696,10 @@ router.post("/", authMiddleware, async (req, res) => {
       }
     }
     console.error("PRODUCT CREATE ERROR:", error);
-    console.error("PRODUCT CREATE ERROR MESSAGE:", error?.message || String(error));
+    console.error(
+      "PRODUCT CREATE ERROR MESSAGE:",
+      error?.message || String(error),
+    );
     if (error?.stack) {
       console.error("PRODUCT CREATE ERROR STACK:", error.stack);
     }
@@ -710,7 +721,9 @@ router.post("/bulk", authMiddleware, async (req, res) => {
     client = await pool.connect();
     const userId = Number(req.user.id);
     const normalizedStoreId = Number(req.body?.store_id);
-    const inputProducts = Array.isArray(req.body?.products) ? req.body.products : [];
+    const inputProducts = Array.isArray(req.body?.products)
+      ? req.body.products
+      : [];
 
     if (!Number.isInteger(normalizedStoreId) || normalizedStoreId <= 0) {
       return res.status(400).json({
@@ -949,15 +962,14 @@ router.post("/import", authMiddleware, async (req, res) => {
 
     const errorMessage = error?.message || String(error);
     const statusCode =
-      errorMessage === "Missing multipart boundary" ? 400
-        : errorMessage === "Uploaded file is too large" ? 413
-        : 500;
+      errorMessage === "Missing multipart boundary"
+        ? 400
+        : errorMessage === "Uploaded file is too large"
+          ? 413
+          : 500;
 
     return res.status(statusCode).json({
-      message:
-        statusCode === 500
-          ? "Something went wrong"
-          : errorMessage,
+      message: statusCode === 500 ? "Something went wrong" : errorMessage,
     });
   } finally {
     if (client) {
@@ -994,10 +1006,7 @@ router.get("/", async (req, res) => {
         p.product_name,
         p.category,
         p.description,
-        CASE
-          WHEN p.image_url ILIKE 'data:%' THEN NULL
-          ELSE p.image_url
-        END AS image_url,
+        p.image_url,
         p.tags,
         pv.id AS variant_id,
         pv.variant_name,
@@ -1066,7 +1075,8 @@ router.get("/", async (req, res) => {
             ? Number(row.price)
             : row.price,
         stock_quantity:
-          typeof row.stock_quantity === "string" && row.stock_quantity.trim() !== ""
+          typeof row.stock_quantity === "string" &&
+          row.stock_quantity.trim() !== ""
             ? Number(row.stock_quantity)
             : row.stock_quantity,
         in_stock: Boolean(row.in_stock),
@@ -1079,7 +1089,10 @@ router.get("/", async (req, res) => {
       route: "/products?store_id=:id",
       storeId,
       productCount: products.length,
-      variantCount: products.reduce((sum, product) => sum + product.variants.length, 0),
+      variantCount: products.reduce(
+        (sum, product) => sum + product.variants.length,
+        0,
+      ),
       duration_ms: Date.now() - startedAt,
     });
 
@@ -1115,10 +1128,7 @@ router.get("/:storeId", async (req, res) => {
         product_name,
         category,
         description,
-        CASE
-          WHEN image_url ILIKE 'data:%' THEN NULL
-          ELSE image_url
-        END AS image_url,
+        image_url,
         tags,
         created_at,
         updated_at
@@ -1126,7 +1136,7 @@ router.get("/:storeId", async (req, res) => {
       WHERE store_id = $1
       ORDER BY created_at DESC
       `,
-      [storeId]
+      [storeId],
     );
 
     res.json({
@@ -1174,7 +1184,7 @@ router.put("/:id", authMiddleware, async (req, res) => {
       JOIN stores ON products.store_id = stores.id
       WHERE products.id = $1
       `,
-      [id]
+      [id],
     );
 
     if (productResult.rows.length === 0) {
@@ -1208,25 +1218,33 @@ router.put("/:id", authMiddleware, async (req, res) => {
 
     const normalizedProductName =
       product_name !== undefined
-        ? normalizeText(product_name) || product.product_name
+        ? normalizeText(product_name)
         : product.product_name;
     const normalizedCategory =
-      category !== undefined ? normalizeNullableText(category) : product.category;
+      category !== undefined
+        ? normalizeNullableText(category)
+        : product.category;
     const normalizedDescription =
       description !== undefined
         ? normalizeNullableText(description)
         : product.description;
     const normalizedImageUrl =
-      image_url !== undefined ? sanitizePublicImageUrl(image_url) : sanitizePublicImageUrl(product.image_url);
+      image_url !== undefined
+        ? sanitizePublicImageUrl(image_url)
+        : sanitizePublicImageUrl(product.image_url);
+
+    if (!normalizedProductName) {
+      return res.status(400).json({
+        message: "product_name is required",
+      });
+    }
 
     const normalizedBasePrice = normalizePrice(price);
     const rawBaseQuantity = quantity_available ?? stock_quantity;
     const normalizedBaseQuantity = normalizeQuantity(rawBaseQuantity);
     const normalizedUnitCount = normalizeUnitCount(unit_count);
-    const {
-      variants: normalizedVariants,
-      errors: normalizedVariantErrors,
-    } = normalizeVariantDrafts(variants);
+    const { variants: normalizedVariants, errors: normalizedVariantErrors } =
+      normalizeVariantDrafts(variants);
     const shouldReplaceVariants =
       Array.isArray(variants) ||
       price !== undefined ||
@@ -1269,16 +1287,20 @@ router.put("/:id", authMiddleware, async (req, res) => {
       normalizedBaseQuantity !== null
         ? normalizedBaseQuantity
         : existingDefaultVariant
-          ? normalizeQuantity(existingDefaultVariant.stock_quantity) ?? 0
+          ? (normalizeQuantity(existingDefaultVariant.stock_quantity) ?? 0)
           : 0;
     const fallbackUnitCount =
       normalizedUnitCount !== null
         ? normalizedUnitCount
         : existingDefaultVariant
-          ? normalizeUnitCount(existingDefaultVariant.unit_count) ?? 1
+          ? (normalizeUnitCount(existingDefaultVariant.unit_count) ?? 1)
           : 1;
 
-    if (shouldReplaceVariants && normalizedVariants.length === 0 && fallbackBasePrice === null) {
+    if (
+      shouldReplaceVariants &&
+      normalizedVariants.length === 0 &&
+      fallbackBasePrice === null
+    ) {
       return res.status(400).json({
         message: "price is required when no variants are provided",
       });
@@ -1306,13 +1328,15 @@ router.put("/:id", authMiddleware, async (req, res) => {
         normalizedImageUrl,
         finalTags,
         id,
-      ]
+      ],
     );
 
     let nextVariants = existingVariants;
 
     if (shouldReplaceVariants) {
-      await client.query("DELETE FROM product_variants WHERE product_id = $1", [id]);
+      await client.query("DELETE FROM product_variants WHERE product_id = $1", [
+        id,
+      ]);
 
       const variantPayload =
         normalizedVariants.length > 0
@@ -1394,7 +1418,7 @@ router.delete("/:id", authMiddleware, async (req, res) => {
       JOIN stores ON products.store_id = stores.id
       WHERE products.id = $1
       `,
-      [id]
+      [id],
     );
 
     if (productResult.rows.length === 0) {

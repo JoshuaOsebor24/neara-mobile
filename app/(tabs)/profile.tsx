@@ -84,7 +84,7 @@ export default function ProfileTab() {
 
             {isRefreshing ? (
               <View style={styles.noticeCard}>
-                <Text style={styles.noticeText}>Loading profile...</Text>
+                <Text style={styles.noticeText}>Refreshing...</Text>
               </View>
             ) : null}
 
@@ -98,12 +98,12 @@ export default function ProfileTab() {
               </View>
               <Text style={styles.identitySubtitle}>
                 {session.isStoreOwner && session.isPro
-                  ? "Pro and Store Owner access active"
+                  ? "Pro · Store"
                   : session.isStoreOwner
-                    ? "Store owner access active"
+                    ? "Store"
                     : session.isPro
-                      ? "Premium access active"
-                      : "Normal account"}
+                      ? "Pro"
+                      : "Account"}
               </Text>
             </View>
 
@@ -141,7 +141,7 @@ export default function ProfileTab() {
                   <View style={styles.upgradeTextWrap}>
                     <Text style={styles.upgradeTitle}>My Store</Text>
                     <Text style={styles.upgradeSubtitle}>
-                      Edit your store details, listing, and products.
+                      Manage products and details.
                     </Text>
                   </View>
                   <Text style={styles.upgradeArrow}>Open →</Text>
@@ -166,8 +166,8 @@ export default function ProfileTab() {
                   </Text>
                   <Text style={styles.upgradeSubtitle}>
                     {session.isPro
-                      ? "All your premium features in one place."
-                      : "Chat with stores • Check availability"}
+                      ? "Premium tools"
+                      : "Chat stores • Check stock"}
                   </Text>
                 </View>
                 <Text style={styles.upgradeArrow}>Open →</Text>

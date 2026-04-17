@@ -52,6 +52,20 @@ class PlaceAutocompleteError extends Error {
 }
 
 const MAPBOX_ACCESS_TOKEN = process.env.EXPO_PUBLIC_MAPBOX_TOKEN?.trim() || "";
+const PLACE_AUTOCOMPLETE_CACHE_TTL_MS = 20_000;
+const PLACE_GEOCODE_CACHE_TTL_MS = 60_000;
+
+const mapboxResponseCache = new Map<
+  string,
+  {
+    expiresAt: number;
+    response: MapboxGeocodingResponse;
+  }
+>();
+const inflightMapboxRequests = new Map<
+  string,
+  Promise<MapboxGeocodingResponse>
+>();
 
 function normalizeCoordinates(
   coordinates:
@@ -76,7 +90,8 @@ function normalizeCoordinates(
 }
 
 function getCoordinatesFromFeature(feature: MapboxFeature) {
-  const [longitude, latitude] = feature.center || feature.geometry?.coordinates || [];
+  const [longitude, latitude] =
+    feature.center || feature.geometry?.coordinates || [];
 
   return normalizeCoordinates({
     latitude,
@@ -84,13 +99,25 @@ function getCoordinatesFromFeature(feature: MapboxFeature) {
   });
 }
 
-function getErrorMessage(body: unknown, statusText: string, fallbackMessage: string) {
+function getErrorMessage(
+  body: unknown,
+  statusText: string,
+  fallbackMessage: string,
+) {
   if (body && typeof body === "object") {
-    if ("message" in body && typeof body.message === "string" && body.message.trim()) {
+    if (
+      "message" in body &&
+      typeof body.message === "string" &&
+      body.message.trim()
+    ) {
       return body.message;
     }
 
-    if ("error" in body && typeof body.error === "string" && body.error.trim()) {
+    if (
+      "error" in body &&
+      typeof body.error === "string" &&
+      body.error.trim()
+    ) {
       return body.error;
     }
   }
@@ -117,29 +144,71 @@ async function parseBody(response: Response) {
 }
 
 async function requestMapbox(url: string, fallbackMessage: string) {
-  const response = await fetch(url);
-  const body = await parseBody(response);
+  const cached = mapboxResponseCache.get(url);
 
-  if (!response.ok) {
-    throw new PlaceAutocompleteError(
-      getErrorMessage(body, response.statusText, fallbackMessage),
-      {
-        body,
-        status: response.status,
-        statusText: response.statusText,
-        url,
-      },
-    );
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.response;
   }
 
-  if (!body || typeof body !== "object") {
-    throw new Error("Place search returned an unreadable response.");
+  if (cached) {
+    mapboxResponseCache.delete(url);
   }
 
-  return body as MapboxGeocodingResponse;
+  const inflight = inflightMapboxRequests.get(url);
+
+  if (inflight) {
+    return inflight;
+  }
+
+  const requestPromise = (async () => {
+    const response = await fetch(url);
+    const body = await parseBody(response);
+
+    if (!response.ok) {
+      throw new PlaceAutocompleteError(
+        getErrorMessage(body, response.statusText, fallbackMessage),
+        {
+          body,
+          status: response.status,
+          statusText: response.statusText,
+          url,
+        },
+      );
+    }
+
+    if (!body || typeof body !== "object") {
+      throw new Error("We couldn't load places right now.");
+    }
+
+    return body as MapboxGeocodingResponse;
+  })();
+
+  inflightMapboxRequests.set(url, requestPromise);
+
+  try {
+    return await requestPromise;
+  } finally {
+    inflightMapboxRequests.delete(url);
+  }
 }
 
-function buildAutocompleteUrl(query: string, proximity?: PlaceCoordinates | null) {
+function cacheMapboxResponse(
+  url: string,
+  response: MapboxGeocodingResponse,
+  ttlMs: number,
+) {
+  mapboxResponseCache.set(url, {
+    expiresAt: Date.now() + ttlMs,
+    response,
+  });
+
+  return response;
+}
+
+function buildAutocompleteUrl(
+  query: string,
+  proximity?: PlaceCoordinates | null,
+) {
   const baseUrl =
     `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json` +
     `?access_token=${MAPBOX_ACCESS_TOKEN}&autocomplete=true&limit=5&country=ng`;
@@ -208,7 +277,11 @@ export async function fetchPlaceSuggestions(options: {
   }
 
   const url = buildAutocompleteUrl(options.query, options.proximity);
-  const response = await requestMapbox(url, "Place autocomplete request failed.");
+  const response = cacheMapboxResponse(
+    url,
+    await requestMapbox(url, "We couldn't search places right now."),
+    PLACE_AUTOCOMPLETE_CACHE_TTL_MS,
+  );
 
   return (response.features || [])
     .map(toSuggestion)
@@ -225,7 +298,11 @@ export async function geocodePlace(options: {
   }
 
   const url = buildGeocodeUrl(options.query, options.proximity);
-  const response = await requestMapbox(url, "Place geocoding request failed.");
+  const response = cacheMapboxResponse(
+    url,
+    await requestMapbox(url, "We couldn't confirm that place right now."),
+    PLACE_GEOCODE_CACHE_TTL_MS,
+  );
   const match = response.features?.[0];
   const coordinates = match ? getCoordinatesFromFeature(match) : null;
 

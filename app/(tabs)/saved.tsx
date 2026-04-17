@@ -1,4 +1,3 @@
-import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useMemo, useState } from "react";
@@ -14,7 +13,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { SavedStoreCard } from "@/components/saved/saved-store-card";
 import { BackPillButton } from "@/components/ui/back-pill-button";
 import { ScreenCard } from "@/components/ui/screen-card";
-import { LoadingCard, SkeletonCard } from "@/components/ux-state";
+import { EmptyCard, LoadingCard, SkeletonCard } from "@/components/ux-state";
 import { theme } from "@/constants/theme";
 import { useMobileSession } from "@/services/mobile-session";
 import {
@@ -68,7 +67,7 @@ export default function SavedTab() {
             text:
               error instanceof Error
                 ? error.message
-                : "Could not load saved stores.",
+                : "We couldn't load your saved stores right now.",
             type: "error",
           });
         }
@@ -106,6 +105,7 @@ export default function SavedTab() {
   }
 
   const showEmptyState = !isLoading && visibleSavedStores.length === 0;
+  const savedStoreCount = visibleSavedStores.length;
 
   return (
     <SafeAreaView edges={["top"]} style={styles.safeArea}>
@@ -117,14 +117,34 @@ export default function SavedTab() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.pageShell}>
-          <View style={styles.topBar}>
-            <BackPillButton fallbackHref="/(tabs)/home" />
+          <View style={styles.header}>
+            <View style={styles.headerLeft}>
+              <BackPillButton fallbackHref="/(tabs)/home" />
+              <Text style={styles.headerTitle}>Saved</Text>
+            </View>
 
-            <Text style={styles.topBarLabel}>NEARA</Text>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => router.push("/(tabs)/home")}
+              style={styles.headerAction}
+            >
+              <Text style={styles.headerActionText}>Browse</Text>
+            </TouchableOpacity>
           </View>
 
-          <ScreenCard style={styles.mainCard}>
-            <Text style={styles.pageTitle}>Saved</Text>
+          <View style={styles.divider} />
+
+          <ScreenCard style={styles.panel}>
+            <View style={styles.panelHeader}>
+              <Text style={styles.panelTitle}>Saved Stores</Text>
+              <View style={styles.limitBadge}>
+                <Text style={styles.limitBadgeText}>
+                  {savedStoreCount === 0
+                    ? "No saved stores yet"
+                    : `${savedStoreCount} saved store${savedStoreCount === 1 ? "" : "s"}`}
+                </Text>
+              </View>
+            </View>
 
             {notice ? (
               <View
@@ -152,25 +172,10 @@ export default function SavedTab() {
             ) : null}
 
             {showEmptyState ? (
-              <View style={styles.emptyStateWrap}>
-                <Ionicons
-                  color="rgba(74,136,255,0.6)"
-                  name="bookmark-outline"
-                  size={48}
-                  style={styles.emptyStateIcon}
-                />
-                <Text style={styles.emptyStateTitle}>No saved stores yet</Text>
-                <Text style={styles.emptyStateContext}>
-                  Stores you save will appear here
-                </Text>
-                <TouchableOpacity
-                  activeOpacity={0.85}
-                  onPress={() => router.push("/(tabs)/home")}
-                  style={styles.exploreButton}
-                >
-                  <Text style={styles.exploreButtonText}>Explore stores</Text>
-                </TouchableOpacity>
-              </View>
+              <EmptyCard
+                title="No saved stores yet"
+                detail="Browse stores and save the ones you want to come back to later."
+              />
             ) : null}
 
             {visibleSavedStores.length > 0 ? (
@@ -210,7 +215,7 @@ export default function SavedTab() {
                           text:
                             error instanceof Error
                               ? error.message
-                              : "Could not remove this store.",
+                              : "We couldn't remove this store right now.",
                           type: "error",
                         });
                       } finally {
@@ -235,11 +240,12 @@ const styles = StyleSheet.create({
     backgroundColor: "transparent",
   },
   scrollContent: {
-    paddingBottom: 44,
-    paddingTop: 6,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 32,
   },
   pageShell: {
-    paddingHorizontal: theme.spacing.screenHorizontal,
+    width: "100%",
   },
   redirectWrap: {
     alignItems: "center",
@@ -251,29 +257,74 @@ const styles = StyleSheet.create({
     color: theme.colors.mutedText,
     fontSize: 16,
   },
-  topBar: {
+  header: {
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 28,
+    marginBottom: 20,
   },
-  topBarLabel: {
-    color: "#8b97ab",
-    fontSize: 13,
-    fontWeight: "700",
-    letterSpacing: 4,
+  headerLeft: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 12,
   },
-  mainCard: {
-    minHeight: 520,
-    paddingBottom: 26,
-    paddingHorizontal: 26,
-    paddingTop: 26,
-  },
-  pageTitle: {
+  headerTitle: {
     color: theme.colors.text,
-    fontSize: theme.typography.pageTitle.fontSize,
-    fontWeight: theme.typography.pageTitle.fontWeight,
-    marginBottom: 14,
+    fontSize: 24,
+    fontWeight: "700",
+  },
+  headerAction: {
+    alignItems: "center",
+    backgroundColor: "rgba(74,136,255,0.12)",
+    borderColor: "rgba(74,136,255,0.20)",
+    borderRadius: 999,
+    borderWidth: 1,
+    justifyContent: "center",
+    minHeight: 44,
+    minWidth: 104,
+    paddingHorizontal: 16,
+  },
+  headerActionText: {
+    color: "#4A88FF",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  divider: {
+    backgroundColor: "rgba(255,255,255,0.08)",
+    height: 1,
+    marginBottom: 16,
+    marginHorizontal: 16,
+  },
+  panel: {
+    backgroundColor: "transparent",
+    borderColor: "transparent",
+    elevation: 0,
+    padding: 16,
+    shadowOpacity: 0,
+    shadowRadius: 0,
+  },
+  panelHeader: {
+    marginBottom: 16,
+  },
+  panelTitle: {
+    color: theme.colors.text,
+    fontSize: 20,
+    fontWeight: "700",
+  },
+  limitBadge: {
+    alignSelf: "flex-start",
+    backgroundColor: "rgba(74,136,255,0.12)",
+    borderColor: "rgba(74,136,255,0.20)",
+    borderRadius: 999,
+    borderWidth: 1,
+    marginTop: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  limitBadgeText: {
+    color: "#4A88FF",
+    fontSize: 12,
+    fontWeight: "600",
   },
   noticeCard: {
     borderRadius: 18,
@@ -295,52 +346,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
   },
-  emptyStateWrap: {
-    alignItems: "center",
-    flex: 1,
-    justifyContent: "center",
-    minHeight: 280,
-    paddingBottom: 26,
-  },
-  emptyStateIcon: {
-    marginBottom: 20,
-  },
-  emptyStateTitle: {
-    color: "#e5edf8",
-    fontSize: 23,
-    fontWeight: "500",
-    marginBottom: 8,
-    textAlign: "center",
-  },
-  emptyStateContext: {
-    color: "#8f9db4",
-    fontSize: 16,
-    lineHeight: 22,
-    marginBottom: 24,
-    textAlign: "center",
-  },
-  exploreButton: {
-    alignItems: "center",
-    backgroundColor: "rgba(74,136,255,0.12)",
-    borderColor: "rgba(74,136,255,0.20)",
-    borderRadius: 999,
-    borderWidth: 1,
-    justifyContent: "center",
-    minHeight: 44,
-    minWidth: 140,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-  },
-  exploreButtonText: {
-    color: "#4A88FF",
-    fontSize: 16,
-    fontWeight: "600",
-  },
   stateWrap: {
     gap: 12,
   },
   savedList: {
     gap: 14,
-    marginTop: 8,
   },
 });

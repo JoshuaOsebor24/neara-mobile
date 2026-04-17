@@ -95,7 +95,9 @@ const COUNTRY_CITY_OPTIONS = {
   ],
 } as const;
 
-const COUNTRY_OPTIONS = Object.keys(COUNTRY_CITY_OPTIONS) as (keyof typeof COUNTRY_CITY_OPTIONS)[];
+const COUNTRY_OPTIONS = Object.keys(
+  COUNTRY_CITY_OPTIONS,
+) as (keyof typeof COUNTRY_CITY_OPTIONS)[];
 
 const OWNER_STEP_META = [
   {
@@ -107,8 +109,8 @@ const OWNER_STEP_META = [
     title: "Store details",
   },
   {
-    description: "Find the place and confirm the final pin",
-    title: "Confirm location",
+    description: "Search to get close, then place your exact store pin",
+    title: "Set Store Map Pin",
   },
 ] as const;
 
@@ -119,9 +121,8 @@ function isValidEmail(value: string) {
 function normalizeCountry(value: string) {
   const normalized = value.trim().toLowerCase();
   return (
-    COUNTRY_OPTIONS.find(
-      (option) => option.toLowerCase() === normalized,
-    ) ?? value.trim()
+    COUNTRY_OPTIONS.find((option) => option.toLowerCase() === normalized) ??
+    value.trim()
   );
 }
 
@@ -297,7 +298,7 @@ export default function SignupScreen() {
   const [locationCoordinates, setLocationCoordinates] =
     useState<StoreCoordinates | null>(null);
   const [locationMessage, setLocationMessage] = useState(
-    "Set your store location",
+    "Set your store map pin",
   );
   const [isLocationConfirmed, setIsLocationConfirmed] = useState(false);
   const [isUsingCurrentLocation, setIsUsingCurrentLocation] = useState(false);
@@ -337,9 +338,10 @@ export default function SignupScreen() {
     [storeImages],
   );
   const selectedCountry = normalizeCountry(country);
-  const stateRegionOptions = COUNTRY_CITY_OPTIONS[
-    selectedCountry as keyof typeof COUNTRY_CITY_OPTIONS
-  ] ?? [];
+  const stateRegionOptions =
+    COUNTRY_CITY_OPTIONS[
+      selectedCountry as keyof typeof COUNTRY_CITY_OPTIONS
+    ] ?? [];
   const hasRequiredStoreFields =
     trimmedStoreName.length > 0 &&
     trimmedCategory.length > 0 &&
@@ -551,15 +553,15 @@ export default function SignupScreen() {
       setCountry(nextValue);
       setStateRegion("");
       setIsLocationConfirmed(false);
-      setLocationMessage("Set your store location");
+      setLocationMessage("Set your store map pin");
     } else if (field === "stateRegion") {
       setStateRegion(nextValue);
       setIsLocationConfirmed(false);
-      setLocationMessage("Set your store location");
+      setLocationMessage("Set your store map pin");
     } else if (field === "address") {
       setAddress(nextValue);
       setIsLocationConfirmed(false);
-      setLocationMessage("Set your store location");
+      setLocationMessage("Set your store map pin");
       setAddressSearchErrorMessage("");
     } else if (field === "description") {
       setDescription(nextValue);
@@ -567,7 +569,8 @@ export default function SignupScreen() {
       setPassword(nextValue);
     }
 
-    const shouldValidateField = touchedFields[field] || hasAttemptedOwnerContinue;
+    const shouldValidateField =
+      touchedFields[field] || hasAttemptedOwnerContinue;
 
     if (shouldValidateField) {
       setErrors((current) => {
@@ -690,7 +693,7 @@ export default function SignupScreen() {
       : undefined;
     const locationError =
       selectedStorePlan && (!locationCoordinates || !isLocationConfirmed)
-        ? "Confirm your store location."
+        ? "Confirm your store map pin."
         : undefined;
 
     if (nameError) {
@@ -770,7 +773,7 @@ export default function SignupScreen() {
         return;
       }
 
-      updateMobileSession(
+      await updateMobileSession(
         buildSessionPatchFromAuthUser(result.user, result.token),
       );
       setIsSubmitting(false);
@@ -802,7 +805,7 @@ export default function SignupScreen() {
         return;
       }
 
-      updateMobileSession(
+      await updateMobileSession(
         buildSessionPatchFromAuthUser(
           accountUpdateResult.user,
           session.authToken,
@@ -833,12 +836,14 @@ export default function SignupScreen() {
         setIsSubmitting(false);
         setNotice({
           type: "error",
-          text: storeCreateResult.error || "Could not create your store.",
+          text:
+            storeCreateResult.error ||
+            "We couldn't create your store right now.",
         });
         return;
       }
 
-      updateMobileSession({
+      await updateMobileSession({
         ...buildSessionPatchFromStore(storeCreateResult.store),
         isStoreOwner: true,
         phoneNumber: trimmedOwnerPhone,
@@ -889,7 +894,7 @@ export default function SignupScreen() {
         signupResult.user &&
         signupResult.store
       ) {
-        updateMobileSession({
+        await updateMobileSession({
           ...buildSessionPatchFromAuthUser(
             signupResult.user,
             signupResult.token,
@@ -920,13 +925,8 @@ export default function SignupScreen() {
       return;
     }
 
-    updateMobileSession({
+    await updateMobileSession({
       ...buildSessionPatchFromAuthUser(signupResult.user, signupResult.token),
-      phoneNumber: trimmedOwnerPhone,
-      storePlan: selectedStorePlan,
-    });
-
-    updateMobileSession({
       ...buildSessionPatchFromStore(signupResult.store),
       isStoreOwner: true,
       phoneNumber: trimmedOwnerPhone,
@@ -991,7 +991,7 @@ export default function SignupScreen() {
 
     if (step === 2) {
       if (!locationCoordinates) {
-        nextErrors.location = "Set your store location to continue.";
+        nextErrors.location = "Set your store map pin to continue.";
       }
     }
 
@@ -1033,10 +1033,12 @@ export default function SignupScreen() {
   const handleBackToPreviousStep = () => {
     if (ownerStep > 0) {
       Alert.alert(
-        ownerStep === 1 ? "Go back to account details?" : "Leave location setup?",
+        ownerStep === 1
+          ? "Go back to account details?"
+          : "Leave location setup?",
         ownerStep === 1
           ? "You can go back, but it may slow down finishing your store setup."
-          : "Your progress is saved, but moving back can interrupt this setup flow.",
+          : "Your progress stays here, but going back may interrupt this step.",
         [
           { text: "Stay here", style: "cancel" },
           {
@@ -1089,7 +1091,7 @@ export default function SignupScreen() {
       });
       setAddressSearchState("idle");
       setIsLocationConfirmed(true);
-      setLocationMessage("Location selected ✓");
+      setLocationMessage("Store pin set ✓");
     } catch {
       setErrors((current) => ({
         ...current,
@@ -1107,7 +1109,7 @@ export default function SignupScreen() {
   const handleMapChange = (coordinates: StoreCoordinates) => {
     setLocationCoordinates(coordinates);
     setIsLocationConfirmed(true);
-    setLocationMessage("Location selected ✓");
+    setLocationMessage("Store pin set ✓");
     setErrors((current) => {
       const next = { ...current };
       delete next.location;
@@ -1139,7 +1141,7 @@ export default function SignupScreen() {
       setLocationCoordinates(match.coordinates);
       setAddressSearchState("ready");
       setIsLocationConfirmed(true);
-      setLocationMessage("Location selected ✓");
+      setLocationMessage("Store pin set ✓");
       setErrors((current) => {
         const next = { ...current };
         delete next.address;
@@ -1190,8 +1192,8 @@ export default function SignupScreen() {
         Alert.alert(
           "Permission needed",
           mode === "camera"
-            ? "Allow camera access to take a store photo."
-            : "Allow photo library access to choose a store photo.",
+            ? "Allow camera access to add a store photo."
+            : "Allow photo access to choose a store photo.",
         );
         setIsPickingImage(false);
         setEditingImageIndex(null);
@@ -1246,7 +1248,7 @@ export default function SignupScreen() {
     if (storeImages.length >= STORE_IMAGE_LIMIT) {
       Alert.alert(
         "Photo limit reached",
-        `You can add up to ${STORE_IMAGE_LIMIT} photos for your store.`,
+        `You can add up to ${STORE_IMAGE_LIMIT} photos to your store.`,
       );
       return;
     }
@@ -1328,7 +1330,9 @@ export default function SignupScreen() {
                       Step {ownerStep + 1} of {OWNER_STEP_META.length}
                     </Text>
                     {ownerStep === 1 ? (
-                      <Text style={styles.stepEncouragement}>Almost done 👏</Text>
+                      <Text style={styles.stepEncouragement}>
+                        Almost done 👏
+                      </Text>
                     ) : null}
                     <View style={styles.stepList}>
                       {OWNER_STEP_META.map((step, index) => {
@@ -1651,7 +1655,8 @@ export default function SignupScreen() {
                           {stateRegionOptions.length > 0 ? (
                             <>
                               <Text style={styles.helperText}>
-                                Choose a location that matches {selectedCountry}.
+                                Choose a location that matches {selectedCountry}
+                                .
                               </Text>
                               <ScrollView
                                 horizontal
@@ -1759,8 +1764,9 @@ export default function SignupScreen() {
                         <View style={styles.fieldGroup}>
                           <Text style={styles.fieldLabel}>Store Photos</Text>
                           <Text style={styles.helperText}>
-                            Add a few clear photos to build trust. The first
-                            image becomes your store header.
+                            Optional: add up to 3 photos now, or continue with
+                            none. If you add one, that image becomes your store
+                            header.
                           </Text>
                           <View style={styles.storeImageGrid}>
                             {imageSlots.map((image, index) => (
@@ -1841,10 +1847,9 @@ export default function SignupScreen() {
                               size={18}
                             />
                             <Text style={styles.addPhotosButtonText}>
-                              {isPickingImage &&
-                              editingImageIndex !== null
+                              {isPickingImage && editingImageIndex !== null
                                 ? "Adding photos..."
-                                : "Add photos"}
+                                : "Add photos (optional)"}
                             </Text>
                           </TouchableOpacity>
                         </View>
@@ -1852,7 +1857,9 @@ export default function SignupScreen() {
                     ) : (
                       <>
                         <View style={styles.noticeInline}>
-                          <Text style={styles.noticeInlineTitle}>Location</Text>
+                          <Text style={styles.noticeInlineTitle}>
+                            Store Map Pin
+                          </Text>
                           <Text style={styles.noticeInlineText}>
                             {locationMessage}
                           </Text>
@@ -1860,7 +1867,7 @@ export default function SignupScreen() {
 
                         <View style={styles.fieldGroup}>
                           <Text style={styles.fieldLabel}>
-                            Search store location
+                            Find your area first
                           </Text>
                           <View
                             style={[
@@ -1885,7 +1892,7 @@ export default function SignupScreen() {
                                 setFieldValue("address", value)
                               }
                               onFocus={() => setIsAddressInputFocused(true)}
-                              placeholder="Search store location"
+                              placeholder="Search area or landmark"
                               placeholderTextColor={theme.colors.mutedText}
                               selectionColor={theme.colors.accent}
                               style={styles.input}
@@ -1952,7 +1959,8 @@ export default function SignupScreen() {
                             </Text>
                           ) : null}
                           <Text style={styles.helperText}>
-                            Search for your store or use the map below
+                            Search helps you get close. Your final store
+                            location is the pin you place on the map.
                           </Text>
                         </View>
 
@@ -1962,24 +1970,21 @@ export default function SignupScreen() {
                           onPress={() => void handleUseCurrentLocation()}
                           style={styles.locationAssistButton}
                         >
-                          <Ionicons
-                            color="#F5F7FB"
-                            name="locate"
-                            size={18}
-                          />
+                          <Ionicons color="#F5F7FB" name="locate" size={18} />
                           <Text style={styles.locationAssistButtonText}>
                             {isUsingCurrentLocation
-                              ? "Getting current location..."
-                              : "Use my current location"}
+                              ? "Getting your location..."
+                              : "Start from my current location"}
                           </Text>
                         </TouchableOpacity>
 
                         <View style={styles.fieldGroup}>
                           <Text style={styles.fieldLabel}>
-                            Move the pin to your store location
+                            Place the pin on your exact store spot
                           </Text>
                           <Text style={styles.helperText}>
-                            This is where customers will find you
+                            Customers use this pin for View on Map and Get
+                            Directions.
                           </Text>
                           <View style={styles.mapCard}>
                             <StoreLocationPicker
@@ -1988,15 +1993,18 @@ export default function SignupScreen() {
                               onChange={handleMapChange}
                               storeName={storeName}
                             />
-                            <View pointerEvents="none" style={styles.mapOverlay}>
+                            <View
+                              pointerEvents="none"
+                              style={styles.mapOverlay}
+                            >
                               <Text style={styles.mapOverlayText}>
-                                Drag map to position your store
+                                Tap or drag to set the exact store pin
                               </Text>
                             </View>
                           </View>
                           {isLocationConfirmed ? (
                             <Text style={styles.locationSelectedText}>
-                              Location selected ✓
+                              Store pin set ✓
                             </Text>
                           ) : null}
                           {errors.location ? (
@@ -2173,7 +2181,7 @@ export default function SignupScreen() {
                       : selectedStorePlan
                         ? ownerStep < 2
                           ? "Continue setup"
-                          : "Confirm & finish setup"
+                          : "Confirm Store Pin & Finish"
                         : "Create account"
                   }
                   onPress={
@@ -2391,7 +2399,7 @@ const styles = StyleSheet.create({
     color: "#F5F7FB",
   },
   fieldGroup: {
-    gap: 8,
+    gap: 6,
   },
   fieldLabel: {
     color: "#C7D2E5",
@@ -2402,11 +2410,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    borderRadius: 18,
+    minHeight: theme.controls.inputHeight,
+    borderRadius: theme.form.inputRadius,
     borderWidth: 1,
-    borderColor: BORDER,
-    backgroundColor: "rgba(10,15,31,0.5)",
-    paddingHorizontal: 14,
+    borderColor: theme.form.inputBorder,
+    backgroundColor: theme.form.inputBackground,
+    paddingHorizontal: 16,
     paddingVertical: 12,
   },
   inputShellError: {
@@ -2419,17 +2428,18 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
   },
   textAreaShell: {
-    borderRadius: 18,
+    borderRadius: theme.form.inputRadius,
     borderWidth: 1,
-    borderColor: BORDER,
-    backgroundColor: "rgba(10,15,31,0.5)",
-    paddingHorizontal: 14,
+    borderColor: theme.form.inputBorder,
+    backgroundColor: theme.form.inputBackground,
+    paddingHorizontal: 16,
     paddingVertical: 12,
   },
   textArea: {
     minHeight: 72,
     color: theme.colors.text,
     fontSize: 15,
+    paddingTop: 0,
   },
   chipRow: {
     gap: 10,
@@ -2469,12 +2479,12 @@ const styles = StyleSheet.create({
   },
   errorText: {
     color: "#D9E1F0",
-    fontSize: 12,
+    fontSize: 11,
   },
   helperText: {
-    color: theme.colors.mutedText,
-    fontSize: 12,
-    lineHeight: 18,
+    color: "rgba(184,194,217,0.84)",
+    fontSize: 11,
+    lineHeight: 16,
   },
   suggestionsCard: {
     borderRadius: 20,

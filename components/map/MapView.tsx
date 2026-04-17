@@ -1,7 +1,8 @@
 import { LinearGradient } from "expo-linear-gradient";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
   Pressable,
   StyleSheet,
   Text,
@@ -43,6 +44,11 @@ const DEFAULT_REGION: Region = {
 
 const MARKER_COLLISION_DISTANCE_METERS = 80;
 const MARKER_SPREAD_RADIUS_METERS = 28;
+const USER_STORE_COLLISION_DISTANCE_METERS = 36;
+const USER_STORE_OFFSET_METERS = {
+  east: 18,
+  north: 26,
+};
 
 function toRadians(value: number) {
   return (value * Math.PI) / 180;
@@ -90,6 +96,7 @@ function buildDisplayStores(
     id: string;
     latitude: number;
     longitude: number;
+    originalId?: string;
   }[],
 ) {
   const groups: {
@@ -98,13 +105,15 @@ function buildDisplayStores(
       id: string;
       latitude: number;
       longitude: number;
+      originalId?: string;
     }[];
   }[] = [];
 
   stores.forEach((store) => {
-    const matchingGroup = groups.find((group) =>
-      distanceBetweenCoordinatesMeters(group.center, store) <=
-      MARKER_COLLISION_DISTANCE_METERS,
+    const matchingGroup = groups.find(
+      (group) =>
+        distanceBetweenCoordinatesMeters(group.center, store) <=
+        MARKER_COLLISION_DISTANCE_METERS,
     );
 
     if (!matchingGroup) {
@@ -204,13 +213,99 @@ function buildStatusContent({
   return null;
 }
 
+const UserLocationMarker = memo(function UserLocationMarker({
+  coordinates,
+  userPulseStyle,
+}: {
+  coordinates: UserCoordinates;
+  userPulseStyle: {
+    opacity: Animated.AnimatedInterpolation<number>;
+    transform: {
+      scale: Animated.AnimatedInterpolation<number>;
+    }[];
+  };
+}) {
+  return (
+    <Marker
+      anchor={{ x: 0.5, y: 0.5 }}
+      coordinate={{
+        latitude: coordinates.latitude,
+        longitude: coordinates.longitude,
+      }}
+      tracksViewChanges
+    >
+      <View pointerEvents="none" style={styles.userLocationWrap}>
+        <Animated.View style={[styles.userLocationPulse, userPulseStyle]} />
+        <View style={styles.userLocationHalo}>
+          <View style={styles.userLocationDot} />
+        </View>
+      </View>
+    </Marker>
+  );
+});
+
+const StoreMapMarker = memo(function StoreMapMarker({
+  id,
+  isSelected,
+  isUserStore,
+  latitude,
+  longitude,
+  onPress,
+}: {
+  id: string;
+  isSelected: boolean;
+  isUserStore: boolean;
+  latitude: number;
+  longitude: number;
+  onPress: (storeId: string) => void;
+}) {
+  return (
+    <Marker
+      anchor={{ x: 0.5, y: 1 }}
+      coordinate={{
+        latitude,
+        longitude,
+      }}
+      onPress={() => onPress(id)}
+      tracksViewChanges={false}
+    >
+      <View style={styles.storeMarkerWrap}>
+        <View
+          style={[
+            styles.storeMarkerHead,
+            isSelected ? styles.storeMarkerHeadSelected : null,
+            isUserStore ? styles.storeMarkerHeadUserStore : null,
+          ]}
+        >
+          <View
+            style={[
+              styles.storeMarkerCore,
+              isSelected ? styles.storeMarkerCoreSelected : null,
+              isUserStore ? styles.storeMarkerCoreUserStore : null,
+            ]}
+          />
+        </View>
+        <View
+          style={[
+            styles.storeMarkerTail,
+            isSelected ? styles.storeMarkerTailSelected : null,
+            isUserStore ? styles.storeMarkerTailUserStore : null,
+          ]}
+        />
+      </View>
+    </Marker>
+  );
+});
+
 export function NearaMapView({
   coordinates,
+  currentUserId,
   disableUserLocationRecenter = false,
   disableGestures = false,
   errorMessage,
   focusedCoordinates,
   isLoading,
+  isStoreOwner,
   mapRecenterKey = 0,
   onMapMoveStart,
   onMapMoveEnd,
@@ -222,10 +317,12 @@ export function NearaMapView({
   style,
 }: {
   coordinates: UserCoordinates | null;
+  currentUserId?: string | null;
   disableUserLocationRecenter?: boolean;
   errorMessage: string;
   focusedCoordinates?: UserCoordinates | null;
   isLoading: boolean;
+  isStoreOwner?: boolean;
   mapRecenterKey?: number;
   disableGestures?: boolean;
   onMapMoveStart?: () => void;
@@ -238,13 +335,16 @@ export function NearaMapView({
   style?: ViewStyle;
 }) {
   const mapRef = useRef<RNMapView | null>(null);
+  const userPulse = useRef(new Animated.Value(0)).current;
   const [userInteracted, setUserInteracted] = useState(false);
   const hasMountedRef = useRef(false);
   const hasSettledInitialRegionRef = useRef(false);
   const lastAppliedStoreFitKeyRef = useRef("");
   const programmaticMoveRef = useRef(false);
   const mapInteractionActiveRef = useRef(false);
-  const mapMoveEndTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mapMoveEndTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
   const region = useMemo(
     () => (coordinates ? buildRegion(coordinates) : null),
     [coordinates],
@@ -260,56 +360,104 @@ export function NearaMapView({
     () =>
       buildDisplayStores(
         (stores ?? [])
-        .map((store) => {
-          const latitude =
-            typeof store.latitude === "number"
-              ? store.latitude
-              : store.latitude !== null && store.latitude !== undefined
-                ? Number(store.latitude)
-                : null;
-          const longitude =
-            typeof store.longitude === "number"
-              ? store.longitude
-              : store.longitude !== null && store.longitude !== undefined
-                ? Number(store.longitude)
-                : null;
+          .map((store) => {
+            const latitude =
+              typeof store.latitude === "number"
+                ? store.latitude
+                : store.latitude !== null && store.latitude !== undefined
+                  ? Number(store.latitude)
+                  : null;
+            const longitude =
+              typeof store.longitude === "number"
+                ? store.longitude
+                : store.longitude !== null && store.longitude !== undefined
+                  ? Number(store.longitude)
+                  : null;
 
-          if (
-            store.id === null ||
-            store.id === undefined ||
-            !Number.isFinite(latitude) ||
-            !Number.isFinite(longitude)
-          ) {
-            return null;
-          }
+            if (
+              store.id === null ||
+              store.id === undefined ||
+              !Number.isFinite(latitude) ||
+              !Number.isFinite(longitude)
+            ) {
+              return null;
+            }
 
-          return {
-            id: String(store.id),
-            latitude: Number(latitude),
-            longitude: Number(longitude),
-          };
-        })
-        .filter(
-          (
-            value,
-          ): value is {
-            id: string;
-            latitude: number;
-            longitude: number;
-          } =>
-            value !== null,
-        ),
+            return {
+              id: String(store.id),
+              latitude: Number(latitude),
+              longitude: Number(longitude),
+              originalId: String(store.id),
+            };
+          })
+          .filter(
+            (
+              value,
+            ): value is {
+              id: string;
+              latitude: number;
+              longitude: number;
+              originalId: string;
+            } => value !== null,
+          ),
       ),
     [stores],
   );
+  const adjustedRenderableStores = useMemo(() => {
+    if (
+      !coordinates ||
+      !isStoreOwner ||
+      !currentUserId ||
+      renderableStores.length === 0
+    ) {
+      return renderableStores;
+    }
+
+    return renderableStores.map((store) => {
+      const isUserStore = store.originalId === currentUserId;
+
+      if (!isUserStore) {
+        return store;
+      }
+
+      const userCoordinate = {
+        latitude: coordinates.latitude,
+        longitude: coordinates.longitude,
+      };
+      const storeCoordinate = {
+        latitude: store.displayLatitude,
+        longitude: store.displayLongitude,
+      };
+
+      if (
+        distanceBetweenCoordinatesMeters(userCoordinate, storeCoordinate) >
+        USER_STORE_COLLISION_DISTANCE_METERS
+      ) {
+        return store;
+      }
+
+      const offsetCoordinate = offsetCoordinateByMeters(
+        storeCoordinate,
+        USER_STORE_OFFSET_METERS,
+      );
+
+      return {
+        ...store,
+        displayLatitude: offsetCoordinate.latitude,
+        displayLongitude: offsetCoordinate.longitude,
+      };
+    });
+  }, [coordinates, currentUserId, isStoreOwner, renderableStores]);
   const validStoreCoordinates = useMemo(
     () =>
-      renderableStores.map(({ id, displayLatitude, displayLongitude }) => ({
-        id,
-        latitude: displayLatitude,
-        longitude: displayLongitude,
-      })),
-    [renderableStores],
+      adjustedRenderableStores.map(
+        ({ id, displayLatitude, displayLongitude }) => ({
+          id,
+          latitude: displayLatitude,
+          longitude: displayLongitude,
+        }),
+      ),
+    [adjustedRenderableStores],
   );
   const status = useMemo(
     () =>
@@ -359,7 +507,10 @@ export function NearaMapView({
     }
 
     const nextFitKey = validStoreCoordinates
-      .map((store) => `${store.id}:${store.latitude.toFixed(5)}:${store.longitude.toFixed(5)}`)
+      .map(
+        (store) =>
+          `${store.id}:${store.latitude.toFixed(5)}:${store.longitude.toFixed(5)}`,
+      )
       .join("|");
 
     if (!nextFitKey || lastAppliedStoreFitKeyRef.current === nextFitKey) {
@@ -410,6 +561,47 @@ export function NearaMapView({
       }
     };
   }, []);
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(userPulse, {
+          duration: 1500,
+          toValue: 1,
+          useNativeDriver: true,
+        }),
+        Animated.timing(userPulse, {
+          duration: 0,
+          toValue: 0,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+
+    animation.start();
+
+    return () => {
+      animation.stop();
+    };
+  }, [userPulse]);
+
+  const userPulseStyle = useMemo(
+    () => ({
+      opacity: userPulse.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0.22, 0],
+      }),
+      transform: [
+        {
+          scale: userPulse.interpolate({
+            inputRange: [0, 1],
+            outputRange: [1, 1.9],
+          }),
+        },
+      ],
+    }),
+    [userPulse],
+  );
 
   const signalMapMoveStart = () => {
     if (programmaticMoveRef.current) {
@@ -495,47 +687,36 @@ export function NearaMapView({
         showsCompass={false}
         showsIndoorLevelPicker={false}
         showsMyLocationButton={false}
-        showsUserLocation
+        showsUserLocation={false}
         toolbarEnabled={false}
         style={styles.map}
       >
-        {renderableStores.map(({ id, displayLatitude, displayLongitude }) => {
-          const isSelected = id === String(selectedStoreId || "");
+        {coordinates ? (
+          <UserLocationMarker
+            coordinates={coordinates}
+            userPulseStyle={userPulseStyle}
+          />
+        ) : null}
 
-          return (
-            <Marker
-              key={id}
-              coordinate={{
-                latitude: displayLatitude,
-                longitude: displayLongitude,
-              }}
-              onPress={() => onSelectStore?.(id)}
-              tracksViewChanges={false}
-            >
-              <View style={styles.storeMarkerWrap}>
-                <View
-                  style={[
-                    styles.storeMarkerHead,
-                    isSelected ? styles.storeMarkerHeadSelected : null,
-                  ]}
-                >
-                  <View
-                    style={[
-                      styles.storeMarkerCore,
-                      isSelected ? styles.storeMarkerCoreSelected : null,
-                    ]}
-                  />
-                </View>
-                <View
-                  style={[
-                    styles.storeMarkerTail,
-                    isSelected ? styles.storeMarkerTailSelected : null,
-                  ]}
-                />
-              </View>
-            </Marker>
-          );
-        })}
+        {adjustedRenderableStores.map(
+          ({ id, displayLatitude, displayLongitude, originalId }) => {
+            const isSelected = id === String(selectedStoreId || "");
+            const isUserStore =
+              isStoreOwner && currentUserId && originalId === currentUserId;
+
+            return (
+              <StoreMapMarker
+                key={id}
+                id={id}
+                isSelected={isSelected}
+                isUserStore={Boolean(isUserStore)}
+                latitude={displayLatitude}
+                longitude={displayLongitude}
+                onPress={(storeId) => onSelectStore?.(storeId)}
+              />
+            );
+          },
+        )}
       </RNMapView>
 
       <LinearGradient
@@ -648,51 +829,97 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "700",
   },
+  userLocationWrap: {
+    alignItems: "center",
+    height: 54,
+    justifyContent: "center",
+    width: 54,
+  },
+  userLocationPulse: {
+    backgroundColor: "rgba(71, 122, 255, 0.26)",
+    borderRadius: 22,
+    height: 44,
+    position: "absolute",
+    width: 44,
+  },
+  userLocationHalo: {
+    alignItems: "center",
+    backgroundColor: "rgba(83, 143, 255, 0.18)",
+    borderColor: "rgba(196, 221, 255, 0.45)",
+    borderRadius: 12,
+    borderWidth: 1,
+    height: 24,
+    justifyContent: "center",
+    shadowColor: "#11203B",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+    width: 24,
+  },
+  userLocationDot: {
+    backgroundColor: "#4F86FF",
+    borderColor: "rgba(241, 247, 255, 0.92)",
+    borderRadius: 7,
+    borderWidth: 2,
+    height: 14,
+    width: 14,
+  },
   storeMarkerWrap: {
     alignItems: "center",
     justifyContent: "flex-start",
-    paddingBottom: 12,
-    paddingHorizontal: 6,
-    paddingTop: 6,
+    paddingBottom: 10,
+    paddingHorizontal: 5,
+    paddingTop: 5,
   },
   storeMarkerHead: {
     alignItems: "center",
-    backgroundColor: "rgba(11, 18, 33, 0.98)",
-    borderColor: "rgba(255,255,255,0.88)",
-    borderRadius: 18,
-    borderWidth: 2,
-    height: 34,
+    backgroundColor: "rgba(14, 22, 38, 0.96)",
+    borderColor: "rgba(210, 222, 244, 0.92)",
+    borderRadius: 15,
+    borderWidth: 1.5,
+    height: 30,
     justifyContent: "center",
-    width: 34,
+    width: 30,
     shadowColor: "#020817",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.24,
-    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 7 },
+    shadowOpacity: 0.22,
+    shadowRadius: 10,
+    elevation: 5,
   },
   storeMarkerHeadSelected: {
-    backgroundColor: "#1F56E5",
-    borderColor: "#D9E4FF",
-    transform: [{ scale: 1.08 }],
+    backgroundColor: "#234FC5",
+    borderColor: "#DDE8FF",
+    transform: [{ scale: 1.05 }],
   },
   storeMarkerCore: {
-    backgroundColor: "#B8C2D9",
-    borderRadius: 7,
-    height: 14,
-    width: 14,
+    backgroundColor: "#D7DFEE",
+    borderRadius: 5,
+    height: 10,
+    width: 10,
   },
   storeMarkerCoreSelected: {
     backgroundColor: "#F7FAFF",
   },
   storeMarkerTail: {
     borderLeftColor: "transparent",
-    borderLeftWidth: 8,
+    borderLeftWidth: 7,
     borderRightColor: "transparent",
-    borderRightWidth: 8,
-    borderTopColor: "rgba(11, 18, 33, 0.98)",
-    borderTopWidth: 14,
+    borderRightWidth: 7,
+    borderTopColor: "rgba(14, 22, 38, 0.96)",
+    borderTopWidth: 12,
     marginTop: -2,
   },
   storeMarkerTailSelected: {
-    borderTopColor: "#1F56E5",
+    borderTopColor: "#234FC5",
+  },
+  storeMarkerHeadUserStore: {
+    backgroundColor: "#A6313D",
+    borderColor: "#F4C6CF",
+  },
+  storeMarkerCoreUserStore: {
+    backgroundColor: "#FBE4E8",
+  },
+  storeMarkerTailUserStore: {
+    borderTopColor: "#A6313D",
   },
 });

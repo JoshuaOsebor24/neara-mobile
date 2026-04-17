@@ -2,7 +2,14 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   Alert,
   LayoutAnimation,
@@ -271,11 +278,7 @@ function InfoRow({
     );
   }
 
-  return (
-    <View style={styles.infoRow}>
-      {rowContent}
-    </View>
-  );
+  return <View style={styles.infoRow}>{rowContent}</View>;
 }
 
 function ProductCard({
@@ -330,7 +333,9 @@ function ProductCard({
               <Text style={styles.productSubtitle}>
                 {hasVariantChoices
                   ? `${product.variants.length} options`
-                  : product.description || singleVariantUnitLabel || "Single price"}
+                  : product.description ||
+                    singleVariantUnitLabel ||
+                    "Single price"}
               </Text>
             </View>
 
@@ -622,7 +627,9 @@ export default function StoreScreen() {
       );
       const matchesCategory =
         activeFilters.length === 0 ||
-        activeFilters.every((filter) => productFilters.has(filter.toLowerCase()));
+        activeFilters.every((filter) =>
+          productFilters.has(filter.toLowerCase()),
+        );
       const matchesSearch =
         !term ||
         product.name.toLowerCase().includes(term) ||
@@ -828,7 +835,7 @@ export default function StoreScreen() {
       if (!supported) {
         Alert.alert(
           "Directions unavailable",
-          "No maps app was available to open directions.",
+          "No maps app is ready to open directions on this device.",
         );
         return;
       }
@@ -837,7 +844,7 @@ export default function StoreScreen() {
     } catch {
       Alert.alert(
         "Directions unavailable",
-        "Could not open directions right now.",
+        "We couldn't open directions right now.",
       );
     }
   };
@@ -877,14 +884,17 @@ export default function StoreScreen() {
       if (!supported) {
         Alert.alert(
           "Calling unavailable",
-          "This device could not open the phone dialer.",
+          "This device can't open phone calls right now.",
         );
         return;
       }
 
       await Linking.openURL(phoneUrl);
     } catch {
-      Alert.alert("Calling unavailable", "Could not start a call right now.");
+      Alert.alert(
+        "Calling unavailable",
+        "We couldn't start the call right now.",
+      );
     }
   };
 
@@ -926,14 +936,20 @@ export default function StoreScreen() {
     setIsSavingInfo(true);
     setOwnerNotice("");
 
-    const result = await updateStoreWithBackend(session.authToken, String(storeId), {
-      address: editAddress.trim(),
-      delivery_available: editDelivery,
-      phone_number: editContact.trim(),
-    });
+    const result = await updateStoreWithBackend(
+      session.authToken,
+      String(storeId),
+      {
+        address: editAddress.trim(),
+        delivery_available: editDelivery,
+        phone_number: editContact.trim(),
+      },
+    );
 
     if (!result.ok || !result.store) {
-      setOwnerNotice(result.error || "Could not update store info.");
+      setOwnerNotice(
+        result.error || "We couldn't save your store details right now.",
+      );
       setIsSavingInfo(false);
       return;
     }
@@ -948,7 +964,7 @@ export default function StoreScreen() {
           }
         : current,
     );
-    setOwnerNotice(result.message || "Store info updated.");
+    setOwnerNotice(result.message || "Your store details are updated.");
     setIsEditingInfo(false);
     setIsSavingInfo(false);
   };
@@ -995,7 +1011,12 @@ export default function StoreScreen() {
       ...resolvedStore.photos.slice(0, STORE_PHOTO_LIMIT),
       ...filteredProducts.slice(0, 8).map((product) => product.image),
     ]);
-  }, [expandedImageUrl, filteredProducts, resolvedStore.heroImage, resolvedStore.photos]);
+  }, [
+    expandedImageUrl,
+    filteredProducts,
+    resolvedStore.heroImage,
+    resolvedStore.photos,
+  ]);
 
   useEffect(() => {
     if (isEditingInfo) {
@@ -1051,7 +1072,7 @@ export default function StoreScreen() {
               <Text style={styles.topBarLabel}>Neara</Text>
             </View>
             <ErrorCard
-              title="Could not load this store"
+              title="This store is taking a moment"
               detail={storeError}
             />
           </View>
@@ -1184,32 +1205,40 @@ export default function StoreScreen() {
                                       numericStoreId,
                                     );
                                     setSaved(false);
-                                    setOwnerNotice("Removed from saved.");
+                                    setOwnerNotice("Removed.");
                                   } else {
-                                    const savedStorePayload = toSavedStorePayload({
-                                      address: resolvedStore.address,
-                                      category: resolvedStore.category,
-                                      id: numericStoreId,
-                                      imageUrl: resolvedStore.heroImage || null,
-                                      name: resolvedStore.storeName || "Store",
-                                      phoneNumber: resolvedStore.phoneNumber,
-                                    });
+                                    const savedStorePayload =
+                                      toSavedStorePayload({
+                                        address: resolvedStore.address,
+                                        category: resolvedStore.category,
+                                        id: numericStoreId,
+                                        imageUrl:
+                                          resolvedStore.heroImage || null,
+                                        name:
+                                          resolvedStore.storeName || "Store",
+                                        phoneNumber: resolvedStore.phoneNumber,
+                                      });
 
                                     if (!savedStorePayload) {
-                                      throw new Error("Could not save this store.");
+                                      throw new Error(
+                                        "We couldn't save this store right now.",
+                                      );
                                     }
 
-                                    await saveStore(session.authToken, savedStorePayload);
+                                    await saveStore(
+                                      session.authToken,
+                                      savedStorePayload,
+                                    );
                                     setSaved(true);
-                                    setOwnerNotice("Saved to your stores.");
+                                    setOwnerNotice("Saved.");
                                   }
                                 } catch (error) {
                                   setOwnerNotice(
                                     error instanceof Error
                                       ? error.message
                                       : saved
-                                        ? "Could not remove this store."
-                                        : "Could not save this store.",
+                                        ? "We couldn't remove this store right now."
+                                        : "We couldn't save this store right now.",
                                   );
                                 } finally {
                                   setIsSaveSubmitting(false);
@@ -1325,9 +1354,7 @@ export default function StoreScreen() {
 
                   {resolvedStore.description ? (
                     <View style={styles.descriptionCard}>
-                      <Text style={styles.descriptionLabel}>
-                        About this store
-                      </Text>
+                      <Text style={styles.descriptionLabel}>About</Text>
                       <Text style={styles.descriptionText}>
                         {resolvedStore.description}
                       </Text>
@@ -1350,9 +1377,7 @@ export default function StoreScreen() {
                             name="create-outline"
                             size={14}
                           />
-                          <Text style={styles.photosEditButtonText}>
-                            Edit Photos
-                          </Text>
+                          <Text style={styles.photosEditButtonText}>Edit</Text>
                         </TouchableOpacity>
                       ) : null}
                     </View>
@@ -1465,9 +1490,7 @@ export default function StoreScreen() {
               <View style={styles.sectionHeader}>
                 <View style={styles.sectionHeaderText}>
                   <Text style={styles.sectionTitle}>Products</Text>
-                  <Text style={styles.sectionSubtitle}>
-                    {productCountText}
-                  </Text>
+                  <Text style={styles.sectionSubtitle}>{productCountText}</Text>
                 </View>
                 <View style={styles.sectionHeaderActions}>
                   {isOwnerViewingStore ? (
@@ -1523,7 +1546,7 @@ export default function StoreScreen() {
                   </View>
                 ) : productsError ? (
                   <ErrorCard
-                    title="Could not load products"
+                    title="Products unavailable"
                     detail={productsError}
                   />
                 ) : renderedProductCount > 0 ? (
@@ -1543,12 +1566,12 @@ export default function StoreScreen() {
                 ) : showNoMatchingProductsState ? (
                   <EmptyCard
                     title="No products found"
-                    detail="Try a different search term or remove a filter."
+                    detail="Try another search."
                   />
                 ) : showNoProductsState ? (
                   <EmptyCard
                     title="No products yet"
-                    detail="This store has not added any products yet. Start a chat to ask what is currently available."
+                    detail="Ask the store what is available."
                   />
                 ) : null}
               </View>
@@ -1556,7 +1579,7 @@ export default function StoreScreen() {
 
             <View style={styles.infoSection}>
               <View style={styles.infoSectionHeader}>
-                <Text style={styles.infoSectionTitle}>Store info</Text>
+                <Text style={styles.infoSectionTitle}>Details</Text>
                 {isOwnerViewingStore ? (
                   <TouchableOpacity
                     activeOpacity={0.85}
@@ -1673,12 +1696,12 @@ export default function StoreScreen() {
                 isEditable={isOwnerViewingStore}
                 isEditing={isEditingInfo}
                 onChangeText={setEditContact}
-                onPress={!isEditingInfo ? () => void handleCallStore() : undefined}
+                onPress={
+                  !isEditingInfo ? () => void handleCallStore() : undefined
+                }
                 pressable={!isEditingInfo && Boolean(resolvedStore.phoneNumber)}
               />
             </View>
-
-            <Text style={styles.routeNote}>Store ID: {storeId}</Text>
           </View>
         </ScrollView>
       )}

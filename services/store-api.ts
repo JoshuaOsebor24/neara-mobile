@@ -173,6 +173,10 @@ type PublicStoresResponse = {
   })[];
 };
 
+function buildInvalidPayloadError(context: string) {
+  return `We couldn't load ${context} right now.`;
+}
+
 function buildStoreRequestKey(location?: {
   latitude?: number | null;
   longitude?: number | null;
@@ -230,7 +234,12 @@ function normalizeStoreList(stores: PublicStoresResponse["stores"]) {
           ? Number(store.longitude)
           : null;
 
-    if (!id || !storeName || !Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+    if (
+      !id ||
+      !storeName ||
+      !Number.isFinite(latitude) ||
+      !Number.isFinite(longitude)
+    ) {
       return;
     }
 
@@ -319,6 +328,15 @@ export async function fetchStoresNearby(location?: {
       };
     }
 
+    if (!Array.isArray(result.data.stores)) {
+      return {
+        error: buildInvalidPayloadError("stores"),
+        ok: false as const,
+        status: result.status,
+        stores: [],
+      };
+    }
+
     const stores = normalizeStoreList(result.data.stores);
     storeResponseCache.set(requestKey, {
       expiresAt: Date.now() + STORE_RESPONSE_CACHE_TTL_MS,
@@ -366,7 +384,9 @@ export async function createStoreWithBackend(
 
   if (!result.ok || !result.data.store) {
     return {
-      error: result.ok ? "Could not create this store." : result.error,
+      error: result.ok
+        ? "We couldn't create this store right now."
+        : result.error,
       ok: false as const,
       status: result.status,
       store: result.data?.store ?? null,
@@ -403,9 +423,12 @@ export async function fetchStoreFullData(storeId: string) {
   }
 
   const request = (async () => {
-    const result = await requestMobileApiNoCache<StoreFullResponse>(`/stores/${normalizedStoreId}/full`, {
-      method: "GET",
-    });
+    const result = await requestMobileApiNoCache<StoreFullResponse>(
+      `/stores/${normalizedStoreId}/full`,
+      {
+        method: "GET",
+      },
+    );
 
     if (!result.ok) {
       return {
@@ -417,9 +440,19 @@ export async function fetchStoreFullData(storeId: string) {
       };
     }
 
+    if (!Array.isArray(result.data.products)) {
+      return {
+        error: buildInvalidPayloadError("store products"),
+        ok: false as const,
+        products: [] as [],
+        status: result.status,
+        store: null,
+      };
+    }
+
     const value = {
       ok: true as const,
-      products: result.data.products ?? [],
+      products: result.data.products,
       status: result.status,
       store: result.data.store ?? null,
     };
@@ -459,13 +492,25 @@ export async function fetchStoreById(storeId: string) {
   }
 
   const request = (async () => {
-    const result = await requestMobileApi<StoreDetailResponse>(`/stores/${normalizedStoreId}`, {
-      method: "GET",
-    });
+    const result = await requestMobileApi<StoreDetailResponse>(
+      `/stores/${normalizedStoreId}`,
+      {
+        method: "GET",
+      },
+    );
 
     if (!result.ok) {
       return {
         error: result.error,
+        ok: false as const,
+        status: result.status,
+        store: null,
+      };
+    }
+
+    if (!("store" in result.data)) {
+      return {
+        error: buildInvalidPayloadError("store details"),
         ok: false as const,
         status: result.status,
         store: null,
@@ -515,15 +560,20 @@ export async function updateStoreWithBackend(
     store_name?: string;
   },
 ) {
-  const result = await requestMobileApi<UpdateStoreResponse>(`/stores/${storeId}`, {
-    body: payload,
-    method: "PUT",
-    token,
-  });
+  const result = await requestMobileApi<UpdateStoreResponse>(
+    `/stores/${storeId}`,
+    {
+      body: payload,
+      method: "PUT",
+      token,
+    },
+  );
 
   if (!result.ok || !result.data.store) {
     return {
-      error: result.ok ? "Could not update this store." : result.error,
+      error: result.ok
+        ? "We couldn't save this store right now."
+        : result.error,
       ok: false as const,
       status: result.status,
       store: null,

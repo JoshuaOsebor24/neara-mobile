@@ -142,6 +142,15 @@ export function DrawerProvider({ children }: { children: ReactNode }) {
     const chatLabel = session.isStoreOwner ? "Inbox" : "Chats";
     const items: DrawerItem[] = [
       { href: "/(tabs)/profile", icon: "person-outline", label: "Profile" },
+      ...(session.isAdmin
+        ? [
+            {
+              href: "/admin",
+              icon: "shield-checkmark-outline" as const,
+              label: "Admin Panel",
+            },
+          ]
+        : []),
       {
         href: chatHref,
         icon: "chatbubble-ellipses-outline",
@@ -179,6 +188,7 @@ export function DrawerProvider({ children }: { children: ReactNode }) {
     return items;
   }, [
     isAuthenticated,
+    session.isAdmin,
     session.isPro,
     session.isStoreOwner,
     session.primaryStoreId,

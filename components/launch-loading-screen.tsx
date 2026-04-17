@@ -1,13 +1,51 @@
-import { Image, StyleSheet, Text, View } from "react-native";
+import { useEffect, useRef } from "react";
+import { Animated, Easing, Image, StyleSheet, Text } from "react-native";
 
 import { theme } from "@/constants/theme";
 
 const LOGO_SOURCE = require("../assets/images/icon-transparent.png");
+const FADE_OUT_DURATION_MS = 450;
 
-export function LaunchLoadingScreen() {
+type LaunchLoadingScreenProps = {
+  isExiting?: boolean;
+  onExitComplete?: () => void;
+  onReady?: () => void;
+};
+
+export function LaunchLoadingScreen({
+  isExiting = false,
+  onExitComplete,
+  onReady,
+}: LaunchLoadingScreenProps) {
+  const opacity = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (!isExiting) {
+      opacity.setValue(1);
+      return;
+    }
+
+    const animation = Animated.timing(opacity, {
+      toValue: 0,
+      duration: FADE_OUT_DURATION_MS,
+      easing: Easing.out(Easing.quad),
+      useNativeDriver: true,
+    });
+
+    animation.start(({ finished }) => {
+      if (finished) {
+        onExitComplete?.();
+      }
+    });
+
+    return () => {
+      animation.stop();
+    };
+  }, [isExiting, onExitComplete, opacity]);
+
   return (
-    <View style={styles.container}>
-      <View style={styles.logoWrap}>
+    <Animated.View onLayout={onReady} style={[styles.container, { opacity }]}>
+      <Animated.View style={styles.logoWrap}>
         <Image
           blurRadius={1}
           resizeMode="contain"
@@ -19,14 +57,10 @@ export function LaunchLoadingScreen() {
           source={LOGO_SOURCE}
           style={styles.logoBorderInner}
         />
-        <Image
-          resizeMode="contain"
-          source={LOGO_SOURCE}
-          style={styles.logo}
-        />
-      </View>
+        <Image resizeMode="contain" source={LOGO_SOURCE} style={styles.logo} />
+      </Animated.View>
       <Text style={styles.label}>Neara</Text>
-    </View>
+    </Animated.View>
   );
 }
 

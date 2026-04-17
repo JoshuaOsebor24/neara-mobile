@@ -1,5 +1,8 @@
 import { requestMobileApi } from "@/services/api";
-import { getCachedUserLocation, type UserCoordinates } from "@/services/location";
+import {
+    getCachedUserLocation,
+    type UserCoordinates,
+} from "@/services/location";
 
 export type SearchProductResult = {
   address?: string | null;
@@ -48,6 +51,12 @@ function resolveSearchResults(payload: SearchApiEnvelope | null | undefined) {
   return [];
 }
 
+function hasSearchResultsArray(payload: SearchApiEnvelope | null | undefined) {
+  return (
+    Array.isArray(payload?.data?.results) || Array.isArray(payload?.results)
+  );
+}
+
 function appendCoordinates(
   query: URLSearchParams,
   coordinates?: UserCoordinates | null,
@@ -75,7 +84,9 @@ export async function searchProducts(
 
   if (normalizedQuery.length < 2) {
     return {
-      message: !normalizedQuery ? "Search query is empty" : "Search query is too short",
+      message: !normalizedQuery
+        ? "Search query is empty"
+        : "Search query is too short",
       ok: true as const,
       results: [] as SearchProductResult[],
       status: 200,
@@ -103,6 +114,15 @@ export async function searchProducts(
   if (!result.ok) {
     return {
       error: result.error,
+      ok: false as const,
+      results: [] as SearchProductResult[],
+      status: result.status,
+    };
+  }
+
+  if (!hasSearchResultsArray(result.data)) {
+    return {
+      error: "We couldn't load search results right now.",
       ok: false as const,
       results: [] as SearchProductResult[],
       status: result.status,

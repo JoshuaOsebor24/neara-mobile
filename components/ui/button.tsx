@@ -27,7 +27,7 @@ export function Button({
 }) {
   return (
     <TouchableOpacity
-      activeOpacity={0.9}
+      activeOpacity={0.88}
       disabled={disabled}
       onPress={onPress}
       style={[
@@ -39,7 +39,9 @@ export function Button({
       ]}
     >
       {variant === "primary" ? (
-        <View style={[styles.primaryShell, disabled && styles.primaryShellDisabled]}>
+        <View
+          style={[styles.primaryShell, disabled && styles.primaryShellDisabled]}
+        >
           <LinearGradient
             colors={
               disabled
@@ -64,7 +66,9 @@ export function Button({
         </View>
       ) : (
         <View style={styles.innerFill}>
-          {variant === "secondary" ? <View style={styles.secondaryHighlight} /> : null}
+          {variant === "secondary" ? (
+            <View style={styles.secondaryHighlight} />
+          ) : null}
           <Text
             style={[
               styles.label,
@@ -91,10 +95,10 @@ const styles = StyleSheet.create({
     overflow: "visible",
     width: "100%",
     shadowColor: theme.button.primaryShadow,
-    shadowOffset: { width: 0, height: 14 },
-    shadowOpacity: 0.28,
-    shadowRadius: 24,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.22,
+    shadowRadius: 20,
+    elevation: 6,
   },
   primaryShell: {
     width: "100%",
@@ -115,16 +119,16 @@ const styles = StyleSheet.create({
     minHeight: theme.controls.actionButtonMinHeight,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 22,
-    paddingVertical: 17,
+    paddingHorizontal: 20,
+    paddingVertical: 15,
   },
   innerFill: {
     width: "100%",
     minHeight: theme.controls.actionButtonMinHeight,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 22,
-    paddingVertical: 17,
+    paddingHorizontal: 20,
+    paddingVertical: 15,
     borderRadius: theme.button.radius,
     overflow: "hidden",
   },
@@ -133,10 +137,10 @@ const styles = StyleSheet.create({
     borderColor: theme.button.secondaryBorder,
     borderWidth: 1,
     shadowColor: theme.colors.shadow,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.12,
-    shadowRadius: 18,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.1,
+    shadowRadius: 14,
+    elevation: 2,
   },
   ghost: {
     backgroundColor: "transparent",
@@ -149,9 +153,9 @@ const styles = StyleSheet.create({
   },
   label: {
     color: theme.colors.primaryTextOnAccent,
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "800",
-    letterSpacing: 0.2,
+    letterSpacing: 0.1,
   },
   primaryLabel: {
     textShadowColor: "rgba(7,11,24,0.18)",

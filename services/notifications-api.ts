@@ -33,11 +33,14 @@ export async function registerPushTokenWithBackend(
   authToken: string,
   payload: RegisterPushTokenPayload,
 ) {
-  const result = await requestMobileApi<RegisterPushTokenResponse>("/notifications/register-token", {
-    body: payload,
-    method: "POST",
-    token: authToken,
-  });
+  const result = await requestMobileApi<RegisterPushTokenResponse>(
+    "/notifications/register-token",
+    {
+      body: payload,
+      method: "POST",
+      token: authToken,
+    },
+  );
 
   if (!result.ok) {
     return {
@@ -48,7 +51,10 @@ export async function registerPushTokenWithBackend(
   }
 
   return {
-    message: result.data?.data?.message ?? result.data?.message ?? "Push token registered.",
+    message:
+      result.data?.data?.message ??
+      result.data?.message ??
+      "Notifications are ready.",
     ok: true as const,
     pushToken: result.data?.data?.push_token ?? result.data?.push_token ?? null,
     status: result.status,
@@ -81,7 +87,10 @@ export async function sendTestPushNotificationWithBackend(authToken: string) {
     attemptedCount: Number(result.data?.data?.attempted_count ?? 0),
     deliveredCount: Number(result.data?.data?.delivered_count ?? 0),
     invalidatedCount: Number(result.data?.data?.invalidated_count ?? 0),
-    message: result.data?.data?.message ?? result.data?.message ?? "Test notification sent.",
+    message:
+      result.data?.data?.message ??
+      result.data?.message ??
+      "Test notification sent.",
     ok: true as const,
     status: result.status,
   };

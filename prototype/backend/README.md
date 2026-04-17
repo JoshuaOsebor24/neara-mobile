@@ -20,6 +20,7 @@ Optional variables:
 
 - `PORT` default `5050`
 - `HOST` default `0.0.0.0`
+- `CORS_ALLOWED_ORIGINS` comma-separated allowed browser origins
 
 ## Start
 
@@ -74,3 +75,20 @@ npm run seed
 - This backend no longer needs runtime imports from the old LocalStore frontend.
 - The mobile app should point to this backend through `EXPO_PUBLIC_API_URL` or the Expo LAN fallback logic in [`/Users/joshua/neara-mobile/services/api.ts`](/Users/joshua/neara-mobile/services/api.ts).
 - For a production-grade standalone system, SQL migrations should eventually replace runtime schema bootstrapping.
+
+## CORS and Connectivity Contract
+
+Development CORS allows:
+
+- configured origins from backend env (`CORS_ALLOWED_ORIGINS`)
+- localhost web origins (`http://localhost:3000`, `3001`, `8081`, `8082`, `8083`)
+- LAN origins when not in production
+
+Production CORS allows only explicitly configured origins.
+Production startup fails if `CORS_ALLOWED_ORIGINS` is empty, contains wildcard entries, or contains invalid origins.
+
+Frontend API base selection should align with this:
+
+- Web dev: use localhost or configured dev API origin.
+- Native dev: use configured dev API origin first; Expo/LAN fallback is allowed.
+- Production app: use only stable public API origins (never localhost/LAN).

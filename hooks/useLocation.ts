@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
-  getCachedUserLocation,
-  getCurrentUserLocation,
-  getForegroundLocationPermission,
-  requestForegroundLocationPermission,
-  type LocationPermissionState,
-  type UserCoordinates,
+    getCachedUserLocation,
+    getCurrentUserLocation,
+    getForegroundLocationPermission,
+    requestForegroundLocationPermission,
+    type LocationPermissionState,
+    type UserCoordinates,
 } from "@/services/location";
 
 type UseLocationState = {
@@ -23,9 +23,7 @@ const DEFAULT_STATE: UseLocationState = {
   permissionStatus: "undetermined",
 };
 
-export function useLocation(options?: {
-  requestOnMount?: boolean;
-}) {
+export function useLocation(options?: { requestOnMount?: boolean }) {
   const requestOnMount = options?.requestOnMount ?? true;
   const [state, setState] = useState<UseLocationState>({
     ...DEFAULT_STATE,
@@ -34,7 +32,10 @@ export function useLocation(options?: {
   const hasLoadedRef = useRef(false);
 
   const resolveLocation = useCallback(
-    async (config?: { forceRefresh?: boolean; requestPermission?: boolean }) => {
+    async (config?: {
+      forceRefresh?: boolean;
+      requestPermission?: boolean;
+    }) => {
       setState((current) => ({
         ...current,
         errorMessage: "",
@@ -44,7 +45,10 @@ export function useLocation(options?: {
       try {
         let permissionStatus = await getForegroundLocationPermission();
 
-        if (permissionStatus !== "granted" && config?.requestPermission !== false) {
+        if (
+          permissionStatus !== "granted" &&
+          config?.requestPermission !== false
+        ) {
           permissionStatus = await requestForegroundLocationPermission();
         }
 
@@ -53,7 +57,7 @@ export function useLocation(options?: {
             ...current,
             errorMessage:
               permissionStatus === "denied"
-                ? "Location access is off. Enable it to center the map on you."
+                ? "Location access is off. Turn it on if you want the map to center on you."
                 : "",
             isLoading: false,
             permissionStatus,
@@ -76,7 +80,8 @@ export function useLocation(options?: {
       } catch {
         setState((current) => ({
           ...current,
-          errorMessage: "We couldn't get your location right now. Try again in a moment.",
+          errorMessage:
+            "We couldn't get your location just yet. Try again in a moment.",
           isLoading: false,
         }));
         return null;
@@ -96,7 +101,8 @@ export function useLocation(options?: {
 
   return {
     ...state,
-    refreshLocation: () => resolveLocation({ forceRefresh: true, requestPermission: true }),
+    refreshLocation: () =>
+      resolveLocation({ forceRefresh: true, requestPermission: true }),
     requestLocationPermission: () =>
       resolveLocation({ forceRefresh: false, requestPermission: true }),
   };

@@ -11,6 +11,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { BackPillButton } from "@/components/ui/back-pill-button";
+import { ScreenCard } from "@/components/ui/screen-card";
 import {
   EmptyCard,
   ErrorCard,
@@ -127,14 +128,13 @@ export default function StoreChatsScreen() {
       >
         <View style={styles.page}>
           <View style={styles.header}>
-            <BackPillButton fallbackHref="/(tabs)/profile" />
-            <View>
-              <Text style={styles.title}>Inbox</Text>
-              <Text style={styles.subtitle}>{storeName} owner inbox</Text>
+            <View style={styles.headerLeft}>
+              <BackPillButton fallbackHref="/(tabs)/profile" />
+              <View>
+                <Text style={styles.title}>Inbox</Text>
+              </View>
             </View>
-          </View>
 
-          <View style={styles.actionRow}>
             <TouchableOpacity
               activeOpacity={0.85}
               onPress={() =>
@@ -144,68 +144,76 @@ export default function StoreChatsScreen() {
                     : "/(tabs)/profile",
                 )
               }
-              style={styles.secondaryAction}
+              style={styles.primaryAction}
             >
-              <Text style={styles.secondaryActionText}>My Store</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              activeOpacity={0.85}
-              onPress={() => router.push("/(tabs)/profile")}
-              style={styles.secondaryAction}
-            >
-              <Text style={styles.secondaryActionText}>Profile</Text>
+              <Text style={styles.primaryActionText}>My Store</Text>
             </TouchableOpacity>
           </View>
 
-          <View style={styles.list}>
-            {isLoading ? (
-              <View style={styles.stateWrap}>
-                <LoadingCard
-                  message="Loading customer conversations"
-                  detail="Checking your latest inbox activity."
-                />
-                <SkeletonCard height={92} />
-                <SkeletonCard height={92} />
-              </View>
-            ) : null}
-            {!isLoading && errorMessage ? (
-              <ErrorCard title="Couldn't load inbox" detail={errorMessage} />
-            ) : null}
-            {!isLoading && !errorMessage && conversations.length === 0 ? (
-              <EmptyCard
-                title="Start a conversation"
-                detail={`Customer messages will appear here when shoppers contact ${storeName}.`}
-              />
-            ) : null}
-            {conversations.map((conversation) => (
-              <TouchableOpacity
-                key={conversation.id}
-                activeOpacity={0.85}
-                onPress={() =>
-                  router.push(
-                    `/chat/${conversation.store_id}?conversationId=${conversation.id}&role=owner`,
-                  )
-                }
-                style={styles.card}
-              >
-                <View style={styles.cardHeader}>
-                  <Text style={styles.customerName}>
-                    {conversation.user_name}
-                  </Text>
-                  <Text style={styles.statusText}>
-                    {conversation.unread_count > 0
-                      ? `${conversation.unread_count} unread`
-                      : "Awaiting reply"}
-                  </Text>
-                </View>
-                <Text style={styles.preview}>
-                  {conversation.last_message ||
-                    "Open this conversation to view messages."}
+          <View style={styles.divider} />
+
+          <ScreenCard style={styles.panel}>
+            <View style={styles.panelHeader}>
+              <Text style={styles.panelTitle}>Conversations</Text>
+              <View style={styles.limitBadge}>
+                <Text style={styles.limitBadgeText}>
+                  {storeName} owner inbox
                 </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+              </View>
+            </View>
+
+            <View style={styles.list}>
+              {isLoading ? (
+                <View style={styles.stateWrap}>
+                  <LoadingCard
+                    message="Loading customer conversations"
+                    detail="Checking your latest inbox activity."
+                  />
+                  <SkeletonCard height={92} />
+                  <SkeletonCard height={92} />
+                </View>
+              ) : null}
+              {!isLoading && errorMessage ? (
+                <ErrorCard
+                  title="We couldn't load your inbox"
+                  detail={errorMessage}
+                />
+              ) : null}
+              {!isLoading && !errorMessage && conversations.length === 0 ? (
+                <EmptyCard
+                  title="No conversations yet"
+                  detail={`Customer messages will appear here when shoppers contact ${storeName}.`}
+                />
+              ) : null}
+              {conversations.map((conversation) => (
+                <TouchableOpacity
+                  key={conversation.id}
+                  activeOpacity={0.85}
+                  onPress={() =>
+                    router.push(
+                      `/chat/${conversation.store_id}?conversationId=${conversation.id}&role=owner`,
+                    )
+                  }
+                  style={styles.card}
+                >
+                  <View style={styles.cardHeader}>
+                    <Text style={styles.customerName}>
+                      {conversation.user_name}
+                    </Text>
+                    <Text style={styles.statusText}>
+                      {conversation.unread_count > 0
+                        ? `${conversation.unread_count} unread`
+                        : "Awaiting reply"}
+                    </Text>
+                  </View>
+                  <Text style={styles.preview}>
+                    {conversation.last_message ||
+                      "Open this conversation to view messages."}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </ScreenCard>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -215,11 +223,11 @@ export default function StoreChatsScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: "transparent",
   },
   scrollContent: {
     paddingHorizontal: 16,
-    paddingTop: 12,
+    paddingTop: 8,
     paddingBottom: 32,
   },
   loadingWrap: {
@@ -237,50 +245,67 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   header: {
-    flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    flexDirection: "row",
+    justifyContent: "space-between",
     marginBottom: 20,
   },
-  backButton: {
+  headerLeft: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 12,
+  },
+  primaryAction: {
+    alignItems: "center",
+    backgroundColor: "rgba(74,136,255,0.12)",
+    borderColor: "rgba(74,136,255,0.20)",
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
-    backgroundColor: "rgba(255,255,255,0.05)",
+    justifyContent: "center",
+    minHeight: 44,
+    minWidth: 104,
     paddingHorizontal: 16,
-    paddingVertical: 10,
   },
-  backButtonText: {
-    color: theme.colors.text,
+  primaryActionText: {
+    color: "#4A88FF",
     fontSize: 14,
     fontWeight: "700",
+  },
+  divider: {
+    backgroundColor: "rgba(255,255,255,0.08)",
+    height: 1,
+    marginBottom: 16,
+    marginHorizontal: 16,
+  },
+  panel: {
+    padding: 16,
+  },
+  panelHeader: {
+    marginBottom: 16,
+  },
+  panelTitle: {
+    color: theme.colors.text,
+    fontSize: 20,
+    fontWeight: "700",
+  },
+  limitBadge: {
+    alignSelf: "flex-start",
+    backgroundColor: "rgba(74,136,255,0.12)",
+    borderColor: "rgba(74,136,255,0.20)",
+    borderRadius: 999,
+    borderWidth: 1,
+    marginTop: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  limitBadgeText: {
+    color: "#4A88FF",
+    fontSize: 12,
+    fontWeight: "600",
   },
   title: {
     color: theme.colors.text,
     fontSize: 24,
-    fontWeight: "700",
-  },
-  subtitle: {
-    marginTop: 2,
-    color: theme.colors.mutedText,
-    fontSize: 13,
-  },
-  actionRow: {
-    flexDirection: "row",
-    gap: 10,
-    marginBottom: 18,
-  },
-  secondaryAction: {
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
-    backgroundColor: "rgba(255,255,255,0.05)",
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-  },
-  secondaryActionText: {
-    color: theme.colors.text,
-    fontSize: 12,
     fontWeight: "700",
   },
   list: {

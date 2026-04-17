@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
-import MapView, { Marker, type MapPressEvent, type Region } from "react-native-maps";
+import MapView, {
+  Marker,
+  type MapPressEvent,
+  type Region,
+} from "react-native-maps";
 
 import { theme } from "@/constants/theme";
 import { DEFAULT_MAP_COORDINATES } from "@/services/location";
@@ -66,12 +70,14 @@ export function StoreLocationPicker({
 
       <View style={styles.overlay}>
         <Text style={styles.overlayTitle}>
-          {coordinates ? "Pin ready" : "Place your pin"}
+          {coordinates ? "Store pin set" : "Place store pin"}
         </Text>
         <Text style={styles.overlayText}>
           {coordinates
-            ? address || storeName || "Tap to move the pin and fine-tune the store location."
-            : "Tap to place the pin. The pin is the final saved store location."}
+            ? address ||
+              storeName ||
+              "Drag the pin until it sits on your exact store spot."
+            : "Search to get close, then tap the exact spot of your store."}
         </Text>
       </View>
     </View>

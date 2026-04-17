@@ -1,9 +1,8 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useCallback, useEffect, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import {
   FlatList,
-  Pressable,
   StyleSheet,
   Text,
   TextInput,
@@ -12,8 +11,12 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import {
+  SearchResultCard as SearchResultListCard,
+  type SearchResultCardVariant,
+} from "@/components/search/search-result-card";
 import { BackPillButton } from "@/components/ui/back-pill-button";
-import { RemoteProductImage } from "@/components/ui/remote-product-image";
+import { EmptyCard, ErrorCard, LoadingCard } from "@/components/ux-state";
 import { theme } from "@/constants/theme";
 import { prefetchImageUris } from "@/services/image-cache";
 import {
@@ -21,6 +24,41 @@ import {
   normalizeQuery,
   type SearchCardRecord,
 } from "@/services/search-data";
+
+const SearchResultRow = memo(function SearchResultRow({
+  animationIndex,
+  animationTriggerKey,
+  item,
+  onPress,
+}: {
+  animationIndex: number;
+  animationTriggerKey: string;
+  item: SearchCardRecord;
+  onPress: (storeId: string) => void;
+}) {
+  const variants: SearchResultCardVariant[] = item.variants.map((variant) => ({
+    key: variant.key,
+    label: variant.label,
+    value: variant.priceLabel,
+  }));
+
+  return (
+    <View style={styles.resultCardWrap}>
+      <SearchResultListCard
+        actionLabel="View"
+        animationIndex={animationIndex}
+        animationTriggerKey={animationTriggerKey}
+        category={item.category}
+        distance={item.distance}
+        image={item.image}
+        onPress={() => onPress(item.storeId)}
+        primaryText={item.store}
+        secondaryText={item.productName || "Store match"}
+        variants={variants}
+      />
+    </View>
+  );
+});
 
 export default function SearchTab() {
   const router = useRouter();
@@ -31,7 +69,6 @@ export default function SearchTab() {
     const normalizedInitialQuery = normalizeQuery(String(params.q || ""));
     return normalizedInitialQuery ? [normalizedInitialQuery] : [];
   });
-  const [activeId, setActiveId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [remoteResults, setRemoteResults] = useState<SearchCardRecord[]>([]);
@@ -47,10 +84,12 @@ export default function SearchTab() {
       return;
     }
 
-    setRecentSearches((current) => [
-      normalized,
-      ...current.filter((value) => value !== normalized),
-    ].slice(0, 6));
+    setRecentSearches((current) =>
+      [normalized, ...current.filter((value) => value !== normalized)].slice(
+        0,
+        6,
+      ),
+    );
   }, [params.q]);
 
   useEffect(() => {
@@ -77,7 +116,9 @@ export default function SearchTab() {
 
       if (!result.ok) {
         setRemoteResults([]);
-        setErrorMessage(result.error || "Search unavailable");
+        setErrorMessage(
+          result.error || "We couldn't load search results right now.",
+        );
         setIsLoading(false);
         return;
       }
@@ -98,6 +139,10 @@ export default function SearchTab() {
   }, [remoteResults]);
 
   const results = remoteResults;
+  const resultsAnimationKey = useMemo(
+    () => results.map((item) => item.key).join("|"),
+    [results],
+  );
 
   const tooShort = query.trim().length > 0 && query.trim().length < 2;
   const hasQuery = normalizeQuery(query).length >= 2;
@@ -115,102 +160,30 @@ export default function SearchTab() {
   };
 
   const renderResultCard = useCallback(
-    ({ item }: { item: SearchCardRecord }) => {
-      const isActive = activeId === item.key;
+    ({ item, index }: { index: number; item: SearchCardRecord }) => {
       return (
-        <View style={styles.resultCardWrap}>
-          <Pressable
-            onPress={() => {
-              setActiveId(item.key);
-              router.push(`/store/${item.storeId}`);
-            }}
-            style={[styles.resultCard, isActive && styles.resultCardActive]}
-          >
-            <View style={styles.resultCardInner}>
-              {item.image ? (
-                <RemoteProductImage style={styles.resultImage} uri={item.image} />
-              ) : (
-                <RemoteProductImage style={styles.resultImage} />
-              )}
-              <View style={styles.resultMain}>
-                <View style={styles.resultTopRow}>
-                  <View style={styles.resultTopMain}>
-                    <View style={styles.resultStoreRow}>
-                      <Text numberOfLines={1} style={styles.resultStoreName}>
-                        {item.store}
-                      </Text>
-                    </View>
-                    <Text numberOfLines={1} style={styles.resultProductName}>
-                      {item.productName || "Store match"}
-                    </Text>
-                    <View style={styles.resultMetaRow}>
-                      {item.category && (
-                        <Text style={styles.resultMetaText}>
-                          {item.category}
-                        </Text>
-                      )}
-                      {item.distance && (
-                        <Text style={styles.resultMetaText}>
-                          {item.distance}
-                        </Text>
-                      )}
-                    </View>
-                  </View>
-                  <View style={styles.resultAside}>
-                    <Text style={styles.resultAction}>VIEW{"\n"}STORE</Text>
-                  </View>
-                </View>
-                <View style={styles.resultVariantBlock}>
-                  {item.variants.length > 0 ? (
-                    item.variants.map((variant, idx) => (
-                      <View
-                        key={`${variant.key}-${idx}`}
-                        style={styles.resultVariantRow}
-                      >
-                        <Text numberOfLines={1} style={styles.resultVariantLine}>
-                          {variant.label ||
-                            (item.variants.length > 1
-                              ? `Option ${idx + 1}`
-                              : "Available")}
-                        </Text>
-                        {variant.priceLabel && (
-                          <Text style={styles.resultVariantPrice}>
-                            {variant.priceLabel}
-                          </Text>
-                        )}
-                      </View>
-                    ))
-                  ) : (
-                    <View style={styles.resultVariantRow}>
-                      <Text numberOfLines={1} style={styles.resultVariantLine}>
-                        Open this store to view available products
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              </View>
-            </View>
-          </Pressable>
-        </View>
+        <SearchResultRow
+          animationIndex={index}
+          animationTriggerKey={resultsAnimationKey}
+          item={item}
+          onPress={(storeId) => router.push(`/store/${storeId}`)}
+        />
       );
     },
-    [activeId, router],
-  );
-
-  const renderStateCard = (title: string, detail: string) => (
-    <View style={styles.stateCard}>
-      <Text style={styles.stateTitle}>{title}</Text>
-      <Text style={styles.stateDetail}>{detail}</Text>
-    </View>
+    [resultsAnimationKey, router],
   );
 
   const ListEmptyComponent = () => {
-    if (isLoading && hasQuery)
-      return renderStateCard("Searching", "Looking for products near you.");
-    if (tooShort)
-      return renderStateCard("Start typing", "Enter at least 2 characters.");
-    if (errorMessage) return renderStateCard("Unavailable", errorMessage);
-    return renderStateCard("No results", "Try different keywords.");
+    if (isLoading && hasQuery) {
+      return <LoadingCard message="Searching" detail="Looking nearby." />;
+    }
+    if (tooShort) {
+      return <EmptyCard title="Keep typing" detail="Enter 2+ characters." />;
+    }
+    if (errorMessage) {
+      return <ErrorCard title="Search paused" detail={errorMessage} />;
+    }
+    return <EmptyCard title="No results" detail="Try another keyword." />;
   };
 
   return (
@@ -225,7 +198,7 @@ export default function SearchTab() {
               value={query}
               onChangeText={setQuery}
               onSubmitEditing={handleSubmitSearch}
-              placeholder="Search stores and products"
+              placeholder="Search products or stores"
               placeholderTextColor={theme.colors.mutedText}
               selectionColor={theme.colors.accent}
               style={styles.searchInput}
@@ -239,7 +212,7 @@ export default function SearchTab() {
           {recentSearches.length > 0 ? (
             <View style={styles.recentSearchesCard}>
               <View style={styles.recentSearchesHeader}>
-                <Text style={styles.recentSearchesLabel}>RECENT SEARCHES</Text>
+                <Text style={styles.recentSearchesLabel}>RECENT</Text>
                 <TouchableOpacity
                   activeOpacity={0.85}
                   onPress={() => setRecentSearches([])}
@@ -266,10 +239,8 @@ export default function SearchTab() {
 
           {showIdle ? (
             <View style={styles.idleContent}>
-              <Text style={styles.idleTitle}>Search stores and products</Text>
-              <Text style={styles.idleSubtitle}>
-                Discover what&apos;s nearby
-              </Text>
+              <Text style={styles.idleTitle}>Search</Text>
+              <Text style={styles.idleSubtitle}>Stores and products</Text>
             </View>
           ) : (
             <FlatList
@@ -300,10 +271,10 @@ const styles = StyleSheet.create({
   searchTopBar: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 14,
+    gap: 12,
     paddingHorizontal: 20,
     paddingTop: 12,
-    paddingBottom: 18,
+    paddingBottom: 16,
   },
   backButton: {
     width: 56,
@@ -315,18 +286,18 @@ const styles = StyleSheet.create({
   },
   searchShell: {
     flex: 1,
-    height: 64,
-    borderRadius: 18,
+    minHeight: theme.controls.inputHeight,
+    borderRadius: theme.form.inputRadius,
     borderWidth: 1,
-    borderColor: theme.colors.borderStrong,
-    backgroundColor: theme.colors.surfaceCard,
+    borderColor: theme.form.inputBorder,
+    backgroundColor: theme.form.inputBackground,
     justifyContent: "center",
-    paddingHorizontal: 18,
+    paddingHorizontal: 16,
   },
   searchInput: {
     flex: 1,
     color: theme.colors.text,
-    fontSize: 17,
+    fontSize: 15,
     fontWeight: "500",
     paddingVertical: 0,
   },
@@ -404,115 +375,8 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
     flexGrow: 1,
   },
-  resultCardWrap: {},
-  resultCard: {
+  resultCardWrap: {
     marginBottom: 10,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: theme.colors.borderStrong,
-    backgroundColor: theme.colors.surfaceCard,
-    padding: 16,
-  },
-  resultCardActive: {
-    borderColor: "rgba(120,163,255,0.30)",
-  },
-  resultCardInner: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 14,
-  },
-  resultImage: {
-    width: 54,
-    height: 54,
-    borderRadius: 14,
-    backgroundColor: "rgba(255,255,255,0.14)",
-    resizeMode: "cover",
-  },
-  resultImageFallback: {
-    width: 54,
-    height: 54,
-    borderRadius: 14,
-    backgroundColor: "rgba(74,136,255,0.14)",
-    borderWidth: 1,
-    borderColor: theme.colors.borderSoft,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  resultImageFallbackText: {
-    color: theme.colors.text,
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  resultMain: {
-    flex: 1,
-    paddingTop: 2,
-  },
-  resultTopRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  resultTopMain: {
-    flex: 1,
-  },
-  resultStoreRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  resultStoreName: {
-    flex: 1,
-    color: theme.colors.text,
-    fontSize: 15,
-    fontWeight: "800",
-  },
-  resultProductName: {
-    marginTop: 4,
-    color: "#E8EEF8",
-    fontSize: 14,
-    fontWeight: "700",
-  },
-  resultMetaRow: {
-    flexDirection: "row",
-    gap: 12,
-    marginTop: 4,
-  },
-  resultMetaText: {
-    color: theme.colors.mutedText,
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  resultVariantBlock: {
-    marginTop: 12,
-    gap: 8,
-  },
-  resultVariantRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  resultVariantLine: {
-    flex: 1,
-    color: "#B8C2D9",
-    fontSize: 14,
-  },
-  resultVariantPrice: {
-    color: theme.colors.text,
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  resultAside: {
-    alignItems: "flex-end",
-    paddingTop: 2,
-  },
-  resultAction: {
-    color: "#B8C2D9",
-    fontSize: 12,
-    fontWeight: "700",
-    textTransform: "uppercase",
-    textAlign: "right",
-    lineHeight: 14,
   },
   stateCard: {
     borderRadius: 22,

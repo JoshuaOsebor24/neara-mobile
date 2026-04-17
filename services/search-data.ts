@@ -1,6 +1,9 @@
-import { searchProducts } from "@/services/search-api";
+import {
+    getCachedUserLocation,
+    type UserCoordinates,
+} from "@/services/location";
 import { parseCoordinate } from "@/services/map-links";
-import { getCachedUserLocation, type UserCoordinates } from "@/services/location";
+import { searchProducts } from "@/services/search-api";
 
 const SEARCH_CACHE_TTL_MS = 15_000;
 
@@ -100,7 +103,10 @@ function parseOptionalNumber(value: number | string | null | undefined) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function formatDistanceLabel(distanceKm: number | null | undefined, fallback = "") {
+function formatDistanceLabel(
+  distanceKm: number | null | undefined,
+  fallback = "",
+) {
   if (typeof distanceKm === "number" && Number.isFinite(distanceKm)) {
     return `${distanceKm.toFixed(distanceKm < 10 ? 1 : 0)} km`;
   }
@@ -157,13 +163,14 @@ function normalizeSearchItems(
           : null,
       kind:
         item.match_source === "store" ||
-        (item.product_id === null || item.product_id === undefined) &&
-          !(typeof item.product_name === "string" && item.product_name.trim())
+        ((item.product_id === null || item.product_id === undefined) &&
+          !(typeof item.product_name === "string" && item.product_name.trim()))
           ? ("store" as const)
           : ("product" as const),
       latitude: parseCoordinate(item.latitude),
       longitude: parseCoordinate(item.longitude),
-      matchSource: typeof item.match_source === "string" ? item.match_source : "",
+      matchSource:
+        typeof item.match_source === "string" ? item.match_source : "",
       price: parseOptionalNumber(item.price),
       productId:
         item.product_id === null || item.product_id === undefined
@@ -174,22 +181,7 @@ function normalizeSearchItems(
       storeId: String(item.store_id),
       storeName: item.store_name || "",
       variant: item.variant_name || item.variant || "",
-    }))
-    .sort((left, right) => {
-      if (left.distanceKm !== null && right.distanceKm !== null) {
-        return left.distanceKm - right.distanceKm;
-      }
-
-      if (left.distanceKm !== null) {
-        return -1;
-      }
-
-      if (right.distanceKm !== null) {
-        return 1;
-      }
-
-      return left.storeName.localeCompare(right.storeName);
-    });
+    }));
 }
 
 export function groupSearchResultCards(items: SearchResultRecord[]) {
@@ -205,9 +197,7 @@ export function groupSearchResultCards(items: SearchResultRecord[]) {
         : `${item.storeId}::${normalizedProductName}`;
     const priceLabel =
       item.price !== null ? formatPrice(item.price) : undefined;
-    const variantLabel = isStoreMatch
-      ? null
-      : item.variant.trim() || null;
+    const variantLabel = isStoreMatch ? null : item.variant.trim() || null;
     const variantKey = `${item.id}::${variantLabel || "base"}::${priceLabel || "no-price"}`;
     const existing = groups.get(key);
 

@@ -243,7 +243,7 @@ export default function UpgradeScreen() {
                           return;
                         }
 
-                        updateMobileSession(
+                        await updateMobileSession(
                           buildSessionPatchFromAuthUser(
                             verifyResult.user,
                             session.authToken,
